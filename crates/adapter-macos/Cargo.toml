@@ -1,0 +1,7 @@
+[package]
+name = "cueward-adapter-macos"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+cueward-core = { path = "../core" }
