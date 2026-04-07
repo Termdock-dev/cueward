@@ -100,7 +100,8 @@ pub fn update(title: &str, body: &str) -> Result<(), MacosError> {
     let folder = find_folder(title)?;
     let escaped_title = escape(title);
     let escaped_folder = escape(&folder);
-    let body_expr = escape_body(&format!("<h1>{title}</h1><br>{body}"));
+    let html_title = title.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+    let body_expr = escape_body(&format!("<h1>{html_title}</h1><br>{body}"));
 
     let script = format!(
         r#"
