@@ -324,11 +324,12 @@ fn main() {
             }
 
             if notify {
-                let preview = if body.chars().count() > 100 {
-                    let truncated: String = body.chars().take(100).collect();
+                let flat = body.replace('\n', " ");
+                let preview = if flat.chars().count() > 100 {
+                    let truncated: String = flat.chars().take(100).collect();
                     format!("{truncated}...")
                 } else {
-                    body.clone()
+                    flat
                 };
                 if let Err(e) = cueward_adapter_macos::send::notify(&title, &preview) {
                     eprintln!("warning: notification failed: {e}");
