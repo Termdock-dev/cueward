@@ -5,6 +5,7 @@ pub mod applescript;
 pub mod send;
 pub mod plan;
 pub mod ocr;
+pub mod quick_notes;
 mod error;
 
 pub use error::MacosError;

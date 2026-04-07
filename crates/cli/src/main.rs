@@ -84,6 +84,12 @@ enum Command {
         #[command(subcommand)]
         action: NotesAction,
     },
+
+    /// Manage Quick Notes (快速備忘錄)
+    QuickNotes {
+        #[command(subcommand)]
+        action: QuickNotesAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -127,6 +133,41 @@ enum NotesAction {
         /// Destination folder
         #[arg(long)]
         to: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum QuickNotesAction {
+    /// List all Quick Notes
+    List,
+
+    /// Create a new Quick Note
+    Create {
+        /// Note title
+        #[arg(long)]
+        title: String,
+
+        /// Note body
+        #[arg(long)]
+        body: String,
+    },
+
+    /// Update a Quick Note's body
+    Update {
+        /// Note title to find
+        #[arg(long)]
+        title: String,
+
+        /// New body content
+        #[arg(long)]
+        body: String,
+    },
+
+    /// Delete a Quick Note
+    Delete {
+        /// Note title to find
+        #[arg(long)]
+        title: String,
     },
 }
 
@@ -387,6 +428,53 @@ fn main() {
             NotesAction::Move { title, from, to } => {
                 match cueward_adapter_macos::send::move_note(&title, &from, &to) {
                     Ok(()) => eprintln!("note moved: {title} ({from} -> {to})"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+        },
+
+        Command::QuickNotes { action } => match action {
+            QuickNotesAction::List => {
+                match cueward_adapter_macos::quick_notes::list() {
+                    Ok(notes) => {
+                        if notes.is_empty() {
+                            eprintln!("no quick notes found");
+                        } else {
+                            let count = notes.len();
+                            println!("{}", serde_json::to_string_pretty(&notes).unwrap());
+                            eprintln!("{count} quick note(s)");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            QuickNotesAction::Create { title, body } => {
+                match cueward_adapter_macos::quick_notes::create(&title, &body) {
+                    Ok(()) => eprintln!("quick note created: {title}"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            QuickNotesAction::Update { title, body } => {
+                match cueward_adapter_macos::quick_notes::update(&title, &body) {
+                    Ok(()) => eprintln!("quick note updated: {title}"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            QuickNotesAction::Delete { title } => {
+                match cueward_adapter_macos::quick_notes::delete(&title) {
+                    Ok(()) => eprintln!("quick note deleted: {title}"),
                     Err(e) => {
                         eprintln!("error: {e}");
                         process::exit(1);
