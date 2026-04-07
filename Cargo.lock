@@ -287,6 +287,8 @@ dependencies = [
  "chrono",
  "cueward-core",
  "rusqlite",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,6 +1,9 @@
 mod safari;
 mod notes;
 mod messages;
+pub mod send;
+pub mod plan;
+pub mod ocr;
 mod error;
 
 pub use error::MacosError;
