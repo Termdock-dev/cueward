@@ -71,6 +71,7 @@ cueward search "<query>" --limit <N>
 
 - Returns JSON objects to stdout, one per line
 - Best for English keyword searches; Chinese content works but tokenization is basic
+- Search results include: source, timestamp, title, content, url, tags — but NOT metadata fields (sender, folder, direction). For full metadata, use `capture` output directly
 
 ## Workflow Patterns
 

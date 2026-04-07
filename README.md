@@ -116,7 +116,7 @@ cueward capture --source all --since 24h | gemini "Group these by topic and high
 A reference skill for Claude Code is included in `skills/cueward-agent/`. Copy it to your skills directory to teach Claude how to use Cueward automatically:
 
 ```bash
-cp -r skills/cueward-agent ~/.claude/skills/
+mkdir -p ~/.claude/skills/ && cp -r skills/cueward-agent ~/.claude/skills/
 ```
 
 ## Architecture
