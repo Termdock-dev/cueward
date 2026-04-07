@@ -21,10 +21,10 @@ Requires Rust 1.85+ (edition 2024).
 Cueward reads local databases that require Full Disk Access:
 
 1. Open **System Settings > Privacy & Security > Full Disk Access**
-2. Add your terminal app (Terminal.app, iTerm2, WezTerm, etc.)
+2. Add your terminal app (Termdock, Terminal.app, iTerm2, WezTerm, etc.)
 
-For Apple Notes capture, also allow automation:
-- **System Settings > Privacy & Security > Automation** > allow your terminal to control Notes
+For Apple Notes and Reminders operations, also allow automation:
+- **System Settings > Privacy & Security > Automation** > allow your terminal to control Notes and Reminders
 
 ## Usage
 
@@ -166,6 +166,7 @@ cueward quick-notes create --title "Title" --body "Content"
 
 Quick Notes are identified by the system `ZISSYSTEMPAPER` flag — notes created via the macOS Quick Note gesture (hot corner, Apple Pencil, etc.). `list`, `update`, and `delete` operate on these system-tagged notes regardless of which folder they reside in. `create` places a regular note in the "Quick Notes" folder but does not mark it as a system Quick Note.
 
+
 ## Agent Integration
 
 Cueward outputs structured JSON — it does not call any LLM. The LLM layer is your Agent's responsibility.
@@ -200,7 +201,7 @@ crates/
 ```
 
 - **Core Engine + Adapter Pattern**: Platform-specific code is isolated in adapters. Core logic is platform-agnostic.
-- **Native First**: Direct SQLite reads and AppleScript. No web scraping, no browser automation.
+- **Native First**: Direct SQLite reads, AppleScript, and Vision Framework. No web scraping, no browser automation.
 - **Privacy**: All data extraction happens locally. Nothing leaves your machine.
 
 ## Data Storage

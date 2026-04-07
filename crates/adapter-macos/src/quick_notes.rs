@@ -21,6 +21,8 @@ fn db_path() -> Result<PathBuf, MacosError> {
 fn query_db(sql: &str) -> Result<String, MacosError> {
     let path = db_path()?;
     let output = Command::new("/usr/bin/sqlite3")
+        .arg("-separator")
+        .arg("\t")
         .arg(path)
         .arg(sql)
         .output()
@@ -50,7 +52,7 @@ pub fn list() -> Result<Vec<QuickNote>, MacosError> {
         .lines()
         .filter(|line| !line.is_empty())
         .filter_map(|line| {
-            let mut parts = line.splitn(2, '|');
+            let mut parts = line.splitn(2, '\t');
             let title = parts.next()?.to_string();
             let folder = parts.next().unwrap_or("").to_string();
             if title.is_empty() {
