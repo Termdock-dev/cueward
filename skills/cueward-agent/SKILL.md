@@ -143,7 +143,7 @@ cueward quick-notes delete --title "Note Title"
 cueward quick-notes create --title "Title" --body "Content"
 ```
 
-- `list` outputs one line per note: `[folder] title`
+- `list` outputs a JSON array of `{"title": "...", "folder": "..."}` objects to stdout
 - `update` and `delete` locate the note by title using the system Quick Note flag — no folder needed
 - `create` places a regular note in the "Quick Notes" folder; it will NOT appear in the system Quick Notes smart folder (快速備忘錄) unless created via macOS gesture
 
