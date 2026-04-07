@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use crate::applescript::escape;
+use crate::applescript::{escape, escape_body, run};
 use crate::send;
 use crate::MacosError;
 
@@ -10,15 +10,16 @@ pub struct QuickNote {
     pub folder: String,
 }
 
-fn db_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    PathBuf::from(home)
-        .join("Library/Group Containers/group.com.apple.notes/NoteStore.sqlite")
+fn db_path() -> Result<PathBuf, MacosError> {
+    let home = std::env::var("HOME")
+        .map_err(|_| MacosError::Other("HOME environment variable not set".to_string()))?;
+    Ok(PathBuf::from(home)
+        .join("Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"))
 }
 
 /// Run a read-only SQLite query via the sqlite3 CLI to get consistent WAL reads.
 fn query_db(sql: &str) -> Result<String, MacosError> {
-    let path = db_path();
+    let path = db_path()?;
     let output = Command::new("/usr/bin/sqlite3")
         .arg(path)
         .arg(sql)
@@ -97,31 +98,18 @@ pub fn update(title: &str, body: &str) -> Result<(), MacosError> {
     let folder = find_folder(title)?;
     let escaped_title = escape(title);
     let escaped_folder = escape(&folder);
-    let escaped_body = escape(body);
+    let body_expr = escape_body(&format!("<h1>{title}</h1><br>{body}"));
 
     let script = format!(
         r#"
         tell application "Notes"
             set theNote to (first note of folder "{escaped_folder}" whose name is "{escaped_title}")
-            set body of theNote to "<h1>{escaped_title}</h1><br>{escaped_body}"
+            set body of theNote to {body_expr}
         end tell
         "#
     );
 
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(&script)
-        .output()
-        .map_err(|e| MacosError::Other(format!("osascript: {e}")))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(MacosError::Other(format!(
-            "failed to update quick note: {stderr}"
-        )));
-    }
-
-    Ok(())
+    run(&script, "failed to update quick note")
 }
 
 /// Delete a Quick Note.
