@@ -443,10 +443,9 @@ fn main() {
                         if notes.is_empty() {
                             eprintln!("no quick notes found");
                         } else {
-                            for n in &notes {
-                                println!("[{}] {}", n.folder, n.title);
-                            }
-                            eprintln!("{} quick note(s)", notes.len());
+                            let count = notes.len();
+                            println!("{}", serde_json::to_string_pretty(&notes).unwrap());
+                            eprintln!("{count} quick note(s)");
                         }
                     }
                     Err(e) => {

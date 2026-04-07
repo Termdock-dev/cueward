@@ -5,6 +5,7 @@ use crate::applescript::{escape, escape_body, run};
 use crate::send;
 use crate::MacosError;
 
+#[derive(serde::Serialize)]
 pub struct QuickNote {
     pub title: String,
     pub folder: String,
@@ -21,6 +22,7 @@ fn db_path() -> Result<PathBuf, MacosError> {
 fn query_db(sql: &str) -> Result<String, MacosError> {
     let path = db_path()?;
     let output = Command::new("/usr/bin/sqlite3")
+        .arg("-readonly")
         .arg("-separator")
         .arg("\t")
         .arg(path)
@@ -44,8 +46,8 @@ pub fn list() -> Result<Vec<QuickNote>, MacosError> {
          LEFT JOIN ZICCLOUDSYNCINGOBJECT f ON n.ZFOLDER = f.Z_PK
          WHERE n.Z_ENT = 11
            AND n.ZISSYSTEMPAPER = 1
-           AND n.ZMARKEDFORDELETION != 1
-           AND f.ZTITLE2 != 'Recently Deleted'",
+           AND COALESCE(n.ZMARKEDFORDELETION, 0) != 1
+           AND (f.ZTITLE2 IS NULL OR f.ZTITLE2 != 'Recently Deleted')",
     )?;
 
     let notes = raw
@@ -74,7 +76,7 @@ fn find_folder(title: &str) -> Result<String, MacosError> {
          JOIN ZICCLOUDSYNCINGOBJECT f ON n.ZFOLDER = f.Z_PK
          WHERE n.Z_ENT = 11
            AND n.ZISSYSTEMPAPER = 1
-           AND n.ZMARKEDFORDELETION != 1
+           AND COALESCE(n.ZMARKEDFORDELETION, 0) != 1
            AND f.ZTITLE2 != 'Recently Deleted'
            AND n.ZTITLE1 = '{escaped}'
          LIMIT 1"
