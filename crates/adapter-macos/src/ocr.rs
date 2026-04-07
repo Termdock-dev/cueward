@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::io::Write;
 use std::process::Command;
 
 use chrono::Utc;
@@ -9,6 +9,8 @@ use cueward_core::{Cue, CueSource};
 
 use crate::MacosError;
 
+const OCR_SCRIPT: &str = include_str!("../scripts/ocr.swift");
+
 #[derive(Debug, Deserialize)]
 struct OcrResult {
     text: String,
@@ -17,18 +19,18 @@ struct OcrResult {
 
 /// Run Vision OCR on an image or PDF file, returning Cues.
 pub fn capture(path: &str) -> Result<Vec<Cue>, MacosError> {
-    if !Path::new(path).exists() {
-        return Err(MacosError::PermissionDenied(format!(
-            "file not found: {path}"
-        )));
-    }
+    let abs_path = std::fs::canonicalize(path)
+        .map_err(|_| MacosError::PermissionDenied(format!("file not found: {path}")))?;
 
-    // Find the ocr.swift script relative to the binary or fall back to common locations
-    let script = find_ocr_script()?;
+    // Write embedded script to temp file
+    let mut tmp = tempfile::NamedTempFile::with_suffix(".swift")
+        .map_err(|e| MacosError::PermissionDenied(format!("failed to create temp file: {e}")))?;
+    tmp.write_all(OCR_SCRIPT.as_bytes())
+        .map_err(|e| MacosError::PermissionDenied(format!("failed to write script: {e}")))?;
 
     let output = Command::new("swift")
-        .arg(&script)
-        .arg(path)
+        .arg(tmp.path())
+        .arg(&abs_path)
         .output()
         .map_err(|e| MacosError::PermissionDenied(format!("swift: {e}")))?;
 
@@ -38,6 +40,12 @@ pub fn capture(path: &str) -> Result<Vec<Cue>, MacosError> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
+    if stdout.trim().is_empty() {
+        return Err(MacosError::PermissionDenied(
+            "OCR produced no output (Swift encoder may have failed)".into(),
+        ));
+    }
+
     let results: Vec<OcrResult> = serde_json::from_str(&stdout)
         .map_err(|e| MacosError::PermissionDenied(format!("failed to parse OCR output: {e}")))?;
 
@@ -52,48 +60,17 @@ pub fn capture(path: &str) -> Result<Vec<Cue>, MacosError> {
         return Ok(Vec::new());
     }
 
-    let filename = Path::new(path)
+    let filename = abs_path
         .file_name()
         .map(|f| f.to_string_lossy().into_owned());
 
     Ok(vec![Cue {
-        source: CueSource::Safari, // Reuse safari as generic source for now
+        source: CueSource::Ocr,
         timestamp: Utc::now(),
         content: text,
-        url: Some(format!("file://{path}")),
+        url: Some(format!("file://{}", abs_path.display())),
         title: filename,
         tags: Vec::new(),
         metadata: HashMap::from([("ocr".into(), "true".into())]),
     }])
-}
-
-fn find_ocr_script() -> Result<String, MacosError> {
-    // Check common locations
-    let candidates = [
-        // Relative to the repo
-        "crates/adapter-macos/scripts/ocr.swift",
-        // Installed location
-        "/usr/local/share/cueward/ocr.swift",
-    ];
-
-    for path in &candidates {
-        if Path::new(path).exists() {
-            return Ok(path.to_string());
-        }
-    }
-
-    // Try to find via the binary's location
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let script = dir.join("ocr.swift");
-            if script.exists() {
-                return Ok(script.to_string_lossy().into_owned());
-            }
-        }
-    }
-
-    Err(MacosError::PermissionDenied(
-        "ocr.swift not found. Ensure it's in the scripts/ directory or /usr/local/share/cueward/"
-            .into(),
-    ))
 }

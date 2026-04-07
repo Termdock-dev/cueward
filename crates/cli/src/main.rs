@@ -324,8 +324,9 @@ fn main() {
             }
 
             if notify {
-                let preview = if body.len() > 100 {
-                    format!("{}...", &body[..100])
+                let preview = if body.chars().count() > 100 {
+                    let truncated: String = body.chars().take(100).collect();
+                    format!("{truncated}...")
                 } else {
                     body.clone()
                 };

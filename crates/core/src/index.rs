@@ -61,6 +61,7 @@ impl CueIndex {
                 crate::CueSource::Safari => "safari",
                 crate::CueSource::Notes => "notes",
                 crate::CueSource::Messages => "messages",
+                crate::CueSource::Ocr => "ocr",
             };
             writer.add_document(doc!(
                 source => source_str,

@@ -92,7 +92,15 @@ guard args.count > 1 else {
 let results = ocrImage(args[1])
 let encoder = JSONEncoder()
 encoder.outputFormatting = .prettyPrinted
-if let data = try? encoder.encode(results),
-   let json = String(data: data, encoding: .utf8) {
-    print(json)
+do {
+    let data = try encoder.encode(results)
+    if let json = String(data: data, encoding: .utf8) {
+        print(json)
+    } else {
+        fputs("error: failed to encode JSON as UTF-8\n", stderr)
+        exit(1)
+    }
+} catch {
+    fputs("error: JSON encoding failed: \(error)\n", stderr)
+    exit(1)
 }
