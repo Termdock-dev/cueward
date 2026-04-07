@@ -21,10 +21,10 @@ Requires Rust 1.85+ (edition 2024).
 Cueward reads local databases that require Full Disk Access:
 
 1. Open **System Settings > Privacy & Security > Full Disk Access**
-2. Add your terminal app (Terminal.app, iTerm2, WezTerm, etc.)
+2. Add your terminal app (Termdock, Terminal.app, iTerm2, WezTerm, etc.)
 
-For Apple Notes capture, also allow automation:
-- **System Settings > Privacy & Security > Automation** > allow your terminal to control Notes
+For Apple Notes and Reminders operations, also allow automation:
+- **System Settings > Privacy & Security > Automation** > allow your terminal to control Notes and Reminders
 
 ## Usage
 
@@ -97,6 +97,55 @@ Query the local index:
 cueward search "rust concurrency" --limit 5
 ```
 
+### Send
+
+Create a digest note in Apple Notes and optionally trigger a macOS notification:
+
+```bash
+# Create a note
+cueward send --title "Daily Digest" --body "Today's summary..." --folder Cueward
+
+# With notification
+cueward send --title "Daily Digest" --body "Summary" --notify
+
+# Pipe from capture
+cueward capture --source all --since 24h | cueward send --title "2026-04-07 Digest"
+```
+
+### Plan
+
+Create a reminder in Apple Reminders:
+
+```bash
+cueward plan --title "Review PR" --notes "Check bot comments" --list Cueward
+```
+
+### OCR
+
+Extract text from images or PDFs via Apple Vision Framework:
+
+```bash
+cueward ocr ~/Desktop/screenshot.png
+cueward ocr ~/Documents/paper.pdf
+```
+
+Supports PNG, JPG, PDF. Languages: zh-Hant, zh-Hans, en-US, ja.
+
+### Notes Management
+
+Update, delete, or move Apple Notes:
+
+```bash
+# Update a note's body
+cueward notes update --title "Note Title" --body "New content" --folder Cueward
+
+# Delete a note
+cueward notes delete --title "Note Title" --folder Cueward
+
+# Move between folders
+cueward notes move --title "Note Title" --from Cueward --to Archive
+```
+
 ## Agent Integration
 
 Cueward outputs structured JSON — it does not call any LLM. The LLM layer is your Agent's responsibility.
@@ -124,13 +173,14 @@ mkdir -p ~/.claude/skills/ && cp -r skills/cueward-agent ~/.claude/skills/
 ```
 crates/
 ├── core/            Cue struct, PlatformAdapter trait, BM25 index, auto-tagger
-├── cli/             clap CLI (capture, triage, search)
-├── adapter-macos/   Safari (SQLite), Notes (AppleScript), Messages (SQLite)
+├── cli/             clap CLI (capture, triage, search, send, plan, ocr, notes)
+├── adapter-macos/   Safari (SQLite), Notes (AppleScript), Messages (SQLite),
+│                    Reminders (AppleScript), Vision OCR (Swift)
 └── adapter-windows/ Reserved for future cross-platform support
 ```
 
 - **Core Engine + Adapter Pattern**: Platform-specific code is isolated in adapters. Core logic is platform-agnostic.
-- **Native First**: Direct SQLite reads and AppleScript. No web scraping, no browser automation.
+- **Native First**: Direct SQLite reads, AppleScript, and Vision Framework. No web scraping, no browser automation.
 - **Privacy**: All data extraction happens locally. Nothing leaves your machine.
 
 ## Data Storage

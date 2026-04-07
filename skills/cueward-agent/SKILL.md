@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Use Cueward CLI to capture, triage, and search the user's scattered knowledge from Safari, Apple Notes, and iMessage. Trigger when the user asks about their browsing history, recent notes, messages, or wants to organize/search their daily knowledge intake. Also use when the user says things like "what did I read today", "find that article I saw", "summarize my knowledge intake", or "help me organize what I've been looking at".
+description: Use Cueward CLI to capture, triage, search, and manage the user's scattered knowledge from Safari, Apple Notes, and iMessage. Also supports OCR (images/PDFs), creating Notes and Reminders, and managing notes (update/delete/move). Trigger when the user asks about their browsing history, recent notes, messages, wants to organize knowledge, create a digest, set reminders from captured content, extract text from images/PDFs, or manage Apple Notes. Also use when the user says things like "what did I read today", "find that article I saw", "summarize my knowledge intake", "help me organize what I've been looking at", "create a reminder for this", "write a summary note", or "OCR this screenshot".
 ---
 
 # Cueward Agent Skill
