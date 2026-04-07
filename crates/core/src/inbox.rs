@@ -11,7 +11,7 @@ fn inbox_dir() -> PathBuf {
 pub fn save(cues: &[Cue]) -> std::io::Result<PathBuf> {
     let dir = inbox_dir();
     fs::create_dir_all(&dir)?;
-    let filename = format!("{}.json", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
+    let filename = format!("{}.json", chrono::Utc::now().format("%Y%m%d-%H%M%S%.3f"));
     let path = dir.join(&filename);
     let json = serde_json::to_string_pretty(cues)?;
     fs::write(&path, json)?;

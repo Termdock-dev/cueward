@@ -171,7 +171,9 @@ fn main() {
                 }
 
                 if let Err(e) = inbox::mark_done(&path) {
-                    eprintln!("warning: failed to move {}: {e}", path.display());
+                    eprintln!("error: failed to move {}: {e}", path.display());
+                    eprintln!("aborting to prevent duplicate indexing on next triage run");
+                    process::exit(1);
                 }
             }
 

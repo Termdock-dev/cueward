@@ -34,7 +34,13 @@ impl Tagger {
     pub fn load() -> Option<Self> {
         let path = Self::config_path();
         let content = fs::read_to_string(&path).ok()?;
-        let config: TagsConfig = toml::from_str(&content).ok()?;
+        let config: TagsConfig = match toml::from_str(&content) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("warning: failed to parse {}: {e}", path.display());
+                return None;
+            }
+        };
 
         let mut tag_names = Vec::new();
         let mut patterns = Vec::new();

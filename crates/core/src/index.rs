@@ -57,9 +57,13 @@ impl CueIndex {
 
         let mut count = 0;
         for cue in cues {
-            let source_str = serde_json::to_string(&cue.source).unwrap_or_default();
+            let source_str = match cue.source {
+                crate::CueSource::Safari => "safari",
+                crate::CueSource::Notes => "notes",
+                crate::CueSource::Messages => "messages",
+            };
             writer.add_document(doc!(
-                source => source_str.trim_matches('"'),
+                source => source_str,
                 timestamp => cue.timestamp.to_rfc3339(),
                 title => cue.title.as_deref().unwrap_or(""),
                 content => cue.content.as_str(),
