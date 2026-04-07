@@ -20,34 +20,34 @@ struct OcrResult {
 /// Run Vision OCR on an image or PDF file, returning Cues.
 pub fn capture(path: &str) -> Result<Vec<Cue>, MacosError> {
     let abs_path = std::fs::canonicalize(path)
-        .map_err(|_| MacosError::PermissionDenied(format!("file not found: {path}")))?;
+        .map_err(|_| MacosError::Other(format!("file not found: {path}")))?;
 
     // Write embedded script to temp file
     let mut tmp = tempfile::NamedTempFile::with_suffix(".swift")
-        .map_err(|e| MacosError::PermissionDenied(format!("failed to create temp file: {e}")))?;
+        .map_err(|e| MacosError::Other(format!("failed to create temp file: {e}")))?;
     tmp.write_all(OCR_SCRIPT.as_bytes())
-        .map_err(|e| MacosError::PermissionDenied(format!("failed to write script: {e}")))?;
+        .map_err(|e| MacosError::Other(format!("failed to write script: {e}")))?;
 
     let output = Command::new("swift")
         .arg(tmp.path())
         .arg(&abs_path)
         .output()
-        .map_err(|e| MacosError::PermissionDenied(format!("swift: {e}")))?;
+        .map_err(|e| MacosError::Other(format!("swift: {e}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(MacosError::PermissionDenied(format!("OCR failed: {stderr}")));
+        return Err(MacosError::Other(format!("OCR failed: {stderr}")));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     if stdout.trim().is_empty() {
-        return Err(MacosError::PermissionDenied(
+        return Err(MacosError::Other(
             "OCR produced no output (Swift encoder may have failed)".into(),
         ));
     }
 
     let results: Vec<OcrResult> = serde_json::from_str(&stdout)
-        .map_err(|e| MacosError::PermissionDenied(format!("failed to parse OCR output: {e}")))?;
+        .map_err(|e| MacosError::Other(format!("failed to parse OCR output: {e}")))?;
 
     let text: String = results
         .iter()

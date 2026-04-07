@@ -5,6 +5,7 @@ pub enum MacosError {
     Sqlite(rusqlite::Error),
     PermissionDenied(String),
     NotImplemented(&'static str),
+    Other(String),
 }
 
 impl fmt::Display for MacosError {
@@ -18,6 +19,7 @@ impl fmt::Display for MacosError {
                  System Settings > Privacy & Security > Full Disk Access"
             ),
             Self::NotImplemented(name) => write!(f, "{name}: not yet implemented"),
+            Self::Other(msg) => write!(f, "{msg}"),
         }
     }
 }

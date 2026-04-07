@@ -1,36 +1,5 @@
-use std::process::Command;
-
+use crate::applescript::{escape, escape_body, run};
 use crate::MacosError;
-
-fn escape(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
-fn escape_body(s: &str) -> String {
-    // AppleScript doesn't support \n in strings.
-    // Split on newlines and join with `& linefeed &`.
-    let parts: Vec<String> = s.split('\n').map(|line| {
-        format!("\"{}\"", escape(line))
-    }).collect();
-    parts.join(" & linefeed & ")
-}
-
-fn run_osascript(script: &str, context: &str) -> Result<(), MacosError> {
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()
-        .map_err(|e| MacosError::PermissionDenied(format!("osascript: {e}")))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(MacosError::PermissionDenied(format!(
-            "{context}: {stderr}"
-        )));
-    }
-
-    Ok(())
-}
 
 /// Create a note in Apple Notes with the given title and body.
 pub fn create_note(title: &str, body: &str, folder: &str) -> Result<(), MacosError> {
@@ -52,7 +21,7 @@ pub fn create_note(title: &str, body: &str, folder: &str) -> Result<(), MacosErr
         "#
     );
 
-    run_osascript(&script, "failed to create note")
+    run(&script, "failed to create note")
 }
 
 /// Update an existing note's body by title.
@@ -70,7 +39,7 @@ pub fn update_note(title: &str, body: &str, folder: &str) -> Result<(), MacosErr
         "#
     );
 
-    run_osascript(&script, "failed to update note")
+    run(&script, "failed to update note")
 }
 
 /// Delete a note by title from a specific folder.
@@ -86,7 +55,7 @@ pub fn delete_note(title: &str, folder: &str) -> Result<(), MacosError> {
         "#
     );
 
-    run_osascript(&script, "failed to delete note")
+    run(&script, "failed to delete note")
 }
 
 /// Move a note to a different folder.
@@ -110,7 +79,7 @@ pub fn move_note(title: &str, from_folder: &str, to_folder: &str) -> Result<(), 
         "#
     );
 
-    run_osascript(&script, "failed to move note")
+    run(&script, "failed to move note")
 }
 
 /// Send a macOS notification via osascript.
@@ -122,5 +91,5 @@ pub fn notify(title: &str, message: &str) -> Result<(), MacosError> {
         r#"display notification "{escaped_msg}" with title "{escaped_title}""#
     );
 
-    run_osascript(&script, "notification failed")
+    run(&script, "notification failed")
 }
