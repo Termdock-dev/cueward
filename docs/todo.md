@@ -10,26 +10,28 @@
 - 專業品味：極簡、專業，Rust Edition 2024。
 
 ## Phase 0：Foundation（基礎建設）
-- [ ] 定義 `Cue` struct（source, timestamp, content, url, metadata/tags）
-- [ ] 定義 `PlatformAdapter` trait（capture_browser_history, capture_notes 等）
-- [ ] CLI 用 clap 建立 subcommand 骨架（capture/triage）
-- [ ] 定義統一的 JSON 輸出格式
+- [x] 定義 `Cue` struct（source, timestamp, content, url, metadata/tags）
+- [x] 定義 `PlatformAdapter` trait（capture_browser_history, capture_notes 等）
+- [x] CLI 用 clap 建立 subcommand 骨架（capture/triage）
+- [x] 定義統一的 JSON 輸出格式
 
 ## Phase 1：Capture — Safari History
-- [ ] macOS adapter 實作 capture_browser_history（Safari History.db SQLite）
-- [ ] TCC 權限錯誤處理（Full Disk Access 提示）
-- [ ] High Watermark 狀態管理（~/.cueward/state.json）
-- [ ] CLI 整合：capture subcommand 呼叫 adapter 輸出 JSON
+- [x] macOS adapter 實作 capture_browser_history（Safari History.db SQLite）
+- [x] TCC 權限錯誤處理（Full Disk Access 提示）
+- [x] High Watermark 狀態管理（~/.cueward/state.json）
+- [x] CLI 整合：capture subcommand 呼叫 adapter 輸出 JSON
 
 ## Phase 2：Capture — Apple Notes + iMessage
-- [ ] 實作 capture_notes（AppleScript）
-- [ ] 實作 capture_messages（chat.db SQLite）
-- [ ] cueward capture --source all 同時收集三種來源
+- [x] 實作 capture_notes（AppleScript）
+- [x] 實作 capture_messages（chat.db SQLite）
+- [x] cueward capture --source all 同時收集三種來源
 
 ## Phase 3：Triage — 本地預處理
-- [ ] tantivy BM25 倒排索引
-- [ ] aho-corasick keyword auto-tagging
-- [ ] Triage 結果寫回索引
+- [x] tantivy BM25 倒排索引
+- [x] aho-corasick keyword auto-tagging
+- [x] Triage 結果寫回索引
+- [x] inbox 持久化機制（capture → inbox → triage → processed）
+- [x] cueward search 指令
 
 ## Phase 4：Triage — LLM 摘要
 - [ ] LLM 整合介面（Anthropic / OpenAI API）
