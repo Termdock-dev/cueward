@@ -97,6 +97,75 @@ Query the local index:
 cueward search "rust concurrency" --limit 5
 ```
 
+### Send
+
+Create a digest note in Apple Notes and optionally trigger a macOS notification:
+
+```bash
+# Create a note
+cueward send --title "Daily Digest" --body "Today's summary..." --folder Cueward
+
+# With notification
+cueward send --title "Daily Digest" --body "Summary" --notify
+
+# Pipe from capture
+cueward capture --source all --since 24h | cueward send --title "2026-04-07 Digest"
+```
+
+### Plan
+
+Create a reminder in Apple Reminders:
+
+```bash
+cueward plan --title "Review PR" --notes "Check bot comments" --list Cueward
+```
+
+### OCR
+
+Extract text from images or PDFs via Apple Vision Framework:
+
+```bash
+cueward ocr ~/Desktop/screenshot.png
+cueward ocr ~/Documents/paper.pdf
+```
+
+Supports PNG, JPG, PDF. Languages: zh-Hant, zh-Hans, en-US, ja.
+
+### Notes Management
+
+Update, delete, or move Apple Notes:
+
+```bash
+# Update a note's body
+cueward notes update --title "Note Title" --body "New content" --folder Cueward
+
+# Delete a note
+cueward notes delete --title "Note Title" --folder Cueward
+
+# Move between folders
+cueward notes move --title "Note Title" --from Cueward --to Archive
+```
+
+### Quick Notes
+
+List, update, and delete system Quick Notes (快速備忘錄):
+
+```bash
+# List all Quick Notes
+cueward quick-notes list
+
+# Update a Quick Note's body
+cueward quick-notes update --title "Note Title" --body "New content"
+
+# Delete a Quick Note
+cueward quick-notes delete --title "Note Title"
+
+# Create a note in the Quick Notes folder
+cueward quick-notes create --title "Title" --body "Content"
+```
+
+Quick Notes are identified by the system `ZISSYSTEMPAPER` flag — notes created via the macOS Quick Note gesture (hot corner, Apple Pencil, etc.). `list`, `update`, and `delete` operate on these system-tagged notes regardless of which folder they reside in. `create` places a regular note in the "Quick Notes" folder but does not mark it as a system Quick Note.
+
 ## Agent Integration
 
 Cueward outputs structured JSON — it does not call any LLM. The LLM layer is your Agent's responsibility.
@@ -124,8 +193,9 @@ mkdir -p ~/.claude/skills/ && cp -r skills/cueward-agent ~/.claude/skills/
 ```
 crates/
 ├── core/            Cue struct, PlatformAdapter trait, BM25 index, auto-tagger
-├── cli/             clap CLI (capture, triage, search)
-├── adapter-macos/   Safari (SQLite), Notes (AppleScript), Messages (SQLite)
+├── cli/             clap CLI (capture, triage, search, send, plan, ocr, notes, quick-notes)
+├── adapter-macos/   Safari (SQLite), Notes (AppleScript), Messages (SQLite),
+│                    Reminders (AppleScript), Vision OCR (Swift)
 └── adapter-windows/ Reserved for future cross-platform support
 ```
 

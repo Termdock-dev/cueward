@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Use Cueward CLI to capture, triage, and search the user's scattered knowledge from Safari, Apple Notes, and iMessage. Trigger when the user asks about their browsing history, recent notes, messages, or wants to organize/search their daily knowledge intake. Also use when the user says things like "what did I read today", "find that article I saw", "summarize my knowledge intake", or "help me organize what I've been looking at".
+description: Use Cueward CLI to capture, triage, search, and manage the user's scattered knowledge from Safari, Apple Notes, and iMessage. Also supports OCR (images/PDFs), creating Notes and Reminders, managing notes (update/delete/move), and Quick Notes (快速備忘錄) operations. Trigger when the user asks about their browsing history, recent notes, messages, Quick Notes, wants to organize knowledge, create a digest, set reminders from captured content, extract text from images/PDFs, or manage Apple Notes. Also use when the user says things like "what did I read today", "find that article I saw", "summarize my knowledge intake", "help me organize what I've been looking at", "create a reminder for this", "write a summary note", "OCR this screenshot", "list my quick notes", or "what's in my quick notes".
 ---
 
 # Cueward Agent Skill
@@ -125,6 +125,28 @@ cueward notes move --title "Note Title" --from Cueward --to Archive
 
 These commands find notes by exact title match within the specified folder.
 
+### 8. Quick Notes
+
+List, update, and delete system Quick Notes (快速備忘錄). Quick Notes are notes created via the macOS Quick Note gesture and tagged with a system flag — they may reside in any folder.
+
+```bash
+# List all Quick Notes
+cueward quick-notes list
+
+# Update a Quick Note's body (finds by title across all folders)
+cueward quick-notes update --title "Note Title" --body "New content"
+
+# Delete a Quick Note
+cueward quick-notes delete --title "Note Title"
+
+# Create a note in the Quick Notes folder (not a system Quick Note)
+cueward quick-notes create --title "Title" --body "Content"
+```
+
+- `list` outputs one line per note: `[folder] title`
+- `update` and `delete` locate the note by title using the system Quick Note flag — no folder needed
+- `create` places a regular note in the "Quick Notes" folder; it will NOT appear in the system Quick Notes smart folder (快速備忘錄) unless created via macOS gesture
+
 ## Workflow Patterns
 
 ### Daily knowledge digest
@@ -191,6 +213,16 @@ cueward ocr ~/Desktop/screenshot.png
 ```
 
 Then summarize the extracted text or answer questions about it.
+
+### Quick Notes review
+
+When the user asks about their Quick Notes or wants to review jotted-down ideas:
+
+```bash
+cueward quick-notes list
+```
+
+Then summarize the Quick Notes, group by folder, or help the user decide what to keep, archive, or delete.
 
 ## Important Notes
 
