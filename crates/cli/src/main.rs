@@ -38,6 +38,96 @@ enum Command {
         #[arg(long, default_value = "10")]
         limit: usize,
     },
+
+    /// Send a digest note or system notification
+    Send {
+        /// Note title
+        #[arg(long)]
+        title: String,
+
+        /// Note body (read from stdin if not provided)
+        #[arg(long)]
+        body: Option<String>,
+
+        /// Target Notes folder
+        #[arg(long, default_value = "Cueward")]
+        folder: String,
+
+        /// Also send a macOS notification
+        #[arg(long)]
+        notify: bool,
+    },
+
+    /// Create a reminder or calendar event
+    Plan {
+        /// Reminder/event title
+        #[arg(long)]
+        title: String,
+
+        /// Notes or description
+        #[arg(long, default_value = "")]
+        notes: String,
+
+        /// Reminders list name
+        #[arg(long, default_value = "Cueward")]
+        list: String,
+    },
+
+    /// Extract text from images or PDFs via Vision OCR
+    Ocr {
+        /// Path to image or PDF file
+        path: String,
+    },
+
+    /// Manage Apple Notes (update, delete, move)
+    Notes {
+        #[command(subcommand)]
+        action: NotesAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum NotesAction {
+    /// Update a note's body
+    Update {
+        /// Note title to find
+        #[arg(long)]
+        title: String,
+
+        /// New body content
+        #[arg(long)]
+        body: String,
+
+        /// Folder to search in
+        #[arg(long, default_value = "Cueward")]
+        folder: String,
+    },
+
+    /// Delete a note
+    Delete {
+        /// Note title to find
+        #[arg(long)]
+        title: String,
+
+        /// Folder to search in
+        #[arg(long, default_value = "Cueward")]
+        folder: String,
+    },
+
+    /// Move a note to a different folder
+    Move {
+        /// Note title to find
+        #[arg(long)]
+        title: String,
+
+        /// Source folder
+        #[arg(long)]
+        from: String,
+
+        /// Destination folder
+        #[arg(long)]
+        to: String,
+    },
 }
 
 #[derive(Clone, ValueEnum)]
@@ -211,5 +301,98 @@ fn main() {
                 }
             }
         }
+
+        Command::Send {
+            title,
+            body,
+            folder,
+            notify,
+        } => {
+            let body = body.unwrap_or_else(|| {
+                use std::io::Read;
+                let mut buf = String::new();
+                std::io::stdin().read_to_string(&mut buf).unwrap_or_default();
+                buf
+            });
+
+            match cueward_adapter_macos::send::create_note(&title, &body, &folder) {
+                Ok(()) => eprintln!("note created in {folder}"),
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            }
+
+            if notify {
+                let flat = body.replace('\n', " ");
+                let preview = if flat.chars().count() > 100 {
+                    let truncated: String = flat.chars().take(100).collect();
+                    format!("{truncated}...")
+                } else {
+                    flat
+                };
+                if let Err(e) = cueward_adapter_macos::send::notify(&title, &preview) {
+                    eprintln!("warning: notification failed: {e}");
+                }
+            }
+        }
+
+        Command::Plan { title, notes, list } => {
+            match cueward_adapter_macos::plan::create_reminder(&title, &notes, &list) {
+                Ok(()) => eprintln!("reminder created in {list}"),
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            }
+        }
+
+        Command::Ocr { path } => {
+            match cueward_adapter_macos::ocr::capture(&path) {
+                Ok(cues) => {
+                    let json = serde_json::to_string_pretty(&cues).unwrap();
+                    println!("{json}");
+                    eprintln!("extracted {} cues", cues.len());
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            }
+        }
+
+        Command::Notes { action } => match action {
+            NotesAction::Update {
+                title,
+                body,
+                folder,
+            } => {
+                match cueward_adapter_macos::send::update_note(&title, &body, &folder) {
+                    Ok(()) => eprintln!("note updated: {title}"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            NotesAction::Delete { title, folder } => {
+                match cueward_adapter_macos::send::delete_note(&title, &folder) {
+                    Ok(()) => eprintln!("note deleted: {title}"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            NotesAction::Move { title, from, to } => {
+                match cueward_adapter_macos::send::move_note(&title, &from, &to) {
+                    Ok(()) => eprintln!("note moved: {title} ({from} -> {to})"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+        },
     }
 }

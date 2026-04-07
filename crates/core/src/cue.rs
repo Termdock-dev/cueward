@@ -8,6 +8,7 @@ pub enum CueSource {
     Safari,
     Notes,
     Messages,
+    Ocr,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

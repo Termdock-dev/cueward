@@ -73,6 +73,58 @@ cueward search "<query>" --limit <N>
 - Best for English keyword searches; Chinese content works but tokenization is basic
 - Search results include: source, timestamp, title, content, url, tags — but NOT metadata fields (sender, folder, direction). For full metadata, use `capture` output directly
 
+### 4. Send
+
+Create a note in Apple Notes and optionally send a macOS notification.
+
+```bash
+cueward send --title "Daily Digest" --body "Summary content..." --folder Cueward --notify
+```
+
+- `--folder`: Target Notes folder (auto-created if missing). Default: `Cueward`
+- `--notify`: Also trigger a macOS notification
+- Body can be piped via stdin if `--body` is omitted
+
+### 5. Plan
+
+Create a reminder in Apple Reminders.
+
+```bash
+cueward plan --title "Review PR" --notes "Check bot comments" --list Cueward
+```
+
+- `--list`: Reminders list (auto-created if missing). Default: `Cueward`
+
+### 6. OCR
+
+Extract text from images or PDFs using Apple Vision Framework.
+
+```bash
+cueward ocr <path_to_image_or_pdf>
+```
+
+- Supports PNG, JPG, PDF
+- PDF: uses native text layer first, falls back to Vision OCR for scanned pages
+- Languages: zh-Hant, zh-Hans, en-US, ja
+- Outputs standard Cue JSON (source: "ocr")
+
+### 7. Notes Management
+
+Update, delete, or move Apple Notes.
+
+```bash
+# Update a note's body
+cueward notes update --title "Note Title" --body "New content" --folder Cueward
+
+# Delete a note
+cueward notes delete --title "Note Title" --folder Cueward
+
+# Move a note between folders
+cueward notes move --title "Note Title" --from Cueward --to Archive
+```
+
+These commands find notes by exact title match within the specified folder.
+
 ## Workflow Patterns
 
 ### Daily knowledge digest
@@ -109,6 +161,36 @@ cueward triage
 ```
 
 Then read the indexed results or the processed JSON to provide a structured overview.
+
+### Capture, summarize, and archive
+
+Full pipeline: capture → summarize → write digest → clean up:
+
+```bash
+# 1. Capture today's knowledge
+cueward capture --source all --since 24h
+
+# 2. (You summarize the JSON output)
+
+# 3. Write digest to Notes
+cueward send --title "2026-04-07 Digest" --body "<your summary>" --folder Cueward --notify
+
+# 4. Create reminders for action items
+cueward plan --title "Follow up on X" --notes "From today's capture"
+
+# 5. Archive processed notes
+cueward notes move --title "Old Note" --from Notes --to Archive
+```
+
+### OCR a document
+
+When the user shares an image or PDF:
+
+```bash
+cueward ocr ~/Desktop/screenshot.png
+```
+
+Then summarize the extracted text or answer questions about it.
 
 ## Important Notes
 

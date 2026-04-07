@@ -38,9 +38,12 @@
 - [x] 撰寫 Agent skill 文件（skills/cueward-agent/）
 - [x] README 改寫為實用文件（安裝、用法、Agent 整合）
 
-## Phase 5+（v0.2）
-- [ ] cueward plan（行事曆 / Reminders）
-- [ ] cueward send（每日摘要通知）
-- [ ] Vision OCR capture
+## Phase 5：v0.2 指令擴展
+- [x] cueward send（寫入 Apple Notes + macOS 通知）
+- [x] cueward plan（建立 Reminders 提醒事項）
+- [x] cueward ocr（Vision Framework OCR，支援圖片 + PDF）
+
+## Phase 6+（未來）
 - [ ] 靈動島 Notch UI
 - [ ] Windows adapter
+- [ ] Calendar event 整合（目前只有 Reminders）
