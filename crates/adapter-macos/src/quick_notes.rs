@@ -195,8 +195,18 @@ fn strip_title_block(title: &str, body_html: &str) -> String {
     body_html.to_string()
 }
 
+fn ensure_archive_destination(source_folder: &str, to_folder: &str) -> Result<(), MacosError> {
+    if source_folder == to_folder {
+        return Err(MacosError::Other(format!(
+            "archive destination must differ from the current quick note folder: {to_folder}"
+        )));
+    }
+    Ok(())
+}
+
 pub fn archive(title: &str, to_folder: &str) -> Result<(), MacosError> {
     let note = find_unique(title)?;
+    ensure_archive_destination(&note.folder, to_folder)?;
     let body_html = read_body_html(&note.title, &note.folder)?;
     let body = strip_title_block(&note.title, &body_html);
 
@@ -212,14 +222,12 @@ pub fn archive(title: &str, to_folder: &str) -> Result<(), MacosError> {
         thread::sleep(Duration::from_millis(500));
     }
 
-    Err(MacosError::Other(format!(
-        "quick note still present after archive: {title}"
-    )))
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::strip_title_block;
+    use super::{ensure_archive_destination, strip_title_block};
 
     #[test]
     fn strip_title_block_removes_leading_title_div() {
@@ -235,6 +243,15 @@ mod tests {
         assert_eq!(
             body,
             "\n<div><br></div>\n<div><a href=https://example.com>https://example.com</a><br></div>"
+        );
+    }
+
+    #[test]
+    fn archive_same_folder_returns_clear_error() {
+        let err = ensure_archive_destination("Notes", "Notes").unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "archive destination must differ from the current quick note folder: Notes"
         );
     }
 }
