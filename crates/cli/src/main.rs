@@ -169,6 +169,17 @@ enum QuickNotesAction {
         #[arg(long)]
         title: String,
     },
+
+    /// Archive a Quick Note into a regular folder and remove it from Quick Notes
+    Archive {
+        /// Note title to find. Must be unique among Quick Notes.
+        #[arg(long)]
+        title: String,
+
+        /// Destination folder for the archived regular note
+        #[arg(long)]
+        to: String,
+    },
 }
 
 #[derive(Clone, ValueEnum)]
@@ -475,6 +486,15 @@ fn main() {
             QuickNotesAction::Delete { title } => {
                 match cueward_adapter_macos::quick_notes::delete(&title) {
                     Ok(()) => eprintln!("quick note deleted: {title}"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            QuickNotesAction::Archive { title, to } => {
+                match cueward_adapter_macos::quick_notes::archive(&title, &to) {
+                    Ok(()) => eprintln!("quick note archived: {title} -> {to}"),
                     Err(e) => {
                         eprintln!("error: {e}");
                         process::exit(1);

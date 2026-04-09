@@ -93,3 +93,25 @@ pub fn notify(title: &str, message: &str) -> Result<(), MacosError> {
 
     run(&script, "notification failed")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{create_note, delete_note};
+
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn create_note_supports_multiline_body() {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let title = format!("Cueward create note multiline test {suffix}");
+        let folder = "Cueward";
+
+        let result = create_note(&title, "line1\nline2", folder);
+        let _ = delete_note(&title, folder);
+
+        assert!(result.is_ok(), "expected multiline note creation to succeed: {result:?}");
+    }
+}

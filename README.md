@@ -148,7 +148,7 @@ cueward notes move --title "Note Title" --from Cueward --to Archive
 
 ### Quick Notes
 
-List, update, and delete system Quick Notes (快速備忘錄):
+List, update, archive, and delete system Quick Notes (快速備忘錄):
 
 ```bash
 # List all Quick Notes
@@ -160,11 +160,16 @@ cueward quick-notes update --title "Note Title" --body "New content"
 # Delete a Quick Note
 cueward quick-notes delete --title "Note Title"
 
+# Archive a Quick Note into a regular note, then remove it from Quick Notes
+cueward quick-notes archive --title "Note Title" --to Archive
+
 # Create a note in the Quick Notes folder
 cueward quick-notes create --title "Title" --body "Content"
 ```
 
 Quick Notes are identified by the system `ZISSYSTEMPAPER` flag — notes created via the macOS Quick Note gesture (hot corner, Apple Pencil, etc.). `list`, `update`, and `delete` operate on these system-tagged notes regardless of which folder they reside in. `create` places a regular note in the "Quick Notes" folder but does not mark it as a system Quick Note.
+
+`archive` is the cleanup workflow for real Quick Notes: it copies the note into a regular destination folder, waits for the new note to appear, and deletes the original Quick Note so it disappears from the Quick Notes smart view. This preserves link URLs, but Apple Notes rich-link cards may be flattened into normal links in the archived copy.
 
 
 ## Agent Integration
