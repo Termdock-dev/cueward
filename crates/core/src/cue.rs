@@ -12,6 +12,19 @@ pub enum CueSource {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachmentSegment {
+    pub index: usize,
+    pub filename: String,
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ocr_text: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub has_ocr: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cue {
     pub source: CueSource,
     pub timestamp: DateTime<Utc>,
@@ -22,6 +35,8 @@ pub struct Cue {
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachment_segments: Vec<AttachmentSegment>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub metadata: HashMap<String, String>,
 }
