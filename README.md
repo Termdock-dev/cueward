@@ -78,6 +78,44 @@ cueward safari fill "textarea" "hello from cueward"
 cueward safari wait ".result" --timeout 30
 ```
 
+### Safari AI
+
+Control web-based AI providers (Gemini, ChatGPT) via Safari automation. Uses URL navigation and `execCommand` — no fragile DOM clicking, no focus stealing.
+
+```bash
+# Send a prompt (general chat)
+cueward safari ai --provider gemini prompt --prompt "explain quantum computing"
+
+# Switch to a specific mode first
+cueward safari ai --provider gemini prompt --prompt "a cat on a keyboard" --mode image
+
+# Deep Research with auto-confirm
+cueward safari ai --provider gemini prompt --prompt "台灣 AI 產業分析" --mode deep-research --auto-confirm
+
+# Switch mode only (no prompt)
+cueward safari ai --provider gemini mode deep-research
+
+# List conversations from sidebar
+cueward safari ai --provider gemini list
+
+# Read a conversation's text content (reports, chat history)
+cueward safari ai --provider gemini read https://gemini.google.com/app/abc123
+
+# Poll an in-progress Deep Research
+cueward safari ai --provider gemini poll --timeout 300
+
+# Save AI-generated images as PNG
+cueward safari ai --provider gemini save-images https://gemini.google.com/app/abc123 --output ~/Downloads
+
+# Download video/music via browser (triggers Safari native download)
+cueward safari ai --provider gemini save-media https://gemini.google.com/app/abc123
+
+# Use a specific Safari profile
+cueward safari ai --provider gemini --profile Ryugu list
+```
+
+Supported Gemini modes: `deep-research`, `image`, `video`, `music`.
+
 Outputs JSON to stdout:
 
 ```json

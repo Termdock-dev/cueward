@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use chrono::{DateTime, TimeZone, Utc};
 use rusqlite::Connection;
 use serde::Serialize;
+use serde_json::Value;
 
 use cueward_core::{Cue, CueSource};
 
@@ -15,6 +16,7 @@ use crate::applescript::{escape, escape_body, run_capture};
 /// Core Data epoch: 2001-01-01 00:00:00 UTC
 const CORE_DATA_EPOCH: i64 = 978_307_200;
 const TAB_SEPARATOR: &str = "---TAB_SEP---";
+const FIELD_SEPARATOR: &str = "<<<FIELD_SEP>>>";
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct SafariTab {
@@ -94,6 +96,27 @@ pub struct SafariAiResponseResult {
     pub response: String,
 }
 
+#[derive(Debug, Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct SafariConversation {
+    pub title: String,
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariDeepResearchResult {
+    pub provider: String,
+    pub mode: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversation_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub actions: Vec<String>,
+}
+
 fn history_db_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_default();
     PathBuf::from(home).join("Library/Safari/History.db")
@@ -152,8 +175,30 @@ fn extract_profile(window_name: &str, active_tab_title: &str) -> Option<String> 
         .map(ToOwned::to_owned)
 }
 
+
+fn target_window_block(profile_filter: Option<&str>) -> String {
+    match profile_filter {
+        Some(profile) => {
+            let profile = escape(profile);
+            format!(
+                r#"set w to missing value
+            repeat with candidate in every window
+                if (name of candidate contains "{profile}") then
+                    set w to candidate
+                    exit repeat
+                end if
+            end repeat
+            if w is missing value then
+                return ""
+            end if"#,
+            )
+        }
+        None => "set w to front window".to_string(),
+    }
+}
+
 fn parse_tab_line(line: &str) -> Option<SafariTab> {
-    let parts: Vec<&str> = line.split('\t').collect();
+    let parts: Vec<&str> = line.split(FIELD_SEPARATOR).collect();
     if parts.len() != 6 {
         return None;
     }
@@ -235,7 +280,8 @@ fn build_tab_return_block(tab_ref: &str, active_flag: &str) -> String {
             set tabIndex to (index of {tab_ref}) - 1
             set tabTitle to my encode_field(name of {tab_ref})
             set tabURL to my encode_field(URL of {tab_ref})
-            return winId & tab & winName & tab & tabIndex & tab & tabTitle & tab & tabURL & tab & "{active_flag}""#
+            return (winId as text) & "{field_separator}" & winName & "{field_separator}" & (tabIndex as text) & "{field_separator}" & tabTitle & "{field_separator}" & tabURL & "{field_separator}" & "{active_flag}""#,
+        field_separator = FIELD_SEPARATOR,
     )
 }
 
@@ -258,7 +304,7 @@ fn build_tabs_script() -> String {
                     else
                         set isActive to "false"
                     end if
-                    set output to output & winId & tab & winName & tab & tabIndex & tab & tabTitle & tab & tabURL & tab & isActive & "{separator}"
+                    set output to output & (winId as text) & "{field_separator}" & winName & "{field_separator}" & (tabIndex as text) & "{field_separator}" & tabTitle & "{field_separator}" & tabURL & "{field_separator}" & isActive & "{separator}"
                 end repeat
             end repeat
             return output
@@ -266,11 +312,13 @@ fn build_tabs_script() -> String {
     "#,
         prelude = safari_script_prelude(),
         separator = TAB_SEPARATOR,
+        field_separator = FIELD_SEPARATOR,
     )
 }
 
-fn build_active_tab_script() -> String {
+fn build_active_tab_script(profile_filter: Option<&str>) -> String {
     let tab_return = build_tab_return_block("t", "true");
+    let target_window = target_window_block(profile_filter);
     format!(
         r#"
         {prelude}
@@ -278,19 +326,53 @@ fn build_active_tab_script() -> String {
             if (count of windows) is 0 then
                 return ""
             end if
-            set w to front window
+            {target_window}
             set t to current tab of w
             {tab_return}
         end tell
     "#,
         prelude = safari_script_prelude(),
+        target_window = target_window,
         tab_return = tab_return,
     )
 }
 
-fn build_open_script(url: &str) -> String {
+
+fn build_exec_script_for_profile(js_code: &str, profile_filter: Option<&str>) -> String {
+    let js_expr = escape_body(js_code);
+    let target_window = target_window_block(profile_filter);
+    format!(
+        r#"
+        {prelude}
+        tell application "Safari"
+            if (count of windows) is 0 then
+                return ""
+            end if
+            {target_window}
+            set jsCode to {js_expr}
+            set rawResult to missing value
+            try
+                set rawResult to do JavaScript jsCode in current tab of w
+            on error errMsg number errNum
+                error errMsg number errNum
+            end try
+            if rawResult is missing value then
+                return ""
+            end if
+            set rawResult to rawResult as string
+            return my encode_field(rawResult)
+        end tell
+    "#,
+        prelude = safari_script_prelude(),
+        target_window = target_window,
+        js_expr = js_expr,
+    )
+}
+
+fn build_open_script(url: &str, profile_filter: Option<&str>) -> String {
     let escaped_url = escape(url);
     let tab_return = build_tab_return_block("t", "true");
+    let target_window = target_window_block(profile_filter);
     format!(
         r#"
         {prelude}
@@ -299,7 +381,7 @@ fn build_open_script(url: &str) -> String {
                 make new document with properties {{URL:"{escaped_url}"}}
                 set w to front window
             else
-                set w to front window
+                {target_window}
                 set t to make new tab at end of tabs of w with properties {{URL:"{escaped_url}"}}
                 set current tab of w to t
             end if
@@ -310,6 +392,7 @@ fn build_open_script(url: &str) -> String {
     "#,
         prelude = safari_script_prelude(),
         escaped_url = escaped_url,
+        target_window = target_window,
         tab_return = tab_return,
     )
 }
@@ -344,6 +427,7 @@ fn build_close_script(index: Option<usize>) -> String {
     )
 }
 
+#[allow(dead_code)]
 fn build_exec_script(js_code: &str) -> String {
     let js_expr = escape_body(js_code);
     format!(
@@ -354,7 +438,12 @@ fn build_exec_script(js_code: &str) -> String {
                 return ""
             end if
             set jsCode to {js_expr}
-            set rawResult to do JavaScript jsCode in current tab of front window
+            set rawResult to missing value
+            try
+                set rawResult to do JavaScript jsCode in current tab of front window
+            on error errMsg number errNum
+                error errMsg number errNum
+            end try
             if rawResult is missing value then
                 return ""
             end if
@@ -414,15 +503,6 @@ fn selector_fill_js(selector: &str, text: &str) -> String {
     )
 }
 
-fn gemini_mode_labels(mode: GeminiMode) -> &'static [&'static str] {
-    match mode {
-        GeminiMode::Image => &["建立圖像", "Create image", "Create Image"],
-        GeminiMode::DeepResearch => &["Deep Research"],
-        GeminiMode::Video => &["建立影片", "Create video", "Create Video"],
-        GeminiMode::Music => &["創作音樂", "Create music", "Create Music"],
-    }
-}
-
 fn gemini_mode_placeholders(mode: GeminiMode) -> &'static [&'static str] {
     match mode {
         GeminiMode::Image => &[
@@ -431,18 +511,9 @@ fn gemini_mode_placeholders(mode: GeminiMode) -> &'static [&'static str] {
             "Describe the image you want to create",
         ],
         GeminiMode::DeepResearch => &["你想研究什麼？", "What do you want to research?"],
-        GeminiMode::Video => &["描述影片", "Describe the video"],
-        GeminiMode::Music => &["描述音樂", "Describe the music"],
+        GeminiMode::Video => &["描述影片", "Describe the video", "Describe your video"],
+        GeminiMode::Music => &["描述音樂", "描述要創作的音樂", "Describe the music", "Describe the music you"],
     }
-}
-
-fn js_string_array(values: &[&str]) -> String {
-    let escaped = values
-        .iter()
-        .map(|value| format!("\"{}\"", escape_js_string(value)))
-        .collect::<Vec<_>>()
-        .join(", ");
-    format!("[{escaped}]")
 }
 
 fn should_skip_gemini_response(trimmed: &str, prompt: &str) -> bool {
@@ -458,90 +529,46 @@ fn gemini_mode_slug(mode: GeminiMode) -> &'static str {
     }
 }
 
-fn build_gemini_mode_switch_js(mode: GeminiMode) -> String {
-    let mode_labels = js_string_array(gemini_mode_labels(mode));
-    let expected_placeholders = js_string_array(gemini_mode_placeholders(mode));
-    format!(
-        r#"(() => {{
-            const modeLabels = {mode_labels};
-            const expectedPlaceholders = {expected_placeholders};
-            const clickableSelector = [
-              "button",
-              "[role='button']",
-              "[role='option']",
-              "mat-option",
-              "li",
-              "span"
-            ].join(",");
-            const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
-            const clickByText = (labels) => {{
-              const wanted = labels.map(normalize).filter(Boolean);
-              const nodes = [...document.querySelectorAll(clickableSelector)];
-              for (const node of nodes) {{
-                const text = normalize(node.innerText || node.textContent);
-                if (!text) continue;
-                if (!wanted.some((label) => text.includes(label))) continue;
-                const clickable = node.closest("button,[role='button'],[role='option'],mat-option,li") || node;
-                clickable.click();
-                return true;
-              }}
-              return false;
-            }};
-
-            clickByText(["工具", "Tools", "模式", "Mode"]);
-            if (!clickByText(modeLabels)) {{
-              throw new Error(`gemini mode not found: ${{modeLabels.join(", ")}}`);
-            }}
-
-            const input = document.querySelector(
-              ".ql-editor, rich-textarea .ProseMirror, div[role='textbox'][contenteditable='true'], div[contenteditable='true']"
-            );
-            if (!input) {{
-              throw new Error("gemini input not found after mode switch");
-            }}
-
-            const placeholder = normalize(
-              input.getAttribute("data-placeholder") ||
-              input.getAttribute("placeholder") ||
-              input.getAttribute("aria-label") ||
-              ""
-            );
-            if (!expectedPlaceholders.some((value) => placeholder.includes(value))) {{
-              throw new Error(`placeholder mismatch: ${{placeholder}}`);
-            }}
-
-            return placeholder;
-        }})()"#
-    )
+fn gemini_mode_url(mode: GeminiMode) -> &'static str {
+    match mode {
+        GeminiMode::Image => "https://gemini.google.com/image",
+        GeminiMode::DeepResearch => "https://gemini.google.com/deepresearch",
+        GeminiMode::Video => "https://gemini.google.com/veo",
+        GeminiMode::Music => "https://gemini.google.com/music",
+    }
 }
 
-fn build_gemini_chat_prompt_js(prompt: &str) -> String {
-    let prompt = escape_js_string(prompt);
-    format!(
-        r#"(() => {{
-            const promptText = "{prompt}";
-            const input = document.querySelector(
-              ".ql-editor, rich-textarea .ProseMirror, div[role='textbox'][contenteditable='true'], div[contenteditable='true']"
-            );
-            if (!input) {{
-              throw new Error("gemini input not found");
-            }}
 
-            input.focus();
-            if ("value" in input) {{
-              input.value = promptText;
-            }} else {{
-              input.textContent = promptText;
-            }}
-            input.dispatchEvent(new Event("input", {{ bubbles: true }}));
-            input.dispatchEvent(new Event("change", {{ bubbles: true }}));
+fn build_gemini_go_home_js() -> String {
+    r#"(function() {
+        window.location.href = "https://gemini.google.com/app";
+        return "true";
+    })()"#
+        .to_string()
+}
 
-            input.dispatchEvent(new KeyboardEvent("keydown", {{ key: "Enter", bubbles: true }}));
-            input.dispatchEvent(new KeyboardEvent("keypress", {{ key: "Enter", bubbles: true }}));
-            input.dispatchEvent(new KeyboardEvent("keyup", {{ key: "Enter", bubbles: true }}));
-            return "true";
-        }})()"#
-    )
+pub fn ensure_gemini_home(profile_filter: Option<&str>) -> Result<(), MacosError> {
+    let _ = execute_js_for_profile(
+        &build_gemini_go_home_js(),
+        profile_filter,
+        "safari_gemini_go_home",
+    )?;
+    thread::sleep(Duration::from_millis(2500));
+    Ok(())
+}
+
+fn build_gemini_placeholder_read_js() -> String {
+    r#"(function() {
+        var input = document.querySelector(".ql-editor, rich-textarea .ProseMirror, div[role='textbox'][contenteditable='true'], div[contenteditable='true']");
+        if (!input) return "";
+        return String(
+          input.getAttribute("data-placeholder") ||
+          input.getAttribute("placeholder") ||
+          input.getAttribute("aria-label") ||
+          ""
+        );
+    })()"#
+        .to_string()
 }
 
 fn gemini_response_extract_js() -> String {
@@ -562,6 +589,270 @@ fn gemini_response_extract_js() -> String {
         return "";
     })()"#
         .to_string()
+}
+fn build_gemini_fill_input_js(prompt: &str) -> String {
+    let prompt = escape_js_string(prompt);
+    format!(
+        r#"(() => {{
+            const input = document.querySelector(
+              ".ql-editor, rich-textarea .ProseMirror, div[role='textbox'][contenteditable='true'], div[contenteditable='true']"
+            );
+            if (!input) throw new Error("gemini input not found");
+            input.focus();
+            input.textContent = "";
+            document.execCommand("insertText", false, "{prompt}");
+            return "true";
+        }})()"#
+    )
+}
+
+fn wait_and_click_send(profile_filter: Option<&str>) -> Result<(), MacosError> {
+    let js = &build_gemini_click_send_js();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(200));
+        let result = execute_js_for_profile(js, profile_filter, "safari_gemini_wait_send")?;
+        if result.trim() == "true" {
+            return Ok(());
+        }
+    }
+    Err(MacosError::Other("send button not found or disabled after 5s".to_string()))
+}
+
+fn build_gemini_click_send_js() -> String {
+    r#"(() => {
+        const sendLabels = ["傳送訊息", "Send message"];
+        const buttons = [...document.querySelectorAll('button,[role="button"]')];
+        for (const button of buttons) {
+          const label = [
+            button.getAttribute("aria-label"),
+            button.getAttribute("title"),
+            button.innerText,
+            button.textContent
+          ].filter(Boolean).join(" ");
+          if (!sendLabels.some((v) => label.includes(v))) continue;
+          if (button.disabled) return "disabled";
+          button.click();
+          return "true";
+        }
+        return "false";
+    })()"#
+        .to_string()
+}
+
+
+fn gemini_deep_research_poll_js() -> String {
+    r#"(() => {
+        const text = document.body.innerText || "";
+        const selectors = [
+          ".model-response-text",
+          ".message-content",
+          ".markdown",
+          "div[data-test-id='message-content']"
+        ];
+        const extractLastResponse = () => {
+          for (const selector of selectors) {
+            const elements = document.querySelectorAll(selector);
+            if (!elements.length) continue;
+            const last = elements[elements.length - 1];
+            const content = (last.innerText || last.textContent || "").trim();
+            if (content) return content;
+          }
+          return "";
+        };
+
+        if (text.includes("開始研究") || text.includes("Start research") || text.includes("編輯計畫") || text.includes("Edit plan")) {
+          return JSON.stringify({
+            status: "plan_ready",
+            plan: extractLastResponse(),
+            actions: ["confirm", "edit"]
+          });
+        }
+        if (text.includes("研究中") || text.includes("Researching") || text.includes("Generating report")) {
+          return JSON.stringify({ status: "running" });
+        }
+
+        const content = extractLastResponse();
+        if (content) {
+          return JSON.stringify({ status: "complete", response: content });
+        }
+
+        return JSON.stringify({ status: "running" });
+    })()"#
+        .to_string()
+}
+
+fn get_gemini_conversation_url(profile_filter: Option<&str>) -> Result<String, MacosError> {
+    let js = r#"(() => {
+        const url = window.location.href || "";
+        if (url.match(/gemini\.google\.com\/app\/[a-f0-9]{10,}/)) return url;
+        return "";
+    })()"#;
+    let url = execute_js_for_profile(js, profile_filter, "safari_gemini_conversation_url")?;
+    let url = url.trim();
+    if url.is_empty() {
+        return Err(MacosError::Other("no conversation URL found".to_string()));
+    }
+    Ok(url.to_string())
+}
+
+pub fn gemini_list_conversations(profile_filter: Option<&str>) -> Result<Vec<SafariConversation>, MacosError> {
+    let js = r#"(() => {
+        const items = document.querySelectorAll('a[href*="/app/"]');
+        const convos = [];
+        for (const a of items) {
+          const href = a.getAttribute("href") || "";
+          if (!/\/app\/[a-f0-9]{10,}/.test(href)) continue;
+          const title = (a.innerText || a.textContent || "").trim();
+          if (!title) continue;
+          convos.push({ title, url: "https://gemini.google.com" + href });
+        }
+        return JSON.stringify(convos);
+    })()"#;
+    let raw = execute_js_for_profile(js, profile_filter, "safari_gemini_list_conversations")?;
+    let items: Vec<SafariConversation> = serde_json::from_str(&raw)
+        .map_err(|e| MacosError::Other(format!("failed to parse conversations: {e}")))?;
+    Ok(items)
+}
+
+pub fn gemini_read_conversation(
+    url: &str,
+    profile_filter: Option<&str>,
+) -> Result<SafariAiResponseResult, MacosError> {
+    let nav_js = format!(
+        r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
+        url = escape_js_string(url),
+    );
+    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_read_navigate")?;
+    thread::sleep(Duration::from_millis(3000));
+
+    let read_js = r#"(() => {
+        const panels = document.querySelectorAll('.markdown.markdown-main-panel');
+        let biggest = null;
+        let maxLen = 0;
+        for (const p of panels) {
+          const len = (p.innerText || "").length;
+          if (len > maxLen) { maxLen = len; biggest = p; }
+        }
+        if (!biggest || maxLen === 0) return JSON.stringify({ status: "empty", response: "" });
+        return JSON.stringify({ status: "complete", response: (biggest.innerText || "").trim() });
+    })()"#;
+    let raw = execute_js_for_profile(read_js, profile_filter, "safari_gemini_read_content")?;
+    let value: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|e| MacosError::Other(format!("failed to parse read result: {e}")))?;
+    let status = value.get("status").and_then(|v| v.as_str()).unwrap_or("error");
+    let response = value.get("response").and_then(|v| v.as_str()).unwrap_or("");
+    Ok(SafariAiResponseResult {
+        provider: "gemini".to_string(),
+        status: status.to_string(),
+        response: response.to_string(),
+    })
+}
+
+pub fn gemini_save_images(
+    conversation_url: &str,
+    output_dir: &str,
+    profile_filter: Option<&str>,
+) -> Result<Vec<String>, MacosError> {
+    let nav_js = format!(
+        r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
+        url = escape_js_string(conversation_url),
+    );
+    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_save_img_navigate")?;
+    thread::sleep(Duration::from_millis(5000));
+
+    let count_js = r#"(() => {
+        const imgs = document.querySelectorAll('img[alt*="AI"], img[alt*="生成"]');
+        return String(imgs.length);
+    })()"#;
+    let count: usize = execute_js_for_profile(count_js, profile_filter, "safari_gemini_img_count")?
+        .trim()
+        .parse()
+        .unwrap_or(0);
+
+    if count == 0 {
+        return Ok(Vec::new());
+    }
+
+    let out_path = std::path::Path::new(output_dir);
+    if !out_path.exists() {
+        std::fs::create_dir_all(out_path)
+            .map_err(|e| MacosError::Other(format!("failed to create output dir: {e}")))?;
+    }
+
+    use base64::Engine;
+    let engine = base64::engine::general_purpose::STANDARD;
+    let mut saved = Vec::new();
+
+    for i in 0..count {
+        let extract_js = format!(
+            r#"(() => {{
+                const imgs = document.querySelectorAll('img[alt*="AI"], img[alt*="生成"]');
+                const img = imgs[{i}];
+                if (!img) return "";
+                const canvas = document.createElement("canvas");
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                canvas.getContext("2d").drawImage(img, 0, 0);
+                const dataUrl = canvas.toDataURL("image/png");
+                const idx = dataUrl.indexOf(",");
+                return idx >= 0 ? dataUrl.substring(idx + 1) : "";
+            }})()"#,
+        );
+        let b64 = execute_js_for_profile(&extract_js, profile_filter, "safari_gemini_img_extract")?;
+        let b64 = b64.trim();
+        if b64.is_empty() {
+            continue;
+        }
+
+        let bytes = engine.decode(b64).map_err(|e| {
+            MacosError::Other(format!("base64 decode failed for image {i}: {e}"))
+        })?;
+
+        let filename = format!("gemini_image_{i}.png");
+        let filepath = out_path.join(&filename);
+        std::fs::write(&filepath, &bytes)
+            .map_err(|e| MacosError::Other(format!("failed to write {}: {e}", filepath.display())))?;
+        saved.push(filepath.to_string_lossy().into_owned());
+    }
+
+    Ok(saved)
+}
+
+pub fn gemini_save_media(
+    conversation_url: &str,
+    profile_filter: Option<&str>,
+) -> Result<SafariAiResponseResult, MacosError> {
+    let nav_js = format!(
+        r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
+        url = escape_js_string(conversation_url),
+    );
+    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_media_navigate")?;
+    thread::sleep(Duration::from_millis(5000));
+
+    let js = r#"(() => {
+        const video = document.querySelector("video");
+        if (!video) return JSON.stringify({ status: "error", response: "no media found" });
+        const src = video.src || video.currentSrc || "";
+        if (!src) return JSON.stringify({ status: "error", response: "no media source" });
+        const a = document.createElement("a");
+        a.href = src;
+        a.download = "gemini_media.mp4";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return JSON.stringify({ status: "downloading", response: src });
+    })()"#;
+    let raw = execute_js_for_profile(js, profile_filter, "safari_gemini_media_download")?;
+    let value: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|e| MacosError::Other(format!("failed to parse media result: {e}")))?;
+    let status = value.get("status").and_then(|v| v.as_str()).unwrap_or("error");
+    let response = value.get("response").and_then(|v| v.as_str()).unwrap_or("");
+    Ok(SafariAiResponseResult {
+        provider: "gemini".to_string(),
+        status: status.to_string(),
+        response: response.to_string(),
+    })
 }
 
 pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
@@ -627,16 +918,16 @@ pub fn tabs(profile_filter: Option<&str>) -> Result<Vec<SafariTab>, MacosError> 
     Ok(tabs)
 }
 
-pub fn active() -> Result<Option<SafariTab>, MacosError> {
-    let stdout = run_capture(&build_active_tab_script(), "safari_active")?;
+pub fn active(profile_filter: Option<&str>) -> Result<Option<SafariTab>, MacosError> {
+    let stdout = run_capture(&build_active_tab_script(profile_filter), "safari_active")?;
     Ok(parse_tab_line(stdout.trim()).map(|mut tab| {
         tab.profile = extract_profile(&tab.window_name, &tab.title);
         tab
     }))
 }
 
-pub fn open(url: &str) -> Result<Option<SafariTab>, MacosError> {
-    let stdout = run_capture(&build_open_script(url), "safari_open")?;
+pub fn open(url: &str, profile_filter: Option<&str>) -> Result<Option<SafariTab>, MacosError> {
+    let stdout = run_capture(&build_open_script(url, profile_filter), "safari_open")?;
     Ok(parse_tab_line(stdout.trim()).map(|mut tab| {
         tab.profile = extract_profile(&tab.window_name, &tab.title);
         tab
@@ -651,25 +942,25 @@ pub fn close(index: Option<usize>) -> Result<SafariCloseResult, MacosError> {
     })
 }
 
-pub fn source() -> Result<SafariSourceResult, MacosError> {
-    let result = execute_js("document.documentElement.outerHTML", "safari_source")?;
+pub fn source(profile_filter: Option<&str>) -> Result<SafariSourceResult, MacosError> {
+    let result = execute_js_for_profile("document.documentElement.outerHTML", profile_filter, "safari_source")?;
     Ok(SafariSourceResult { html: result })
 }
 
-pub fn read(selector: Option<&str>) -> Result<SafariReadResult, MacosError> {
+pub fn read(selector: Option<&str>, profile_filter: Option<&str>) -> Result<SafariReadResult, MacosError> {
     let js = match selector {
         Some(selector) => selector_text_js(selector),
         None => "(document.body.innerText ?? \"\").trim()".to_string(),
     };
-    let content = execute_js(&js, "safari_read")?;
+    let content = execute_js_for_profile(&js, profile_filter, "safari_read")?;
     Ok(SafariReadResult {
         selector: selector.map(ToOwned::to_owned),
         content,
     })
 }
 
-pub fn exec(js_code: &str) -> Result<SafariEvalResult, MacosError> {
-    let result = execute_js(js_code, "safari_exec")?;
+pub fn exec(js_code: &str, profile_filter: Option<&str>) -> Result<SafariEvalResult, MacosError> {
+    let result = execute_js_for_profile(js_code, profile_filter, "safari_exec")?;
     Ok(SafariEvalResult { result })
 }
 
@@ -722,14 +1013,58 @@ pub fn wait(selector: &str, timeout_seconds: u64) -> Result<SafariWaitResult, Ma
     }
 }
 
-pub fn prepare_gemini_mode(mode: GeminiMode) -> Result<SafariAiReadyResult, MacosError> {
-    let placeholder = execute_js(&build_gemini_mode_switch_js(mode), "safari_gemini_mode")?;
+fn parse_deep_research_payload(payload: &str) -> Result<SafariDeepResearchResult, MacosError> {
+    let value: Value = serde_json::from_str(payload)
+        .map_err(|error| MacosError::Other(format!("invalid deep research payload: {error}: {payload}")))?;
+    let status = value
+        .get("status")
+        .and_then(Value::as_str)
+        .ok_or_else(|| MacosError::Other("deep research payload missing status".to_string()))?;
+    let actions = value
+        .get("actions")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    Ok(SafariDeepResearchResult {
+        provider: "gemini".to_string(),
+        mode: "deep-research".to_string(),
+        status: status.to_string(),
+        conversation_url: None,
+        plan: value.get("plan").and_then(Value::as_str).map(ToOwned::to_owned),
+        response: value.get("response").and_then(Value::as_str).map(ToOwned::to_owned),
+        actions,
+    })
+}
+
+pub fn prepare_gemini_mode(
+    mode: GeminiMode,
+    profile_filter: Option<&str>,
+) -> Result<SafariAiReadyResult, MacosError> {
+    let url = gemini_mode_url(mode);
+    let nav_js = format!(
+        r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
+    );
+    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_mode_navigate")?;
+    thread::sleep(Duration::from_millis(2500));
+
+    let placeholder = execute_js_for_profile(
+        &build_gemini_placeholder_read_js(),
+        profile_filter,
+        "safari_gemini_mode_placeholder",
+    )?;
     if !gemini_mode_placeholders(mode)
         .iter()
         .any(|value| placeholder.contains(value))
     {
         return Err(MacosError::Other(format!(
-            "unexpected Gemini placeholder after mode switch: {placeholder}"
+            "unexpected Gemini placeholder after URL navigation to {url}: {placeholder}"
         )));
     }
 
@@ -740,13 +1075,104 @@ pub fn prepare_gemini_mode(mode: GeminiMode) -> Result<SafariAiReadyResult, Maco
     })
 }
 
-pub fn send_gemini_prompt(prompt: &str) -> Result<SafariAiResponseResult, MacosError> {
-    let sent = execute_js(&build_gemini_chat_prompt_js(prompt), "safari_gemini_prompt")?;
-    if sent.trim() != "true" {
-        return Err(MacosError::Other(format!(
-            "failed to trigger Gemini prompt submission: {sent}"
-        )));
+
+pub fn start_gemini_deep_research(
+    prompt: &str,
+    auto_confirm: bool,
+    profile_filter: Option<&str>,
+) -> Result<SafariDeepResearchResult, MacosError> {
+    prepare_gemini_mode(GeminiMode::DeepResearch, profile_filter)?;
+
+    let filled = execute_js_for_profile(
+        &build_gemini_fill_input_js(prompt),
+        profile_filter,
+        "safari_gemini_deep_research_fill",
+    )?;
+    if filled.trim() != "true" {
+        return Err(MacosError::Other(format!("failed to fill deep research input: {filled}")));
     }
+
+    wait_and_click_send(profile_filter)?;
+
+    // Capture conversation URL after submission
+    thread::sleep(Duration::from_millis(1000));
+    let conv_url = get_gemini_conversation_url(profile_filter).ok();
+
+    let mut result = poll_gemini_deep_research(30, profile_filter)?;
+    result.conversation_url = conv_url.clone();
+    if result.plan.is_none() {
+        result.plan = Some(prompt.to_string());
+    }
+
+    if auto_confirm && result.status == "plan_ready" {
+        let filled = execute_js_for_profile(
+            &build_gemini_fill_input_js("ok"),
+            profile_filter,
+            "safari_gemini_deep_research_confirm_fill",
+        )?;
+        if filled.trim() != "true" {
+            return Err(MacosError::Other("failed to fill confirm text".to_string()));
+        }
+        wait_and_click_send(profile_filter)?;
+        // Wait for page to transition from plan_ready to running state
+        thread::sleep(Duration::from_secs(3));
+        let mut final_result = poll_gemini_deep_research(900, profile_filter)?;
+        final_result.conversation_url = conv_url;
+        Ok(final_result)
+    } else {
+        Ok(result)
+    }
+}
+
+pub fn poll_gemini_deep_research(
+    timeout_seconds: u64,
+    profile_filter: Option<&str>,
+) -> Result<SafariDeepResearchResult, MacosError> {
+    let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
+    let js = gemini_deep_research_poll_js();
+
+    while Instant::now() < deadline {
+        let payload = execute_js_for_profile(&js, profile_filter, "safari_gemini_deep_research_poll")?;
+        let result = parse_deep_research_payload(&payload)?;
+        match result.status.as_str() {
+            "plan_ready" | "complete" => return Ok(result),
+            "running" => {}
+            _ => {
+                return Err(MacosError::Other(format!(
+                    "unknown deep research status: {}",
+                    result.status
+                )))
+            }
+        }
+
+        thread::sleep(Duration::from_secs(1));
+    }
+
+    Ok(SafariDeepResearchResult {
+        provider: "gemini".to_string(),
+        mode: "deep-research".to_string(),
+        status: "timeout".to_string(),
+        conversation_url: None,
+        plan: None,
+        response: None,
+        actions: Vec::new(),
+    })
+}
+
+pub fn send_gemini_prompt(
+    prompt: &str,
+    profile_filter: Option<&str>,
+) -> Result<SafariAiResponseResult, MacosError> {
+    let filled = execute_js_for_profile(
+        &build_gemini_fill_input_js(prompt),
+        profile_filter,
+        "safari_gemini_prompt_fill",
+    )?;
+    if filled.trim() != "true" {
+        return Err(MacosError::Other(format!("failed to fill Gemini input: {filled}")));
+    }
+
+    wait_and_click_send(profile_filter)?;
 
     let mut last_text = String::new();
     let mut stable_count = 0;
@@ -755,7 +1181,7 @@ pub fn send_gemini_prompt(prompt: &str) -> Result<SafariAiResponseResult, MacosE
 
     while Instant::now() < deadline {
         thread::sleep(Duration::from_secs(1));
-        let text = execute_js(&response_js, "safari_gemini_response")?;
+        let text = execute_js_for_profile(&response_js, profile_filter, "safari_gemini_response")?;
         let trimmed = text.trim();
         if should_skip_gemini_response(trimmed, prompt) {
             continue;
@@ -790,16 +1216,26 @@ pub fn send_gemini_prompt(prompt: &str) -> Result<SafariAiResponseResult, MacosE
 }
 
 fn execute_js(js_code: &str, context: &str) -> Result<String, MacosError> {
-    let stdout = run_capture(&build_exec_script(js_code), context)?;
+    execute_js_for_profile(js_code, None, context)
+}
+
+fn execute_js_for_profile(
+    js_code: &str,
+    profile_filter: Option<&str>,
+    context: &str,
+) -> Result<String, MacosError> {
+    let stdout = run_capture(&build_exec_script_for_profile(js_code, profile_filter), context)?;
     Ok(decode_field(stdout.trim()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        GeminiMode, TAB_SEPARATOR, build_active_tab_script, build_close_script, build_exec_script,
-        build_gemini_chat_prompt_js, build_gemini_mode_switch_js, build_open_script,
-        build_tabs_script, extract_profile, gemini_response_extract_js, parse_tab_line,
+        TAB_SEPARATOR, build_active_tab_script, build_close_script,
+        build_exec_script, build_gemini_fill_input_js, build_gemini_go_home_js,
+        build_open_script,
+        build_tab_return_block, build_tabs_script, extract_profile, gemini_deep_research_poll_js,
+        gemini_response_extract_js, parse_deep_research_payload, parse_tab_line,
         parse_tabs_output, selector_click_js, selector_fill_js, selector_text_js,
         should_skip_gemini_response,
     };
@@ -813,7 +1249,7 @@ mod tests {
 
     #[test]
     fn parse_tab_line_decodes_fields() {
-        let line = "61998\tRyugu — Google\\tGemini\t0\tGoogle\\tGemini\thttps://gemini.google.com/app\ttrue";
+        let line = "61998<<<FIELD_SEP>>>Ryugu — Google\\tGemini<<<FIELD_SEP>>>0<<<FIELD_SEP>>>Google\\tGemini<<<FIELD_SEP>>>https://gemini.google.com/app<<<FIELD_SEP>>>true";
 
         let tab = parse_tab_line(line).expect("tab");
 
@@ -829,8 +1265,8 @@ mod tests {
     #[test]
     fn parse_tabs_output_keeps_multiple_tabs() {
         let raw = concat!(
-            "1\tWork — Mail\t0\tMail\thttps://mail.google.com\ttrue---TAB_SEP---",
-            "1\tWork — Mail\t1\tDocs\thttps://docs.google.com\tfalse---TAB_SEP---"
+            "1<<<FIELD_SEP>>>Work — Mail<<<FIELD_SEP>>>0<<<FIELD_SEP>>>Mail<<<FIELD_SEP>>>https://mail.google.com<<<FIELD_SEP>>>true---TAB_SEP---",
+            "1<<<FIELD_SEP>>>Work — Mail<<<FIELD_SEP>>>1<<<FIELD_SEP>>>Docs<<<FIELD_SEP>>>https://docs.google.com<<<FIELD_SEP>>>false---TAB_SEP---"
         );
 
         let tabs = parse_tabs_output(raw);
@@ -848,11 +1284,12 @@ mod tests {
 
         assert!(script.contains(TAB_SEPARATOR));
         assert!(script.contains("\\s"));
+        assert!(script.contains("<<<FIELD_SEP>>>"));
     }
 
     #[test]
     fn build_open_script_creates_new_tab() {
-        let script = build_open_script("https://example.com");
+        let script = build_open_script("https://example.com", None);
 
         assert!(script.contains("make new tab at end of tabs of w"));
         assert!(script.contains("https://example.com"));
@@ -867,10 +1304,19 @@ mod tests {
 
     #[test]
     fn build_active_tab_script_targets_front_window() {
-        let script = build_active_tab_script();
+        let script = build_active_tab_script(None);
 
         assert!(script.contains("set w to front window"));
         assert!(script.contains("set t to current tab of w"));
+    }
+
+    #[test]
+    fn build_tab_return_block_coerces_numeric_fields_to_text() {
+        let script = build_tab_return_block("t", "true");
+
+        assert!(script.contains("(winId as text)"));
+        assert!(script.contains("(tabIndex as text)"));
+        assert!(script.contains("<<<FIELD_SEP>>>"));
     }
 
     #[test]
@@ -878,7 +1324,10 @@ mod tests {
         let script = build_exec_script("const x = 1;\nx + 1;");
 
         assert!(script.contains("set jsCode to"));
+        assert!(script.contains("set rawResult to missing value"));
+        assert!(script.contains("try"));
         assert!(script.contains("do JavaScript jsCode"));
+        assert!(script.contains("on error errMsg"));
         assert!(script.contains("& linefeed &"));
         assert!(script.contains("if rawResult is missing value then"));
     }
@@ -893,22 +1342,51 @@ mod tests {
     }
 
     #[test]
-    fn gemini_mode_switch_script_targets_requested_mode() {
-        let script = build_gemini_mode_switch_js(GeminiMode::DeepResearch);
-
-        assert!(script.contains("Deep Research"));
-        assert!(script.contains("What do you want to research?"));
-        assert!(script.contains("你想研究什麼？"));
-        assert!(script.contains("document.querySelector"));
-    }
-
-    #[test]
-    fn gemini_chat_prompt_script_targets_editor_and_send() {
-        let script = build_gemini_chat_prompt_js("hello world");
+    fn gemini_fill_input_script_targets_editor() {
+        let script = build_gemini_fill_input_js("hello world");
 
         assert!(script.contains(".ql-editor"));
         assert!(script.contains("hello world"));
-        assert!(script.contains("KeyboardEvent"));
+        assert!(script.contains("execCommand"));
+    }
+
+    #[test]
+    fn gemini_deep_research_poll_script_exposes_status_markers() {
+        let script = gemini_deep_research_poll_js();
+
+        assert!(script.contains("plan_ready"));
+        assert!(script.contains("running"));
+        assert!(script.contains("complete"));
+        assert!(script.contains("開始研究"));
+        assert!(script.contains("編輯計畫"));
+    }
+
+    #[test]
+    fn gemini_go_home_script_targets_root_app() {
+        let script = build_gemini_go_home_js();
+
+        assert!(script.contains("gemini.google.com/app"));
+    }
+
+    #[test]
+    fn parse_deep_research_payload_reads_plan_and_actions() {
+        let payload = r#"{"status":"plan_ready","plan":"Outline","actions":["confirm","edit"]}"#;
+        let result = parse_deep_research_payload(payload).expect("parse payload");
+
+        assert_eq!(result.status, "plan_ready");
+        assert_eq!(result.plan.as_deref(), Some("Outline"));
+        assert_eq!(result.actions, vec!["confirm".to_string(), "edit".to_string()]);
+    }
+
+    #[test]
+    fn parse_deep_research_payload_reads_running_without_plan() {
+        let payload = r#"{"status":"running"}"#;
+        let result = parse_deep_research_payload(payload).expect("parse payload");
+
+        assert_eq!(result.status, "running");
+        assert_eq!(result.plan, None);
+        assert_eq!(result.response, None);
+        assert!(result.actions.is_empty());
     }
 
     #[test]
