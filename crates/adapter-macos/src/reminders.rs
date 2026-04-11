@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, TimeZone};
+use chrono::{DateTime, Datelike, Local, TimeZone, Timelike};
 use serde::Serialize;
 
 use crate::MacosError;
@@ -15,8 +15,13 @@ pub struct ReminderItem {
     pub list_name: String,
 }
 
-fn format_for_applescript(dt: &DateTime<Local>) -> String {
-    dt.format("%Y-%m-%d %H:%M:%S").to_string()
+fn local_datetime_components(dt: &DateTime<Local>) -> (i32, u32, u32, u32) {
+    (
+        dt.year(),
+        dt.month(),
+        dt.day(),
+        dt.num_seconds_from_midnight(),
+    )
 }
 
 fn decode_field(value: &str) -> String {
@@ -32,6 +37,7 @@ fn decode_field(value: &str) -> String {
             Some('n') => decoded.push('\n'),
             Some('r') => decoded.push('\r'),
             Some('t') => decoded.push('\t'),
+            Some('s') => decoded.push_str(REMINDER_SEPARATOR),
             Some('\\') => decoded.push('\\'),
             Some(other) => {
                 decoded.push('\\');
@@ -96,6 +102,7 @@ fn reminders_script_prelude() -> &'static str {
             set escaped_text to my replace_text(tab, "\\t", escaped_text)
             set escaped_text to my replace_text(return, "\\r", escaped_text)
             set escaped_text to my replace_text(linefeed, "\\n", escaped_text)
+            set escaped_text to my replace_text("{REMINDER_SEPARATOR}", "\\s", escaped_text)
             return escaped_text
         end encode_field
 
@@ -153,7 +160,11 @@ fn build_list_script(list_filter: Option<&str>) -> String {
                     else
                         set reminderDue to my format_reminder_date(due date of aReminder)
                     end if
-                    set reminderCompleted to completed of aReminder
+                    if completed of aReminder then
+                        set reminderCompleted to "true"
+                    else
+                        set reminderCompleted to "false"
+                    end if
                     set output to output & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
                 end repeat
             end repeat
@@ -171,61 +182,94 @@ pub fn list(list_filter: Option<&str>) -> Result<Vec<ReminderItem>, MacosError> 
 }
 
 fn build_today_script(from: &str, to: &str) -> String {
+    let from_dt = DateTime::parse_from_rfc3339(from)
+        .ok()
+        .map(|dt| dt.with_timezone(&Local))
+        .unwrap_or_else(Local::now);
+    let to_dt = DateTime::parse_from_rfc3339(to)
+        .ok()
+        .map(|dt| dt.with_timezone(&Local))
+        .unwrap_or_else(Local::now);
+    let (from_year, from_month, from_day, from_seconds) = local_datetime_components(&from_dt);
+    let (to_year, to_month, to_day, to_seconds) = local_datetime_components(&to_dt);
+
     format!(
         r#"
         {prelude}
         tell application "Reminders"
-            set fromDate to date "{from}"
-            set toDate to date "{to}"
+            set fromDate to current date
+            set year of fromDate to {from_year}
+            set month of fromDate to {from_month}
+            set day of fromDate to {from_day}
+            set time of fromDate to {from_seconds}
+            set toDate to current date
+            set year of toDate to {to_year}
+            set month of toDate to {to_month}
+            set day of toDate to {to_day}
+            set time of toDate to {to_seconds}
             set output to ""
             repeat with aList in lists
                 set listName to my encode_field(name of aList)
-                repeat with aReminder in reminders of aList
-                    if due date of aReminder is not missing value then
-                        set reminderDueDate to due date of aReminder
-                        if reminderDueDate is greater than or equal to fromDate and reminderDueDate is less than or equal to toDate then
-                            set reminderTitle to my encode_field(name of aReminder)
-                            if body of aReminder is missing value then
-                                set reminderNotes to ""
-                            else
-                                set reminderNotes to my encode_field(body of aReminder)
-                            end if
-                            set reminderDue to my format_reminder_date(reminderDueDate)
-                            set reminderCompleted to completed of aReminder
-                            set output to output & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
-                        end if
+                set matchingReminders to (reminders of aList whose due date is not missing value and due date is greater than or equal to fromDate and due date is less than or equal to toDate)
+                repeat with aReminder in matchingReminders
+                    set reminderTitle to my encode_field(name of aReminder)
+                    if body of aReminder is missing value then
+                        set reminderNotes to ""
+                    else
+                        set reminderNotes to my encode_field(body of aReminder)
                     end if
+                    set reminderDue to my format_reminder_date(due date of aReminder)
+                    if completed of aReminder then
+                        set reminderCompleted to "true"
+                    else
+                        set reminderCompleted to "false"
+                    end if
+                    set output to output & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
                 end repeat
             end repeat
             return output
         end tell
         "#,
         prelude = reminders_script_prelude(),
+        from_year = from_year,
+        from_month = from_month,
+        from_day = from_day,
+        from_seconds = from_seconds,
+        to_year = to_year,
+        to_month = to_month,
+        to_day = to_day,
+        to_seconds = to_seconds,
     )
 }
 
 pub fn today() -> Result<Vec<ReminderItem>, MacosError> {
     let now = Local::now();
-    let from = format_for_applescript(
-        &now.date_naive()
-            .and_hms_opt(0, 0, 0)
-            .and_then(|dt| Local.from_local_datetime(&dt).single())
-            .ok_or_else(|| MacosError::Other("failed to determine start of today".into()))?,
-    );
-    let to = format_for_applescript(
-        &now.date_naive()
-            .and_hms_opt(23, 59, 59)
-            .and_then(|dt| Local.from_local_datetime(&dt).single())
-            .ok_or_else(|| MacosError::Other("failed to determine end of today".into()))?,
-    );
+    let from = now
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .and_then(|dt| Local.from_local_datetime(&dt).single())
+        .ok_or_else(|| MacosError::Other("failed to determine start of today".into()))?;
+    let to = now
+        .date_naive()
+        .and_hms_opt(23, 59, 59)
+        .and_then(|dt| Local.from_local_datetime(&dt).single())
+        .ok_or_else(|| MacosError::Other("failed to determine end of today".into()))?;
 
-    let stdout = run_capture(&build_today_script(&from, &to), "today_reminders")?;
+    let stdout = run_capture(
+        &build_today_script(&from.to_rfc3339(), &to.to_rfc3339()),
+        "today_reminders",
+    )?;
     Ok(parse_reminders_output(&stdout))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{build_list_script, build_today_script, parse_reminder_line, parse_reminders_output};
+    use chrono::{Local, TimeZone};
+
+    use super::{
+        build_list_script, build_today_script, parse_reminder_line, parse_reminders_output,
+        REMINDER_SEPARATOR,
+    };
 
     #[test]
     fn parse_reminder_line_unescapes_fields() {
@@ -259,11 +303,30 @@ mod tests {
     #[test]
     fn reminder_scripts_do_not_use_invalid_isot_coercion() {
         let list_script = build_list_script(None);
-        let today_script = build_today_script("2026-04-11 00:00:00", "2026-04-11 23:59:59");
+        let from = Local
+            .with_ymd_and_hms(2026, 4, 11, 0, 0, 0)
+            .single()
+            .expect("from");
+        let to = Local
+            .with_ymd_and_hms(2026, 4, 11, 23, 59, 59)
+            .single()
+            .expect("to");
+        let today_script = build_today_script(&from.to_rfc3339(), &to.to_rfc3339());
 
         assert!(!list_script.contains("class isot"));
         assert!(!today_script.contains("class isot"));
         assert!(list_script.contains("format_reminder_date"));
         assert!(today_script.contains("format_reminder_date"));
+        assert!(list_script.contains("set reminderCompleted to \"true\""));
+        assert!(today_script.contains("set matchingReminders to"));
+    }
+
+    #[test]
+    fn parse_reminder_line_unescapes_separator_escape() {
+        let line = "One\tContains\\sMarker\t\ttrue\tInbox";
+
+        let reminder = parse_reminder_line(line).expect("reminder");
+
+        assert_eq!(reminder.notes, format!("Contains{REMINDER_SEPARATOR}Marker"));
     }
 }
