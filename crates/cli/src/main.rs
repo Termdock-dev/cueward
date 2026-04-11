@@ -97,7 +97,7 @@ enum Command {
         action: CalendarAction,
     },
 
-    /// Capture a screenshot of the entire screen
+    /// Capture a screenshot of the screen
     Screenshot {
         /// Also run OCR on the captured image
         #[arg(long)]
@@ -106,6 +106,10 @@ enum Command {
         /// Output path (default: ~/.cueward/cache/screenshots/<timestamp>.png)
         #[arg(long)]
         output: Option<String>,
+
+        /// Display number (1 = main, 2 = secondary, 3 = third)
+        #[arg(long)]
+        display: Option<u32>,
     },
 
     /// Read or write the system clipboard
@@ -631,8 +635,8 @@ fn main() {
             }
         },
 
-        Command::Screenshot { ocr, output } => {
-            match cueward_adapter_macos::screenshot::capture(ocr, output.as_deref()) {
+        Command::Screenshot { ocr, output, display } => {
+            match cueward_adapter_macos::screenshot::capture(ocr, output.as_deref(), display) {
                 Ok(result) => {
                     println!("{}", serde_json::to_string_pretty(&result).unwrap());
                     eprintln!("screenshot saved to {}", result.path);
