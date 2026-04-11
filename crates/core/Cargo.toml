@@ -2,6 +2,12 @@
 name = "cueward-core"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+description = "Core types, indexing, and tagging engine for the Cueward knowledge capture toolkit."
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

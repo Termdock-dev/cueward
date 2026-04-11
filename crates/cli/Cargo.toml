@@ -2,14 +2,20 @@
 name = "cueward-cli"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+description = "CLI for capturing and searching local knowledge from macOS native sources."
 
 [[bin]]
 name = "cueward"
 path = "src/main.rs"
 
 [dependencies]
-cueward-core = { path = "../core" }
-cueward-adapter-macos = { path = "../adapter-macos" }
+cueward-core = { workspace = true }
+cueward-adapter-macos = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 chrono = "0.4"
 serde_json = "1"
