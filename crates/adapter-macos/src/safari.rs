@@ -1114,6 +1114,8 @@ pub fn start_gemini_deep_research(
             return Err(MacosError::Other("failed to fill confirm text".to_string()));
         }
         wait_and_click_send(profile_filter)?;
+        // Wait for page to transition from plan_ready to running state
+        thread::sleep(Duration::from_secs(3));
         let mut final_result = poll_gemini_deep_research(900, profile_filter)?;
         final_result.conversation_url = conv_url;
         Ok(final_result)
