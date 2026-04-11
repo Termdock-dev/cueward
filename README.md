@@ -56,6 +56,26 @@ cueward safari tabs --profile Ryugu
 
 # Current active tab in the front window
 cueward safari active
+
+# Open a new tab
+cueward safari open https://example.com
+
+# Close current tab or a specific tab index in the front window
+cueward safari close
+cueward safari close --index 2
+
+# Read current page text or a specific element
+cueward safari read
+cueward safari read --selector ".article-body"
+
+# Read full HTML source
+cueward safari source
+
+# Execute JavaScript / DOM actions in the active tab
+cueward safari exec "document.title"
+cueward safari click "#submit"
+cueward safari fill "textarea" "hello from cueward"
+cueward safari wait ".result" --timeout 30
 ```
 
 Outputs JSON to stdout:
