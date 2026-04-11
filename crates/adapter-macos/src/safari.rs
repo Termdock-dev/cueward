@@ -947,12 +947,12 @@ pub fn source(profile_filter: Option<&str>) -> Result<SafariSourceResult, MacosE
     Ok(SafariSourceResult { html: result })
 }
 
-pub fn read(selector: Option<&str>) -> Result<SafariReadResult, MacosError> {
+pub fn read(selector: Option<&str>, profile_filter: Option<&str>) -> Result<SafariReadResult, MacosError> {
     let js = match selector {
         Some(selector) => selector_text_js(selector),
         None => "(document.body.innerText ?? \"\").trim()".to_string(),
     };
-    let content = execute_js(&js, "safari_read")?;
+    let content = execute_js_for_profile(&js, profile_filter, "safari_read")?;
     Ok(SafariReadResult {
         selector: selector.map(ToOwned::to_owned),
         content,

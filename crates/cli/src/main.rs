@@ -899,8 +899,8 @@ fn main() {
                     process::exit(1);
                 }
             },
-            SafariAction::Read { selector, .. } => {
-                match cueward_adapter_macos::safari::read(selector.as_deref()) {
+            SafariAction::Read { selector, profile } => {
+                match cueward_adapter_macos::safari::read(selector.as_deref(), profile.as_deref()) {
                     Ok(result) => {
                         println!("{}", serde_json::to_string_pretty(&result).unwrap());
                         eprintln!("read page content");
