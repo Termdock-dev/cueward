@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use chrono::{DateTime, TimeZone, Utc};
 use rusqlite::Connection;
 use serde::Serialize;
+use serde_json::Value;
 
 use cueward_core::{Cue, CueSource};
 
@@ -92,6 +93,19 @@ pub struct SafariAiResponseResult {
     pub provider: String,
     pub status: String,
     pub response: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariDeepResearchResult {
+    pub provider: String,
+    pub mode: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub actions: Vec<String>,
 }
 
 fn history_db_path() -> PathBuf {
@@ -563,6 +577,111 @@ fn gemini_response_extract_js() -> String {
     })()"#
         .to_string()
 }
+fn build_gemini_deep_research_plan_js(prompt: &str) -> String {
+    let prompt = escape_js_string(prompt);
+    format!(
+        r#"(() => {{
+            const promptText = "{prompt}";
+            const input = document.querySelector(
+              ".ql-editor, rich-textarea .ProseMirror, div[role='textbox'][contenteditable='true'], div[contenteditable='true']"
+            );
+            if (!input) {{
+              throw new Error("gemini deep research input not found");
+            }}
+
+            input.focus();
+            input.textContent = promptText;
+            input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+            input.dispatchEvent(new KeyboardEvent("keydown", {{ key: "Enter", bubbles: true }}));
+            input.dispatchEvent(new KeyboardEvent("keyup", {{ key: "Enter", bubbles: true }}));
+
+            const bodyText = document.body.innerText || "";
+            const plan = (() => {{
+              const selectors = [
+                ".model-response-text",
+                ".message-content",
+                ".markdown",
+                "div[data-test-id='message-content']"
+              ];
+              for (const selector of selectors) {{
+                const elements = document.querySelectorAll(selector);
+                if (!elements.length) continue;
+                const last = elements[elements.length - 1];
+                const text = (last.innerText || last.textContent || "").trim();
+                if (text) return text;
+              }}
+              return promptText;
+            }})();
+            const actions = [];
+            if (bodyText.includes("開始研究") || bodyText.includes("Start research")) actions.push("confirm");
+            if (bodyText.includes("編輯計畫") || bodyText.includes("Edit plan")) actions.push("edit");
+
+            return JSON.stringify({{
+              status: actions.length ? "plan_ready" : "running",
+              plan,
+              actions
+            }});
+        }})()"#
+    )
+}
+
+fn build_gemini_deep_research_confirm_js() -> String {
+    r#"(() => {
+        const labels = ["開始研究", "Start research"];
+        const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+        const nodes = [...document.querySelectorAll("button,[role='button'],[role='option'],span")];
+        for (const node of nodes) {
+          const text = normalize(node.innerText || node.textContent);
+          if (!labels.some((label) => text.includes(label))) continue;
+          const clickable = node.closest("button,[role='button'],[role='option']") || node;
+          clickable.click();
+          return "true";
+        }
+        throw new Error("deep research confirm button not found");
+    })()"#
+        .to_string()
+}
+
+fn gemini_deep_research_poll_js() -> String {
+    r#"(() => {
+        const text = document.body.innerText || "";
+        const selectors = [
+          ".model-response-text",
+          ".message-content",
+          ".markdown",
+          "div[data-test-id='message-content']"
+        ];
+        const extractLastResponse = () => {
+          for (const selector of selectors) {
+            const elements = document.querySelectorAll(selector);
+            if (!elements.length) continue;
+            const last = elements[elements.length - 1];
+            const content = (last.innerText || last.textContent || "").trim();
+            if (content) return content;
+          }
+          return "";
+        };
+
+        if (text.includes("開始研究") || text.includes("Start research")) {
+          return JSON.stringify({
+            status: "plan_ready",
+            plan: extractLastResponse(),
+            actions: ["confirm", "edit"]
+          });
+        }
+        if (text.includes("研究中") || text.includes("Researching") || text.includes("Generating report")) {
+          return JSON.stringify({ status: "running" });
+        }
+
+        const content = extractLastResponse();
+        if (content) {
+          return JSON.stringify({ status: "complete", response: content });
+        }
+
+        return JSON.stringify({ status: "running" });
+    })()"#
+        .to_string()
+}
 
 pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
     let db_path = history_db_path();
@@ -722,6 +841,35 @@ pub fn wait(selector: &str, timeout_seconds: u64) -> Result<SafariWaitResult, Ma
     }
 }
 
+fn parse_deep_research_payload(payload: &str) -> Result<SafariDeepResearchResult, MacosError> {
+    let value: Value = serde_json::from_str(payload)
+        .map_err(|error| MacosError::Other(format!("invalid deep research payload: {error}: {payload}")))?;
+    let status = value
+        .get("status")
+        .and_then(Value::as_str)
+        .ok_or_else(|| MacosError::Other("deep research payload missing status".to_string()))?;
+    let actions = value
+        .get("actions")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    Ok(SafariDeepResearchResult {
+        provider: "gemini".to_string(),
+        mode: "deep-research".to_string(),
+        status: status.to_string(),
+        plan: value.get("plan").and_then(Value::as_str).map(ToOwned::to_owned),
+        response: value.get("response").and_then(Value::as_str).map(ToOwned::to_owned),
+        actions,
+    })
+}
+
 pub fn prepare_gemini_mode(mode: GeminiMode) -> Result<SafariAiReadyResult, MacosError> {
     let placeholder = execute_js(&build_gemini_mode_switch_js(mode), "safari_gemini_mode")?;
     if !gemini_mode_placeholders(mode)
@@ -737,6 +885,67 @@ pub fn prepare_gemini_mode(mode: GeminiMode) -> Result<SafariAiReadyResult, Maco
         provider: "gemini".to_string(),
         mode: gemini_mode_slug(mode).to_string(),
         status: "ready".to_string(),
+    })
+}
+
+
+pub fn start_gemini_deep_research(
+    prompt: &str,
+    auto_confirm: bool,
+) -> Result<SafariDeepResearchResult, MacosError> {
+    let raw = execute_js(
+        &build_gemini_deep_research_plan_js(prompt),
+        "safari_gemini_deep_research_plan",
+    )?;
+    let mut result = parse_deep_research_payload(&raw)?;
+    if result.plan.is_none() {
+        result.plan = Some(prompt.to_string());
+    }
+
+    if auto_confirm {
+        let confirm = execute_js(
+            &build_gemini_deep_research_confirm_js(),
+            "safari_gemini_deep_research_confirm",
+        )?;
+        if confirm.trim() != "true" {
+            return Err(MacosError::Other(format!(
+                "failed to confirm deep research plan: {confirm}"
+            )));
+        }
+        poll_gemini_deep_research(900)
+    } else {
+        Ok(result)
+    }
+}
+
+pub fn poll_gemini_deep_research(timeout_seconds: u64) -> Result<SafariDeepResearchResult, MacosError> {
+    let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
+    let js = gemini_deep_research_poll_js();
+
+    while Instant::now() < deadline {
+        let payload = execute_js(&js, "safari_gemini_deep_research_poll")?;
+        let result = parse_deep_research_payload(&payload)?;
+        match result.status.as_str() {
+            "plan_ready" | "complete" => return Ok(result),
+            "running" => {}
+            _ => {
+                return Err(MacosError::Other(format!(
+                    "unknown deep research status: {}",
+                    result.status
+                )))
+            }
+        }
+
+        thread::sleep(Duration::from_secs(1));
+    }
+
+    Ok(SafariDeepResearchResult {
+        provider: "gemini".to_string(),
+        mode: "deep-research".to_string(),
+        status: "timeout".to_string(),
+        plan: None,
+        response: None,
+        actions: Vec::new(),
     })
 }
 
@@ -797,9 +1006,11 @@ fn execute_js(js_code: &str, context: &str) -> Result<String, MacosError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        GeminiMode, TAB_SEPARATOR, build_active_tab_script, build_close_script, build_exec_script,
-        build_gemini_chat_prompt_js, build_gemini_mode_switch_js, build_open_script,
-        build_tabs_script, extract_profile, gemini_response_extract_js, parse_tab_line,
+        GeminiMode, TAB_SEPARATOR, build_active_tab_script, build_close_script,
+        build_exec_script, build_gemini_chat_prompt_js, build_gemini_deep_research_confirm_js,
+        build_gemini_deep_research_plan_js, build_gemini_mode_switch_js, build_open_script,
+        build_tabs_script, extract_profile, gemini_deep_research_poll_js,
+        gemini_response_extract_js, parse_deep_research_payload, parse_tab_line,
         parse_tabs_output, selector_click_js, selector_fill_js, selector_text_js,
         should_skip_gemini_response,
     };
@@ -909,6 +1120,44 @@ mod tests {
         assert!(script.contains(".ql-editor"));
         assert!(script.contains("hello world"));
         assert!(script.contains("KeyboardEvent"));
+    }
+
+    #[test]
+    fn gemini_deep_research_plan_script_targets_plan_controls() {
+        let script = build_gemini_deep_research_plan_js("研究主題");
+
+        assert!(script.contains("研究主題"));
+        assert!(script.contains("開始研究"));
+        assert!(script.contains("Start research"));
+        assert!(script.contains("編輯計畫"));
+    }
+
+    #[test]
+    fn gemini_deep_research_poll_script_exposes_status_markers() {
+        let script = gemini_deep_research_poll_js();
+
+        assert!(script.contains("plan_ready"));
+        assert!(script.contains("running"));
+        assert!(script.contains("complete"));
+        assert!(script.contains("開始研究"));
+    }
+
+    #[test]
+    fn gemini_deep_research_confirm_script_targets_confirm_button() {
+        let script = build_gemini_deep_research_confirm_js();
+
+        assert!(script.contains("開始研究"));
+        assert!(script.contains("Start research"));
+    }
+
+    #[test]
+    fn parse_deep_research_payload_reads_plan_and_actions() {
+        let payload = r#"{"status":"plan_ready","plan":"Outline","actions":["confirm","edit"]}"#;
+        let result = parse_deep_research_payload(payload).expect("parse payload");
+
+        assert_eq!(result.status, "plan_ready");
+        assert_eq!(result.plan.as_deref(), Some("Outline"));
+        assert_eq!(result.actions, vec!["confirm".to_string(), "edit".to_string()]);
     }
 
     #[test]

@@ -283,6 +283,16 @@ enum SafariAction {
         /// Prompt to send in a later workflow stage
         #[arg(long)]
         prompt: Option<String>,
+        /// Automatically confirm the Deep Research plan when available
+        #[arg(long, default_value_t = false)]
+        auto_confirm: bool,
+    },
+
+    /// Poll an in-progress Safari AI workflow
+    AiPoll {
+        /// Timeout in seconds
+        #[arg(long, default_value = "900")]
+        timeout: u64,
     },
 }
 
@@ -530,13 +540,18 @@ enum GeminiAiAction {
     ModeOnly(GeminiMode),
     PromptOnly(String),
     ModeThenPrompt(GeminiMode, String),
+    DeepResearchPlan(String, bool),
 }
 
 fn build_gemini_ai_action(
     mode: Option<GeminiMode>,
     prompt: Option<&str>,
+    auto_confirm: bool,
 ) -> Result<GeminiAiAction, &'static str> {
     match (mode, prompt) {
+        (Some(GeminiMode::DeepResearch), Some(prompt)) => {
+            Ok(GeminiAiAction::DeepResearchPlan(prompt.to_string(), auto_confirm))
+        }
         (Some(mode), Some(prompt)) => Ok(GeminiAiAction::ModeThenPrompt(mode, prompt.to_string())),
         (Some(mode), None) => Ok(GeminiAiAction::ModeOnly(mode)),
         (None, Some(prompt)) => Ok(GeminiAiAction::PromptOnly(prompt.to_string())),
@@ -897,9 +912,10 @@ fn main() {
                 provider,
                 mode,
                 prompt,
+                auto_confirm,
             } => match provider {
                 SafariAiProvider::Gemini => {
-                    let action = match build_gemini_ai_action(mode, prompt.as_deref()) {
+                    let action = match build_gemini_ai_action(mode, prompt.as_deref(), auto_confirm) {
                         Ok(action) => action,
                         Err(err) => {
                             eprintln!("error: {err}");
@@ -953,6 +969,21 @@ fn main() {
                                 }
                             }
                         }
+                        GeminiAiAction::DeepResearchPlan(prompt, auto_confirm) => {
+                            match cueward_adapter_macos::safari::start_gemini_deep_research(
+                                &prompt,
+                                auto_confirm,
+                            ) {
+                                Ok(result) => {
+                                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                                    eprintln!("gemini deep research state ready");
+                                }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
+                            }
+                        }
                     }
                 }
                 SafariAiProvider::Chatgpt => {
@@ -960,6 +991,19 @@ fn main() {
                     process::exit(1);
                 }
             },
+                        SafariAction::AiPoll { timeout } => {
+                match cueward_adapter_macos::safari::poll_gemini_deep_research(timeout) {
+                    Ok(result) => {
+                        println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                        eprintln!("gemini deep research polled");
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+
         },
 
         Command::Notes { action } => match action {
@@ -1292,11 +1336,13 @@ mod tests {
                         provider,
                         mode,
                         prompt,
+                        auto_confirm,
                     },
             } => {
                 assert_eq!(provider, SafariAiProvider::Gemini);
                 assert_eq!(mode, Some(GeminiMode::DeepResearch));
                 assert_eq!(prompt, Some("研究議題".to_string()));
+                assert!(!auto_confirm);
             }
             _ => panic!("unexpected command"),
         }
@@ -1322,11 +1368,13 @@ mod tests {
                         provider,
                         mode,
                         prompt,
+                        auto_confirm,
                     },
             } => {
                 assert_eq!(provider, SafariAiProvider::Gemini);
                 assert_eq!(mode, None);
                 assert_eq!(prompt, Some("哈囉".to_string()));
+                assert!(!auto_confirm);
             }
             _ => panic!("unexpected command"),
         }
@@ -1335,16 +1383,70 @@ mod tests {
     #[test]
     fn build_gemini_ai_action_allows_mode_and_prompt_together() {
         assert_eq!(
-            build_gemini_ai_action(Some(GeminiMode::DeepResearch), Some("研究主題")).unwrap(),
-            GeminiAiAction::ModeThenPrompt(GeminiMode::DeepResearch, "研究主題".to_string())
+            build_gemini_ai_action(Some(GeminiMode::DeepResearch), Some("研究主題"), false).unwrap(),
+            GeminiAiAction::DeepResearchPlan("研究主題".to_string(), false)
         );
     }
 
     #[test]
     fn build_gemini_ai_action_requires_mode_or_prompt() {
         assert_eq!(
-            build_gemini_ai_action(None, None),
+            build_gemini_ai_action(None, None, false),
             Err("--mode or --prompt is required for Gemini Safari AI workflow")
         );
+    }
+
+    #[test]
+    fn cli_parses_gemini_deep_research_auto_confirm_command() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "ai",
+            "--provider",
+            "gemini",
+            "--mode",
+            "deep-research",
+            "--prompt",
+            "研究主題",
+            "--auto-confirm",
+        ])
+        .expect("parse deep research command");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Ai {
+                        provider,
+                        mode,
+                        prompt,
+                        auto_confirm,
+                    },
+            } => {
+                assert_eq!(provider, SafariAiProvider::Gemini);
+                assert_eq!(mode, Some(GeminiMode::DeepResearch));
+                assert_eq!(prompt, Some("研究主題".to_string()));
+                assert!(auto_confirm);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_safari_ai_poll_command() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "ai-poll",
+            "--timeout",
+            "120",
+        ])
+        .expect("parse ai-poll command");
+
+        match cli.command {
+            Command::Safari {
+                action: SafariAction::AiPoll { timeout },
+            } => assert_eq!(timeout, 120),
+            _ => panic!("unexpected command"),
+        }
     }
 }
