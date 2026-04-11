@@ -7,7 +7,7 @@ repository.workspace = true
 homepage.workspace = true
 readme.workspace = true
 rust-version.workspace = true
-description = "macOS adapter for Cueward with Safari, Notes, Messages, Reminders, and OCR integrations."
+description = "macOS adapter for Cueward with Safari, Notes, Messages, Reminders, Calendar, Screenshot, Clipboard, and OCR integrations."
 
 [dependencies]
 cueward-core = { version = "0.1.0", path = "../core" }

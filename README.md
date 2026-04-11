@@ -23,8 +23,8 @@ Cueward reads local databases that require Full Disk Access:
 1. Open **System Settings > Privacy & Security > Full Disk Access**
 2. Add your terminal app (Termdock, Terminal.app, iTerm2, WezTerm, etc.)
 
-For Apple Notes and Reminders operations, also allow automation:
-- **System Settings > Privacy & Security > Automation** > allow your terminal to control Notes and Reminders
+For Apple Notes, Reminders, and Calendar operations, also allow automation:
+- **System Settings > Privacy & Security > Automation** > allow your terminal to control Notes, Reminders, and Calendar
 
 ## Usage
 
@@ -146,6 +146,64 @@ cueward notes delete --title "Note Title" --folder Cueward
 cueward notes move --title "Note Title" --from Cueward --to Archive
 ```
 
+### Calendar
+
+Query and manage Apple Calendar events:
+
+```bash
+# Today's events
+cueward calendar today
+
+# Events in a time range
+cueward calendar list --from "2026-04-11 09:00" --to "2026-04-11 18:00"
+
+# Filter by calendar
+cueward calendar list --calendar Work
+
+# Create an event
+cueward calendar create --title "Team Sync" --start "2026-04-12 14:00" --end "2026-04-12 15:00" --calendar Work --location "Google Meet" --notes "Weekly sync"
+
+# Delete an event (matches by title + start time)
+cueward calendar delete --title "Team Sync" --start "2026-04-12 14:00"
+```
+
+Datetime format: ISO 8601 (`2026-04-11T14:00:00`) or `YYYY-MM-DD HH:MM`.
+
+### Screenshot
+
+Capture a screenshot, optionally with OCR:
+
+```bash
+# Capture main screen
+cueward screenshot
+
+# With OCR text extraction
+cueward screenshot --ocr
+
+# Specific display (1=main, 2=secondary, 3=third)
+cueward screenshot --display 2
+
+# Custom output path
+cueward screenshot --output ~/Desktop/shot.png --ocr
+```
+
+### Clipboard
+
+Read and write the system clipboard:
+
+```bash
+# Read clipboard (text or image)
+cueward clipboard get
+
+# Save clipboard image to a specific path
+cueward clipboard get --save-image ~/Desktop/clip.png
+
+# Write text to clipboard
+cueward clipboard set "Hello from cueward"
+```
+
+Text content returns JSON with `"type": "text"`. Image content is saved as PNG and returns `"type": "image"` with the file path.
+
 ### Quick Notes
 
 List, update, archive, and delete system Quick Notes (快速備忘錄):
@@ -199,9 +257,11 @@ mkdir -p ~/.claude/skills/ && cp -r skills/cueward-agent ~/.claude/skills/
 ```
 crates/
 ├── core/            Cue struct, PlatformAdapter trait, BM25 index, auto-tagger
-├── cli/             clap CLI (capture, triage, search, send, plan, ocr, notes, quick-notes)
+├── cli/             clap CLI (capture, triage, search, send, plan, ocr, notes, quick-notes,
+│                    calendar, screenshot, clipboard)
 ├── adapter-macos/   Safari (SQLite), Notes (AppleScript), Messages (SQLite),
-│                    Reminders (AppleScript), Vision OCR (Swift)
+│                    Reminders (AppleScript), Calendar (AppleScript),
+│                    Vision OCR (Swift), Screenshot (screencapture), Clipboard (pbpaste/pbcopy)
 └── adapter-windows/ Reserved for future cross-platform support
 ```
 
@@ -216,6 +276,10 @@ crates/
 ├── inbox/        Captured cues awaiting triage
 ├── processed/    Triaged cues (moved from inbox)
 ├── index/        Tantivy BM25 search index
+├── cache/
+│   ├── ocr/          OCR result cache (by SHA256)
+│   ├── screenshots/  Screenshot captures
+│   └── clipboard/    Clipboard image captures
 ├── state.json    High watermark timestamps per source
 └── tags.toml     Auto-tagging keyword rules (user-created)
 ```
