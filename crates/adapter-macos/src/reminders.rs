@@ -82,8 +82,9 @@ fn parse_reminders_output(stdout: &str) -> Vec<ReminderItem> {
         .collect()
 }
 
-fn reminders_script_prelude() -> &'static str {
-    r#"
+fn reminders_script_prelude() -> String {
+    format!(
+        r#"
         on replace_text(find_text, replace_text, source_text)
             set previous_delimiters to AppleScript's text item delimiters
             set AppleScript's text item delimiters to find_text
@@ -102,7 +103,7 @@ fn reminders_script_prelude() -> &'static str {
             set escaped_text to my replace_text(tab, "\\t", escaped_text)
             set escaped_text to my replace_text(return, "\\r", escaped_text)
             set escaped_text to my replace_text(linefeed, "\\n", escaped_text)
-            set escaped_text to my replace_text("{REMINDER_SEPARATOR}", "\\s", escaped_text)
+            set escaped_text to my replace_text("{separator}", "\\s", escaped_text)
             return escaped_text
         end encode_field
 
@@ -123,7 +124,9 @@ fn reminders_script_prelude() -> &'static str {
             set ss to seconds of reminder_date as integer
             return (y as string) & "-" & my pad2(m) & "-" & my pad2(d) & "T" & my pad2(hh) & ":" & my pad2(mm) & ":" & my pad2(ss)
         end format_reminder_date
-    "#
+    "#,
+        separator = REMINDER_SEPARATOR,
+    )
 }
 
 fn build_list_script(list_filter: Option<&str>) -> String {
