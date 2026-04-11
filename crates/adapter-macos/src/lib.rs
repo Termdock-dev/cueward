@@ -2,6 +2,7 @@ mod safari;
 mod notes;
 mod messages;
 pub mod applescript;
+pub mod calendar;
 pub mod send;
 pub mod plan;
 pub mod ocr;
