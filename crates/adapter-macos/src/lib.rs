@@ -1,4 +1,4 @@
-mod safari;
+pub mod safari;
 mod notes;
 mod messages;
 pub mod applescript;

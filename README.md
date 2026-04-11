@@ -43,6 +43,21 @@ cueward capture --source safari --since 7d
 cueward capture --source notes --since 3h
 ```
 
+### Safari
+
+Read current Safari tabs, not just browsing history:
+
+```bash
+# List all open tabs
+cueward safari tabs
+
+# Filter by Safari profile name parsed from window title
+cueward safari tabs --profile Ryugu
+
+# Current active tab in the front window
+cueward safari active
+```
+
 Outputs JSON to stdout:
 
 ```json
@@ -274,11 +289,12 @@ mkdir -p ~/.claude/skills/ && cp -r skills/cueward-agent ~/.claude/skills/
 ```
 crates/
 ├── core/            Cue struct, PlatformAdapter trait, BM25 index, auto-tagger
-├── cli/             clap CLI (capture, triage, search, send, plan, reminders, ocr, notes,
-│                    quick-notes, calendar, screenshot, clipboard)
+├── cli/             clap CLI (capture, triage, search, send, plan, reminders, ocr, safari,
+│                    notes, quick-notes, calendar, screenshot, clipboard)
 ├── adapter-macos/   Safari (SQLite), Notes (AppleScript), Messages (SQLite),
-│                    Reminders write/read (AppleScript), Calendar (AppleScript),
-│                    Vision OCR (Swift), Screenshot (screencapture), Clipboard (pbpaste/pbcopy)
+│                    Safari current tabs (AppleScript), Reminders write/read (AppleScript),
+│                    Calendar (AppleScript), Vision OCR (Swift), Screenshot (screencapture),
+│                    Clipboard (pbpaste/pbcopy)
 └── adapter-windows/ Reserved for future cross-platform support
 ```
 
