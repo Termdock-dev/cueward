@@ -871,7 +871,7 @@ fn main() {
                     process::exit(1);
                 }
             },
-            SafariAction::Open { url, .. } => match cueward_adapter_macos::safari::open(&url) {
+            SafariAction::Open { url, profile } => match cueward_adapter_macos::safari::open(&url, profile.as_deref()) {
                 Ok(tab) => {
                     println!("{}", serde_json::to_string_pretty(&tab).unwrap());
                     if tab.is_some() {
@@ -911,7 +911,7 @@ fn main() {
                     }
                 }
             }
-            SafariAction::Source { .. } => match cueward_adapter_macos::safari::source() {
+            SafariAction::Source { profile } => match cueward_adapter_macos::safari::source(profile.as_deref()) {
                 Ok(result) => {
                     println!("{}", serde_json::to_string_pretty(&result).unwrap());
                     eprintln!("read page source");

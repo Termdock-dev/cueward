@@ -369,9 +369,10 @@ fn build_exec_script_for_profile(js_code: &str, profile_filter: Option<&str>) ->
     )
 }
 
-fn build_open_script(url: &str) -> String {
+fn build_open_script(url: &str, profile_filter: Option<&str>) -> String {
     let escaped_url = escape(url);
     let tab_return = build_tab_return_block("t", "true");
+    let target_window = target_window_block(profile_filter);
     format!(
         r#"
         {prelude}
@@ -380,7 +381,7 @@ fn build_open_script(url: &str) -> String {
                 make new document with properties {{URL:"{escaped_url}"}}
                 set w to front window
             else
-                set w to front window
+                {target_window}
                 set t to make new tab at end of tabs of w with properties {{URL:"{escaped_url}"}}
                 set current tab of w to t
             end if
@@ -391,6 +392,7 @@ fn build_open_script(url: &str) -> String {
     "#,
         prelude = safari_script_prelude(),
         escaped_url = escaped_url,
+        target_window = target_window,
         tab_return = tab_return,
     )
 }
@@ -924,8 +926,8 @@ pub fn active(profile_filter: Option<&str>) -> Result<Option<SafariTab>, MacosEr
     }))
 }
 
-pub fn open(url: &str) -> Result<Option<SafariTab>, MacosError> {
-    let stdout = run_capture(&build_open_script(url), "safari_open")?;
+pub fn open(url: &str, profile_filter: Option<&str>) -> Result<Option<SafariTab>, MacosError> {
+    let stdout = run_capture(&build_open_script(url, profile_filter), "safari_open")?;
     Ok(parse_tab_line(stdout.trim()).map(|mut tab| {
         tab.profile = extract_profile(&tab.window_name, &tab.title);
         tab
@@ -940,8 +942,8 @@ pub fn close(index: Option<usize>) -> Result<SafariCloseResult, MacosError> {
     })
 }
 
-pub fn source() -> Result<SafariSourceResult, MacosError> {
-    let result = execute_js("document.documentElement.outerHTML", "safari_source")?;
+pub fn source(profile_filter: Option<&str>) -> Result<SafariSourceResult, MacosError> {
+    let result = execute_js_for_profile("document.documentElement.outerHTML", profile_filter, "safari_source")?;
     Ok(SafariSourceResult { html: result })
 }
 
@@ -1285,7 +1287,7 @@ mod tests {
 
     #[test]
     fn build_open_script_creates_new_tab() {
-        let script = build_open_script("https://example.com");
+        let script = build_open_script("https://example.com", None);
 
         assert!(script.contains("make new tab at end of tabs of w"));
         assert!(script.contains("https://example.com"));
