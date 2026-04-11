@@ -205,6 +205,58 @@ enum SafariAction {
 
     /// Show the current active tab in the front Safari window
     Active,
+
+    /// Open a URL in a new Safari tab
+    Open {
+        /// URL to open
+        url: String,
+    },
+
+    /// Close a tab in the front Safari window
+    Close {
+        /// Zero-based tab index in the front window. Defaults to the current tab.
+        #[arg(long)]
+        index: Option<usize>,
+    },
+
+    /// Read page content from the current active tab
+    Read {
+        /// Optional CSS selector to extract a specific element's text
+        #[arg(long)]
+        selector: Option<String>,
+    },
+
+    /// Read the full HTML source of the current active tab
+    Source,
+
+    /// Execute JavaScript in the current active tab
+    Exec {
+        /// JavaScript code to execute
+        js_code: String,
+    },
+
+    /// Click an element in the current active tab
+    Click {
+        /// CSS selector
+        selector: String,
+    },
+
+    /// Fill an element in the current active tab
+    Fill {
+        /// CSS selector
+        selector: String,
+        /// Text to fill
+        text: String,
+    },
+
+    /// Wait for an element to appear in the current active tab
+    Wait {
+        /// CSS selector
+        selector: String,
+        /// Timeout in seconds
+        #[arg(long, default_value = "30")]
+        timeout: u64,
+    },
 }
 
 #[derive(Subcommand)]
@@ -682,6 +734,94 @@ fn main() {
                     } else {
                         eprintln!("no Safari window");
                     }
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+            SafariAction::Open { url } => match cueward_adapter_macos::safari::open(&url) {
+                Ok(tab) => {
+                    println!("{}", serde_json::to_string_pretty(&tab).unwrap());
+                    if tab.is_some() {
+                        eprintln!("opened tab");
+                    } else {
+                        eprintln!("no Safari window");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+            SafariAction::Close { index } => match cueward_adapter_macos::safari::close(index) {
+                Ok(result) => {
+                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    if result.closed {
+                        eprintln!("tab closed");
+                    } else {
+                        eprintln!("no Safari window");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+            SafariAction::Read { selector } => match cueward_adapter_macos::safari::read(selector.as_deref()) {
+                Ok(result) => {
+                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    eprintln!("read page content");
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+            SafariAction::Source => match cueward_adapter_macos::safari::source() {
+                Ok(result) => {
+                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    eprintln!("read page source");
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+            SafariAction::Exec { js_code } => match cueward_adapter_macos::safari::exec(&js_code) {
+                Ok(result) => {
+                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    eprintln!("executed javascript");
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+            SafariAction::Click { selector } => match cueward_adapter_macos::safari::click(&selector) {
+                Ok(result) => {
+                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    eprintln!("clicked element");
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+            SafariAction::Fill { selector, text } => match cueward_adapter_macos::safari::fill(&selector, &text) {
+                Ok(result) => {
+                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    eprintln!("filled element");
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+            SafariAction::Wait { selector, timeout } => match cueward_adapter_macos::safari::wait(&selector, timeout) {
+                Ok(result) => {
+                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    eprintln!("selector found");
                 }
                 Err(e) => {
                     eprintln!("error: {e}");

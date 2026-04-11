@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use chrono::{DateTime, TimeZone, Utc};
 use rusqlite::Connection;
@@ -8,7 +10,7 @@ use serde::Serialize;
 use cueward_core::{Cue, CueSource};
 
 use crate::MacosError;
-use crate::applescript::run_capture;
+use crate::applescript::{escape, escape_body, run_capture};
 
 /// Core Data epoch: 2001-01-01 00:00:00 UTC
 const CORE_DATA_EPOCH: i64 = 978_307_200;
@@ -24,6 +26,50 @@ pub struct SafariTab {
     pub title: String,
     pub url: String,
     pub active: bool,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariEvalResult {
+    pub result: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariReadResult {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selector: Option<String>,
+    pub content: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariSourceResult {
+    pub html: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariCloseResult {
+    pub closed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index: Option<usize>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariClickResult {
+    pub clicked: bool,
+    pub selector: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariFillResult {
+    pub filled: bool,
+    pub selector: String,
+    pub text: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariWaitResult {
+    pub found: bool,
+    pub selector: String,
+    pub timeout_seconds: u64,
 }
 
 fn history_db_path() -> PathBuf {
@@ -66,8 +112,17 @@ fn decode_field(value: &str) -> String {
     decoded
 }
 
-fn extract_profile(window_name: &str, tab_title: &str) -> Option<String> {
-    let expected_suffix = format!(" — {tab_title}");
+fn escape_js_string(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
+}
+
+fn extract_profile(window_name: &str, active_tab_title: &str) -> Option<String> {
+    let expected_suffix = format!(" — {active_tab_title}");
     window_name
         .strip_suffix(&expected_suffix)
         .map(str::trim)
@@ -83,10 +138,11 @@ fn parse_tab_line(line: &str) -> Option<SafariTab> {
 
     let window_id = parts[0].trim().parse().ok()?;
     let window_name = decode_field(parts[1]);
-    let index: usize = parts[2].trim().parse().ok()?;
+    let index = parts[2].trim().parse().ok()?;
     let title = decode_field(parts[3]);
     let url = decode_field(parts[4]);
     let active = parts[5].trim() == "true";
+
     Some(SafariTab {
         window_id,
         window_name,
@@ -150,6 +206,17 @@ fn safari_script_prelude() -> String {
     )
 }
 
+fn build_tab_return_block(tab_ref: &str, active_flag: &str) -> String {
+    format!(
+        r#"set winId to id of w
+            set winName to my encode_field(name of w)
+            set tabIndex to (index of {tab_ref}) - 1
+            set tabTitle to my encode_field(name of {tab_ref})
+            set tabURL to my encode_field(URL of {tab_ref})
+            return winId & tab & winName & tab & tabIndex & tab & tabTitle & tab & tabURL & tab & "{active_flag}""#
+    )
+}
+
 fn build_tabs_script() -> String {
     format!(
         r#"
@@ -181,6 +248,7 @@ fn build_tabs_script() -> String {
 }
 
 fn build_active_tab_script() -> String {
+    let tab_return = build_tab_return_block("t", "true");
     format!(
         r#"
         {prelude}
@@ -190,15 +258,137 @@ fn build_active_tab_script() -> String {
             end if
             set w to front window
             set t to current tab of w
-            set winId to id of w
-            set winName to my encode_field(name of w)
-            set tabIndex to (index of t) - 1
-            set tabTitle to my encode_field(name of t)
-            set tabURL to my encode_field(URL of t)
-            return winId & tab & winName & tab & tabIndex & tab & tabTitle & tab & tabURL & tab & "true"
+            {tab_return}
         end tell
     "#,
         prelude = safari_script_prelude(),
+        tab_return = tab_return,
+    )
+}
+
+fn build_open_script(url: &str) -> String {
+    let escaped_url = escape(url);
+    let tab_return = build_tab_return_block("t", "true");
+    format!(
+        r#"
+        {prelude}
+        tell application "Safari"
+            if (count of windows) is 0 then
+                make new document with properties {{URL:"{escaped_url}"}}
+                set w to front window
+            else
+                set w to front window
+                set t to make new tab at end of tabs of w with properties {{URL:"{escaped_url}"}}
+                set current tab of w to t
+            end if
+            delay 0.1
+            set t to current tab of w
+            {tab_return}
+        end tell
+    "#,
+        prelude = safari_script_prelude(),
+        escaped_url = escaped_url,
+        tab_return = tab_return,
+    )
+}
+
+fn build_close_script(index: Option<usize>) -> String {
+    let target_block = match index {
+        Some(index) => {
+            let one_based = index + 1;
+            format!(
+                r#"if {one_based} > (count of tabs of w) then
+                    error "tab index out of range"
+                end if
+                set t to tab {one_based} of w"#
+            )
+        }
+        None => "set t to current tab of w".to_string(),
+    };
+
+    format!(
+        r#"
+        tell application "Safari"
+            if (count of windows) is 0 then
+                return "false"
+            end if
+            set w to front window
+            {target_block}
+            close t
+            return "true"
+        end tell
+    "#,
+        target_block = target_block,
+    )
+}
+
+fn build_exec_script(js_code: &str) -> String {
+    let js_expr = escape_body(js_code);
+    format!(
+        r#"
+        {prelude}
+        tell application "Safari"
+            if (count of windows) is 0 then
+                return ""
+            end if
+            set jsCode to {js_expr}
+            set rawResult to do JavaScript jsCode in current tab of front window
+            if rawResult is missing value then
+                return ""
+            end if
+            set rawResult to rawResult as string
+            return my encode_field(rawResult)
+        end tell
+    "#,
+        prelude = safari_script_prelude(),
+        js_expr = js_expr,
+    )
+}
+
+fn selector_text_js(selector: &str) -> String {
+    let selector = escape_js_string(selector);
+    format!(
+        r#"(() => {{
+            const el = document.querySelector("{selector}");
+            if (!el) throw new Error("selector not found");
+            return (el.innerText ?? el.textContent ?? "").trim();
+        }})()"#
+    )
+}
+
+fn selector_exists_js(selector: &str) -> String {
+    let selector = escape_js_string(selector);
+    format!(r#"(() => document.querySelector("{selector}") ? "true" : "false")()"#)
+}
+
+fn selector_click_js(selector: &str) -> String {
+    let selector = escape_js_string(selector);
+    format!(
+        r#"(() => {{
+            const el = document.querySelector("{selector}");
+            if (!el) throw new Error("selector not found");
+            el.click();
+            return "true";
+        }})()"#
+    )
+}
+
+fn selector_fill_js(selector: &str, text: &str) -> String {
+    let selector = escape_js_string(selector);
+    let text = escape_js_string(text);
+    format!(
+        r#"(() => {{
+            const el = document.querySelector("{selector}");
+            if (!el) throw new Error("selector not found");
+            if ("value" in el) {{
+                el.value = "{text}";
+            }} else {{
+                el.textContent = "{text}";
+            }}
+            el.dispatchEvent(new Event("input", {{ bubbles: true }}));
+            el.dispatchEvent(new Event("change", {{ bubbles: true }}));
+            return "true";
+        }})()"#
     )
 }
 
@@ -267,12 +457,111 @@ pub fn tabs(profile_filter: Option<&str>) -> Result<Vec<SafariTab>, MacosError> 
 
 pub fn active() -> Result<Option<SafariTab>, MacosError> {
     let stdout = run_capture(&build_active_tab_script(), "safari_active")?;
-    Ok(parse_tab_line(stdout.trim()))
+    Ok(parse_tab_line(stdout.trim()).map(|mut tab| {
+        tab.profile = extract_profile(&tab.window_name, &tab.title);
+        tab
+    }))
+}
+
+pub fn open(url: &str) -> Result<Option<SafariTab>, MacosError> {
+    let stdout = run_capture(&build_open_script(url), "safari_open")?;
+    Ok(parse_tab_line(stdout.trim()).map(|mut tab| {
+        tab.profile = extract_profile(&tab.window_name, &tab.title);
+        tab
+    }))
+}
+
+pub fn close(index: Option<usize>) -> Result<SafariCloseResult, MacosError> {
+    let stdout = run_capture(&build_close_script(index), "safari_close")?;
+    Ok(SafariCloseResult {
+        closed: stdout.trim() == "true",
+        index,
+    })
+}
+
+pub fn source() -> Result<SafariSourceResult, MacosError> {
+    let result = execute_js("document.documentElement.outerHTML", "safari_source")?;
+    Ok(SafariSourceResult { html: result })
+}
+
+pub fn read(selector: Option<&str>) -> Result<SafariReadResult, MacosError> {
+    let js = match selector {
+        Some(selector) => selector_text_js(selector),
+        None => "(document.body.innerText ?? \"\").trim()".to_string(),
+    };
+    let content = execute_js(&js, "safari_read")?;
+    Ok(SafariReadResult {
+        selector: selector.map(ToOwned::to_owned),
+        content,
+    })
+}
+
+pub fn exec(js_code: &str) -> Result<SafariEvalResult, MacosError> {
+    let result = execute_js(js_code, "safari_exec")?;
+    Ok(SafariEvalResult { result })
+}
+
+pub fn click(selector: &str) -> Result<SafariClickResult, MacosError> {
+    let result = execute_js(&selector_click_js(selector), "safari_click")?;
+    if result.trim() != "true" {
+        return Err(MacosError::Other(result));
+    }
+    Ok(SafariClickResult {
+        clicked: true,
+        selector: selector.to_string(),
+    })
+}
+
+pub fn fill(selector: &str, text: &str) -> Result<SafariFillResult, MacosError> {
+    let result = execute_js(&selector_fill_js(selector, text), "safari_fill")?;
+    if result.trim() != "true" {
+        return Err(MacosError::Other(result));
+    }
+    Ok(SafariFillResult {
+        filled: true,
+        selector: selector.to_string(),
+        text: text.to_string(),
+    })
+}
+
+pub fn wait(selector: &str, timeout_seconds: u64) -> Result<SafariWaitResult, MacosError> {
+    let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
+    let js = selector_exists_js(selector);
+    loop {
+        let exists = execute_js(&js, "safari_wait")?;
+        if exists.is_empty() {
+            return Err(MacosError::Other(
+                "no Safari window or active tab available".to_string(),
+            ));
+        }
+        if exists.trim() == "true" {
+            return Ok(SafariWaitResult {
+                found: true,
+                selector: selector.to_string(),
+                timeout_seconds,
+            });
+        }
+        if Instant::now() >= deadline {
+            return Err(MacosError::Other(format!(
+                "timeout waiting for selector: {selector}"
+            )));
+        }
+        thread::sleep(Duration::from_millis(250));
+    }
+}
+
+fn execute_js(js_code: &str, context: &str) -> Result<String, MacosError> {
+    let stdout = run_capture(&build_exec_script(js_code), context)?;
+    Ok(decode_field(stdout.trim()))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{build_tabs_script, extract_profile, parse_tab_line, parse_tabs_output, TAB_SEPARATOR};
+    use super::{
+        TAB_SEPARATOR, build_active_tab_script, build_close_script, build_exec_script,
+        build_open_script, build_tabs_script, extract_profile, parse_tab_line, parse_tabs_output,
+        selector_click_js, selector_fill_js, selector_text_js,
+    };
 
     #[test]
     fn extract_profile_from_window_name() {
@@ -283,7 +572,8 @@ mod tests {
 
     #[test]
     fn parse_tab_line_decodes_fields() {
-        let line = "61998\tRyugu — Google\\tGemini\t0\tGoogle\\tGemini\thttps://gemini.google.com/app\ttrue";
+        let line =
+            "61998\tRyugu — Google\\tGemini\t0\tGoogle\\tGemini\thttps://gemini.google.com/app\ttrue";
 
         let tab = parse_tab_line(line).expect("tab");
 
@@ -300,7 +590,7 @@ mod tests {
     fn parse_tabs_output_keeps_multiple_tabs() {
         let raw = concat!(
             "1\tWork — Mail\t0\tMail\thttps://mail.google.com\ttrue---TAB_SEP---",
-            "1\tWork — Docs\t1\tDocs\thttps://docs.google.com\tfalse---TAB_SEP---"
+            "1\tWork — Mail\t1\tDocs\thttps://docs.google.com\tfalse---TAB_SEP---"
         );
 
         let tabs = parse_tabs_output(raw);
@@ -318,5 +608,47 @@ mod tests {
 
         assert!(script.contains(TAB_SEPARATOR));
         assert!(script.contains("\\s"));
+    }
+
+    #[test]
+    fn build_open_script_creates_new_tab() {
+        let script = build_open_script("https://example.com");
+
+        assert!(script.contains("make new tab at end of tabs of w"));
+        assert!(script.contains("https://example.com"));
+    }
+
+    #[test]
+    fn build_close_script_targets_requested_index() {
+        let script = build_close_script(Some(2));
+
+        assert!(script.contains("set t to tab 3 of w"));
+    }
+
+    #[test]
+    fn build_active_tab_script_targets_front_window() {
+        let script = build_active_tab_script();
+
+        assert!(script.contains("set w to front window"));
+        assert!(script.contains("set t to current tab of w"));
+    }
+
+    #[test]
+    fn build_exec_script_supports_multiline_js() {
+        let script = build_exec_script("const x = 1;\nx + 1;");
+
+        assert!(script.contains("set jsCode to"));
+        assert!(script.contains("do JavaScript jsCode"));
+        assert!(script.contains("& linefeed &"));
+        assert!(script.contains("if rawResult is missing value then"));
+    }
+
+    #[test]
+    fn selector_js_builders_include_selector_and_text() {
+        assert!(selector_text_js(".item").contains("querySelector(\".item\")"));
+        assert!(selector_click_js("#submit").contains("querySelector(\"#submit\")"));
+        let fill = selector_fill_js("input[name=q]", "hello");
+        assert!(fill.contains("input[name=q]"));
+        assert!(fill.contains("hello"));
     }
 }
