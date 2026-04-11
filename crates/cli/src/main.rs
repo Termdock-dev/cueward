@@ -339,6 +339,34 @@ fn parse_required_datetime_arg(
     }
 }
 
+fn validate_optional_output_path(label: &str, value: Option<&str>) -> Result<(), String> {
+    if let Some(path) = value {
+        if std::path::Path::new(path)
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+        {
+            return Err(format!(
+                "error: {label} path must not contain parent directory components"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn local_day_bounds(now: DateTime<Local>) -> Result<(DateTime<Local>, DateTime<Local>), String> {
+    let from = now
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .and_then(|dt| Local.from_local_datetime(&dt).single())
+        .ok_or_else(|| "error: could not determine start of today".to_string())?;
+    let to = now
+        .date_naive()
+        .and_hms_opt(23, 59, 59)
+        .and_then(|dt| Local.from_local_datetime(&dt).single())
+        .ok_or_else(|| "error: could not determine end of today".to_string())?;
+    Ok((from, to))
+}
+
 fn parse_duration(s: &str) -> Option<chrono::Duration> {
     let s = s.trim();
     if let Some(hours) = s.strip_suffix('h') {
@@ -652,19 +680,31 @@ fn main() {
             ocr,
             output,
             display,
-        } => match cueward_adapter_macos::screenshot::capture(ocr, output.as_deref(), display) {
-            Ok(result) => {
-                println!("{}", serde_json::to_string_pretty(&result).unwrap());
-                eprintln!("screenshot saved to {}", result.path);
-            }
-            Err(e) => {
-                eprintln!("error: {e}");
+        } => {
+            if let Err(err) = validate_optional_output_path("--output", output.as_deref()) {
+                eprintln!("{err}");
                 process::exit(1);
             }
-        },
+            match cueward_adapter_macos::screenshot::capture(ocr, output.as_deref(), display) {
+                Ok(result) => {
+                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    eprintln!("screenshot saved to {}", result.path);
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            }
+        }
 
         Command::Clipboard { action } => match action {
             ClipboardAction::Get { save_image } => {
+                if let Err(err) =
+                    validate_optional_output_path("--save-image", save_image.as_deref())
+                {
+                    eprintln!("{err}");
+                    process::exit(1);
+                }
                 match cueward_adapter_macos::clipboard::get(save_image.as_deref()) {
                     Ok(content) => {
                         println!("{}", serde_json::to_string_pretty(&content).unwrap());
@@ -694,16 +734,13 @@ fn main() {
         Command::Calendar { action } => match action {
             CalendarAction::Today { calendar } => {
                 let now = Local::now();
-                let from = now
-                    .date_naive()
-                    .and_hms_opt(0, 0, 0)
-                    .and_then(|dt| Local.from_local_datetime(&dt).single())
-                    .unwrap_or(now);
-                let to = now
-                    .date_naive()
-                    .and_hms_opt(23, 59, 59)
-                    .and_then(|dt| Local.from_local_datetime(&dt).single())
-                    .unwrap_or(now);
+                let (from, to) = match local_day_bounds(now) {
+                    Ok(bounds) => bounds,
+                    Err(err) => {
+                        eprintln!("{err}");
+                        process::exit(1);
+                    }
+                };
                 match cueward_adapter_macos::calendar::list_events(from, to, calendar.as_deref()) {
                     Ok(events) => {
                         println!("{}", serde_json::to_string_pretty(&events).unwrap());
@@ -818,15 +855,35 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_required_datetime_arg;
+    use chrono::Timelike;
+    use chrono::{Local, TimeZone};
+
+    use super::{local_day_bounds, validate_optional_output_path};
 
     #[test]
-    fn parse_required_datetime_arg_rejects_invalid_values() {
-        let result = parse_required_datetime_arg("--from", Some("April 11"));
+    fn validate_optional_output_path_rejects_parent_components() {
+        let result = validate_optional_output_path("--output", Some("../secret.png"));
 
         assert_eq!(
             result,
-            Err("error: invalid --from datetime 'April 11'".to_string())
+            Err("error: --output path must not contain parent directory components".to_string())
         );
+    }
+
+    #[test]
+    fn local_day_bounds_covers_full_day() {
+        let now = Local
+            .with_ymd_and_hms(2026, 4, 11, 10, 30, 0)
+            .single()
+            .expect("local dt");
+
+        let (from, to) = local_day_bounds(now).expect("bounds");
+
+        assert_eq!(from.hour(), 0);
+        assert_eq!(from.minute(), 0);
+        assert_eq!(from.second(), 0);
+        assert_eq!(to.hour(), 23);
+        assert_eq!(to.minute(), 59);
+        assert_eq!(to.second(), 59);
     }
 }

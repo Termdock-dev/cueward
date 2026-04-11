@@ -251,6 +251,7 @@ fn replace_attachment_labels(
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AttachmentOcrBlock {
+    index: usize,
     filename: String,
     sha256: Option<String>,
     text: String,
@@ -263,7 +264,8 @@ fn collect_attachment_ocr_blocks(
     attachments
         .iter()
         .take(placeholder_count)
-        .filter_map(|attachment| {
+        .enumerate()
+        .filter_map(|(idx, attachment)| {
             let text = load_or_run_attachment_ocr(attachment).ok().flatten()?;
             let trimmed = text.trim();
             if trimmed.is_empty() {
@@ -271,6 +273,7 @@ fn collect_attachment_ocr_blocks(
             }
 
             Some(AttachmentOcrBlock {
+                index: idx + 1,
                 filename: attachment.filename.clone(),
                 sha256: attachment.sha256.clone(),
                 text: trimmed.to_string(),
@@ -285,12 +288,10 @@ fn append_attachment_ocr(content: &str, blocks: &[AttachmentOcrBlock]) -> String
     }
 
     let mut sections = Vec::with_capacity(blocks.len());
-    for (idx, block) in blocks.iter().enumerate() {
+    for block in blocks {
         sections.push(format!(
             "[Attachment {} OCR: {}]\n{}",
-            idx + 1,
-            block.filename,
-            block.text
+            block.index, block.filename, block.text
         ));
     }
 
@@ -700,6 +701,7 @@ mod tests {
     fn append_attachment_ocr_adds_readable_sections() {
         let content = "[Attachment 1: image.png]";
         let blocks = vec![AttachmentOcrBlock {
+            index: 1,
             filename: "image.png".into(),
             sha256: Some("hash1".into()),
             text: "detected text".into(),
@@ -737,6 +739,7 @@ mod tests {
             sha256: Some("hash1".into()),
         }];
         let blocks = vec![AttachmentOcrBlock {
+            index: 1,
             filename: "image.png".into(),
             sha256: Some("hash1".into()),
             text: "detected text".into(),
@@ -769,11 +772,13 @@ mod tests {
         ];
         let blocks = vec![
             AttachmentOcrBlock {
+                index: 1,
                 filename: "image.png".into(),
                 sha256: Some("hash-a".into()),
                 text: "first".into(),
             },
             AttachmentOcrBlock {
+                index: 2,
                 filename: "image.png".into(),
                 sha256: Some("hash-b".into()),
                 text: "second".into(),
@@ -806,5 +811,20 @@ mod tests {
     fn cached_ocr_text_treats_empty_files_as_cache_miss() {
         assert_eq!(cached_ocr_text(""), None);
         assert_eq!(cached_ocr_text(OCR_EMPTY_SENTINEL), Some(String::new()));
+    }
+
+    #[test]
+    fn append_attachment_ocr_keeps_original_attachment_indices() {
+        let content = "[Attachment 1: one.png]\n[Attachment 2: two.png]";
+        let blocks = vec![AttachmentOcrBlock {
+            index: 2,
+            filename: "two.png".into(),
+            sha256: Some("hash2".into()),
+            text: "detected text".into(),
+        }];
+
+        let combined = append_attachment_ocr(content, &blocks);
+
+        assert!(combined.contains("[Attachment 2 OCR: two.png]"));
     }
 }

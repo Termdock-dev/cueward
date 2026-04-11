@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::{Component, Path};
 use std::process::Command;
 
 use chrono::Local;
@@ -18,9 +19,19 @@ pub struct ClipboardContent {
 
 const CACHE_DIR: &str = ".cueward/cache/clipboard";
 
+fn validate_user_output_path(path: &str) -> Result<&Path, String> {
+    let candidate = Path::new(path);
+    if candidate
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err("path must not contain parent directory components".into());
+    }
+    Ok(candidate)
+}
+
 fn ensure_cache_dir() -> Result<String, MacosError> {
-    let home = std::env::var("HOME")
-        .map_err(|_| MacosError::Other("HOME not set".into()))?;
+    let home = std::env::var("HOME").map_err(|_| MacosError::Other("HOME not set".into()))?;
     let dir = format!("{home}/{CACHE_DIR}");
     fs::create_dir_all(&dir)
         .map_err(|e| MacosError::Other(format!("failed to create {dir}: {e}")))?;
@@ -44,6 +55,8 @@ fn has_image() -> bool {
 
 /// Save clipboard image to PNG using AppleScript with Cocoa bridge.
 fn save_clipboard_image(save_path: &str) -> Result<(), MacosError> {
+    validate_user_output_path(save_path).map_err(MacosError::Other)?;
+
     let script = format!(
         r#"
         use framework "AppKit"
@@ -57,7 +70,7 @@ fn save_clipboard_image(save_path: &str) -> Result<(), MacosError> {
         end if
         imgData's writeToFile:"{save_path}" atomically:true
         "#,
-        save_path = save_path.replace('"', "\\\""),
+        save_path = save_path.replace('\\', "\\\\").replace('"', "\\\""),
     );
 
     let output = Command::new("osascript")
@@ -70,7 +83,9 @@ fn save_clipboard_image(save_path: &str) -> Result<(), MacosError> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(MacosError::Other(format!("failed to save clipboard image: {stderr}")));
+        return Err(MacosError::Other(format!(
+            "failed to save clipboard image: {stderr}"
+        )));
     }
 
     Ok(())
@@ -120,12 +135,16 @@ pub fn set(text: &str) -> Result<(), MacosError> {
         .spawn()
         .map_err(|e| MacosError::Other(format!("pbcopy: {e}")))?;
 
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(text.as_bytes())
-            .map_err(|e| MacosError::Other(format!("failed to write to pbcopy: {e}")))?;
-    }
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| MacosError::Other("failed to open stdin for pbcopy".into()))?;
+    stdin
+        .write_all(text.as_bytes())
+        .map_err(|e| MacosError::Other(format!("failed to write to pbcopy: {e}")))?;
 
-    let status = child.wait()
+    let status = child
+        .wait()
         .map_err(|e| MacosError::Other(format!("pbcopy: {e}")))?;
 
     if !status.success() {
@@ -133,4 +152,25 @@ pub fn set(text: &str) -> Result<(), MacosError> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::validate_user_output_path;
+
+    #[test]
+    fn validate_user_output_path_rejects_parent_components() {
+        let err = validate_user_output_path("../../etc/passwd").expect_err("should reject");
+
+        assert!(err.contains("parent directory"));
+    }
+
+    #[test]
+    fn validate_user_output_path_accepts_normal_relative_paths() {
+        let path = validate_user_output_path("screenshots/out.png").expect("path");
+
+        assert_eq!(path, Path::new("screenshots/out.png"));
+    }
 }

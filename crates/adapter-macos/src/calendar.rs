@@ -1,10 +1,8 @@
-use std::process::Command;
-
 use chrono::{DateTime, Local};
 use serde::Serialize;
 
 use crate::MacosError;
-use crate::applescript::{escape, run};
+use crate::applescript::{escape, run, run_capture};
 
 const EVENT_SEPARATOR: &str = "---EVENT_SEP---";
 
@@ -154,18 +152,7 @@ pub fn list_events(
         "#
     );
 
-    let raw = Command::new("osascript")
-        .arg("-e")
-        .arg(&script)
-        .output()
-        .map_err(|e| MacosError::Other(format!("osascript: {e}")))?;
-
-    if !raw.status.success() {
-        let stderr = String::from_utf8_lossy(&raw.stderr);
-        return Err(MacosError::Other(format!("list_events: {stderr}")));
-    }
-
-    let stdout = String::from_utf8_lossy(&raw.stdout);
+    let stdout = run_capture(&script, "list_events")?;
     let events = parse_events_output(&stdout);
 
     Ok(events)

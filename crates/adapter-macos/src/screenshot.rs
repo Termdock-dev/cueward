@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::{Component, Path};
 use std::process::Command;
 
 use chrono::Local;
@@ -16,9 +17,30 @@ pub struct ScreenshotResult {
 
 const CACHE_DIR: &str = ".cueward/cache/screenshots";
 
+fn validate_user_output_path(path: &str) -> Result<&Path, String> {
+    let candidate = Path::new(path);
+    if candidate
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err("path must not contain parent directory components".into());
+    }
+    Ok(candidate)
+}
+
+fn ensure_screenshot_file_exists(path: &Path) -> Result<(), String> {
+    if path.exists() {
+        Ok(())
+    } else {
+        Err(format!(
+            "screenshot file was not created at {}",
+            path.display()
+        ))
+    }
+}
+
 fn ensure_cache_dir() -> Result<String, MacosError> {
-    let home = std::env::var("HOME")
-        .map_err(|_| MacosError::Other("HOME not set".into()))?;
+    let home = std::env::var("HOME").map_err(|_| MacosError::Other("HOME not set".into()))?;
     let dir = format!("{home}/{CACHE_DIR}");
     fs::create_dir_all(&dir)
         .map_err(|e| MacosError::Other(format!("failed to create {dir}: {e}")))?;
@@ -38,7 +60,10 @@ pub fn capture(
     let timestamp = now.format("%Y%m%d-%H%M%S").to_string();
 
     let path = match output {
-        Some(p) => p.to_string(),
+        Some(p) => {
+            validate_user_output_path(p).map_err(MacosError::Other)?;
+            p.to_string()
+        }
         None => {
             let dir = ensure_cache_dir()?;
             let suffix = display.map(|d| format!("-d{d}")).unwrap_or_default();
@@ -60,6 +85,8 @@ pub fn capture(
     if !status.success() {
         return Err(MacosError::Other("screencapture failed".into()));
     }
+
+    ensure_screenshot_file_exists(Path::new(&path)).map_err(MacosError::Other)?;
 
     let ocr_text = if ocr {
         match crate::ocr::capture(&path) {
@@ -85,4 +112,26 @@ pub fn capture(
         timestamp: now.to_rfc3339(),
         ocr_text,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::{ensure_screenshot_file_exists, validate_user_output_path};
+
+    #[test]
+    fn validate_user_output_path_rejects_parent_components() {
+        let err = validate_user_output_path("../shot.png").expect_err("should reject");
+
+        assert!(err.contains("parent directory"));
+    }
+
+    #[test]
+    fn ensure_screenshot_file_exists_reports_missing_file() {
+        let err = ensure_screenshot_file_exists(Path::new("/tmp/does-not-exist-cueward.png"))
+            .expect_err("should fail");
+
+        assert!(err.contains("was not created"));
+    }
 }
