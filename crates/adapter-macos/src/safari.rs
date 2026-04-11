@@ -16,6 +16,7 @@ use crate::applescript::{escape, escape_body, run_capture};
 /// Core Data epoch: 2001-01-01 00:00:00 UTC
 const CORE_DATA_EPOCH: i64 = 978_307_200;
 const TAB_SEPARATOR: &str = "---TAB_SEP---";
+const FIELD_SEPARATOR: &str = "<<<FIELD_SEP>>>";
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct SafariTab {
@@ -167,7 +168,7 @@ fn extract_profile(window_name: &str, active_tab_title: &str) -> Option<String> 
 }
 
 fn parse_tab_line(line: &str) -> Option<SafariTab> {
-    let parts: Vec<&str> = line.split('\t').collect();
+    let parts: Vec<&str> = line.split(FIELD_SEPARATOR).collect();
     if parts.len() != 6 {
         return None;
     }
@@ -249,7 +250,8 @@ fn build_tab_return_block(tab_ref: &str, active_flag: &str) -> String {
             set tabIndex to (index of {tab_ref}) - 1
             set tabTitle to my encode_field(name of {tab_ref})
             set tabURL to my encode_field(URL of {tab_ref})
-            return winId & tab & winName & tab & tabIndex & tab & tabTitle & tab & tabURL & tab & "{active_flag}""#
+            return (winId as text) & "{field_separator}" & winName & "{field_separator}" & (tabIndex as text) & "{field_separator}" & tabTitle & "{field_separator}" & tabURL & "{field_separator}" & "{active_flag}""#,
+        field_separator = FIELD_SEPARATOR,
     )
 }
 
@@ -272,7 +274,7 @@ fn build_tabs_script() -> String {
                     else
                         set isActive to "false"
                     end if
-                    set output to output & winId & tab & winName & tab & tabIndex & tab & tabTitle & tab & tabURL & tab & isActive & "{separator}"
+                    set output to output & (winId as text) & "{field_separator}" & winName & "{field_separator}" & (tabIndex as text) & "{field_separator}" & tabTitle & "{field_separator}" & tabURL & "{field_separator}" & isActive & "{separator}"
                 end repeat
             end repeat
             return output
@@ -280,6 +282,7 @@ fn build_tabs_script() -> String {
     "#,
         prelude = safari_script_prelude(),
         separator = TAB_SEPARATOR,
+        field_separator = FIELD_SEPARATOR,
     )
 }
 
@@ -368,7 +371,12 @@ fn build_exec_script(js_code: &str) -> String {
                 return ""
             end if
             set jsCode to {js_expr}
-            set rawResult to do JavaScript jsCode in current tab of front window
+            set rawResult to missing value
+            try
+                set rawResult to do JavaScript jsCode in current tab of front window
+            on error errMsg number errNum
+                error errMsg number errNum
+            end try
             if rawResult is missing value then
                 return ""
             end if
@@ -553,6 +561,23 @@ fn build_gemini_chat_prompt_js(prompt: &str) -> String {
             input.dispatchEvent(new KeyboardEvent("keydown", {{ key: "Enter", bubbles: true }}));
             input.dispatchEvent(new KeyboardEvent("keypress", {{ key: "Enter", bubbles: true }}));
             input.dispatchEvent(new KeyboardEvent("keyup", {{ key: "Enter", bubbles: true }}));
+
+            const sendLabels = ["傳送訊息", "Send message"];
+            const buttons = [...document.querySelectorAll('button,[role="button"]')];
+            for (const button of buttons) {{
+              const label = [
+                button.getAttribute("aria-label"),
+                button.getAttribute("title"),
+                button.innerText,
+                button.textContent
+              ]
+                .filter(Boolean)
+                .join(" ");
+              if (!sendLabels.some((value) => label.includes(value))) continue;
+              button.click();
+              break;
+            }}
+
             return "true";
         }})()"#
     )
@@ -1009,7 +1034,7 @@ mod tests {
         GeminiMode, TAB_SEPARATOR, build_active_tab_script, build_close_script,
         build_exec_script, build_gemini_chat_prompt_js, build_gemini_deep_research_confirm_js,
         build_gemini_deep_research_plan_js, build_gemini_mode_switch_js, build_open_script,
-        build_tabs_script, extract_profile, gemini_deep_research_poll_js,
+        build_tab_return_block, build_tabs_script, extract_profile, gemini_deep_research_poll_js,
         gemini_response_extract_js, parse_deep_research_payload, parse_tab_line,
         parse_tabs_output, selector_click_js, selector_fill_js, selector_text_js,
         should_skip_gemini_response,
@@ -1024,7 +1049,7 @@ mod tests {
 
     #[test]
     fn parse_tab_line_decodes_fields() {
-        let line = "61998\tRyugu — Google\\tGemini\t0\tGoogle\\tGemini\thttps://gemini.google.com/app\ttrue";
+        let line = "61998<<<FIELD_SEP>>>Ryugu — Google\\tGemini<<<FIELD_SEP>>>0<<<FIELD_SEP>>>Google\\tGemini<<<FIELD_SEP>>>https://gemini.google.com/app<<<FIELD_SEP>>>true";
 
         let tab = parse_tab_line(line).expect("tab");
 
@@ -1040,8 +1065,8 @@ mod tests {
     #[test]
     fn parse_tabs_output_keeps_multiple_tabs() {
         let raw = concat!(
-            "1\tWork — Mail\t0\tMail\thttps://mail.google.com\ttrue---TAB_SEP---",
-            "1\tWork — Mail\t1\tDocs\thttps://docs.google.com\tfalse---TAB_SEP---"
+            "1<<<FIELD_SEP>>>Work — Mail<<<FIELD_SEP>>>0<<<FIELD_SEP>>>Mail<<<FIELD_SEP>>>https://mail.google.com<<<FIELD_SEP>>>true---TAB_SEP---",
+            "1<<<FIELD_SEP>>>Work — Mail<<<FIELD_SEP>>>1<<<FIELD_SEP>>>Docs<<<FIELD_SEP>>>https://docs.google.com<<<FIELD_SEP>>>false---TAB_SEP---"
         );
 
         let tabs = parse_tabs_output(raw);
@@ -1059,6 +1084,7 @@ mod tests {
 
         assert!(script.contains(TAB_SEPARATOR));
         assert!(script.contains("\\s"));
+        assert!(script.contains("<<<FIELD_SEP>>>"));
     }
 
     #[test]
@@ -1085,11 +1111,23 @@ mod tests {
     }
 
     #[test]
+    fn build_tab_return_block_coerces_numeric_fields_to_text() {
+        let script = build_tab_return_block("t", "true");
+
+        assert!(script.contains("(winId as text)"));
+        assert!(script.contains("(tabIndex as text)"));
+        assert!(script.contains("<<<FIELD_SEP>>>"));
+    }
+
+    #[test]
     fn build_exec_script_supports_multiline_js() {
         let script = build_exec_script("const x = 1;\nx + 1;");
 
         assert!(script.contains("set jsCode to"));
+        assert!(script.contains("set rawResult to missing value"));
+        assert!(script.contains("try"));
         assert!(script.contains("do JavaScript jsCode"));
+        assert!(script.contains("on error errMsg"));
         assert!(script.contains("& linefeed &"));
         assert!(script.contains("if rawResult is missing value then"));
     }
@@ -1120,6 +1158,8 @@ mod tests {
         assert!(script.contains(".ql-editor"));
         assert!(script.contains("hello world"));
         assert!(script.contains("KeyboardEvent"));
+        assert!(script.contains("傳送訊息"));
+        assert!(script.contains("Send message"));
     }
 
     #[test]
