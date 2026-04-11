@@ -120,6 +120,23 @@ Create a reminder in Apple Reminders:
 cueward plan --title "Review PR" --notes "Check bot comments" --list Cueward
 ```
 
+### Reminders
+
+Read existing Apple Reminders:
+
+```bash
+# List all reminders
+cueward reminders list
+
+# Filter by reminders list
+cueward reminders list --list Work
+
+# Reminders due today
+cueward reminders today
+```
+
+Outputs JSON with `title`, `notes`, `due_date`, `completed`, and `list_name`.
+
 ### OCR
 
 Extract text from images or PDFs via Apple Vision Framework:
@@ -257,10 +274,10 @@ mkdir -p ~/.claude/skills/ && cp -r skills/cueward-agent ~/.claude/skills/
 ```
 crates/
 ├── core/            Cue struct, PlatformAdapter trait, BM25 index, auto-tagger
-├── cli/             clap CLI (capture, triage, search, send, plan, ocr, notes, quick-notes,
-│                    calendar, screenshot, clipboard)
+├── cli/             clap CLI (capture, triage, search, send, plan, reminders, ocr, notes,
+│                    quick-notes, calendar, screenshot, clipboard)
 ├── adapter-macos/   Safari (SQLite), Notes (AppleScript), Messages (SQLite),
-│                    Reminders (AppleScript), Calendar (AppleScript),
+│                    Reminders write/read (AppleScript), Calendar (AppleScript),
 │                    Vision OCR (Swift), Screenshot (screencapture), Clipboard (pbpaste/pbcopy)
 └── adapter-windows/ Reserved for future cross-platform support
 ```
