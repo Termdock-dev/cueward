@@ -4,10 +4,13 @@ use chrono::{DateTime, Local, TimeZone, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
 
 use cueward_adapter_macos::MacosAdapter;
-use cueward_core::{inbox, CueIndex, PlatformAdapter, State, Tagger};
+use cueward_core::{CueIndex, PlatformAdapter, State, Tagger, inbox};
 
 #[derive(Parser)]
-#[command(name = "cueward", about = "Capture and triage your scattered knowledge")]
+#[command(
+    name = "cueward",
+    about = "Capture and triage your scattered knowledge"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -322,6 +325,20 @@ fn parse_datetime(s: &str) -> Option<DateTime<Local>> {
     None
 }
 
+fn parse_datetime_arg(label: &str, value: &str) -> Result<DateTime<Local>, String> {
+    parse_datetime(value).ok_or_else(|| format!("error: invalid {label} datetime '{value}'"))
+}
+
+fn parse_required_datetime_arg(
+    label: &str,
+    value: Option<&str>,
+) -> Result<DateTime<Local>, String> {
+    match value {
+        Some(value) => parse_datetime_arg(label, value),
+        None => Err(format!("error: missing {label} datetime")),
+    }
+}
+
 fn parse_duration(s: &str) -> Option<chrono::Duration> {
     let s = s.trim();
     if let Some(hours) = s.strip_suffix('h') {
@@ -495,7 +512,9 @@ fn main() {
             let body = body.unwrap_or_else(|| {
                 use std::io::Read;
                 let mut buf = String::new();
-                std::io::stdin().read_to_string(&mut buf).unwrap_or_default();
+                std::io::stdin()
+                    .read_to_string(&mut buf)
+                    .unwrap_or_default();
                 buf
             });
 
@@ -531,34 +550,30 @@ fn main() {
             }
         }
 
-        Command::Ocr { path } => {
-            match cueward_adapter_macos::ocr::capture(&path) {
-                Ok(cues) => {
-                    let json = serde_json::to_string_pretty(&cues).unwrap();
-                    println!("{json}");
-                    eprintln!("extracted {} cues", cues.len());
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
+        Command::Ocr { path } => match cueward_adapter_macos::ocr::capture(&path) {
+            Ok(cues) => {
+                let json = serde_json::to_string_pretty(&cues).unwrap();
+                println!("{json}");
+                eprintln!("extracted {} cues", cues.len());
             }
-        }
+            Err(e) => {
+                eprintln!("error: {e}");
+                process::exit(1);
+            }
+        },
 
         Command::Notes { action } => match action {
             NotesAction::Update {
                 title,
                 body,
                 folder,
-            } => {
-                match cueward_adapter_macos::send::update_note(&title, &body, &folder) {
-                    Ok(()) => eprintln!("note updated: {title}"),
-                    Err(e) => {
-                        eprintln!("error: {e}");
-                        process::exit(1);
-                    }
+            } => match cueward_adapter_macos::send::update_note(&title, &body, &folder) {
+                Ok(()) => eprintln!("note updated: {title}"),
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
                 }
-            }
+            },
             NotesAction::Delete { title, folder } => {
                 match cueward_adapter_macos::send::delete_note(&title, &folder) {
                     Ok(()) => eprintln!("note deleted: {title}"),
@@ -580,23 +595,21 @@ fn main() {
         },
 
         Command::QuickNotes { action } => match action {
-            QuickNotesAction::List => {
-                match cueward_adapter_macos::quick_notes::list() {
-                    Ok(notes) => {
-                        if notes.is_empty() {
-                            eprintln!("no quick notes found");
-                        } else {
-                            let count = notes.len();
-                            println!("{}", serde_json::to_string_pretty(&notes).unwrap());
-                            eprintln!("{count} quick note(s)");
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("error: {e}");
-                        process::exit(1);
+            QuickNotesAction::List => match cueward_adapter_macos::quick_notes::list() {
+                Ok(notes) => {
+                    if notes.is_empty() {
+                        eprintln!("no quick notes found");
+                    } else {
+                        let count = notes.len();
+                        println!("{}", serde_json::to_string_pretty(&notes).unwrap());
+                        eprintln!("{count} quick note(s)");
                     }
                 }
-            }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
             QuickNotesAction::Create { title, body } => {
                 match cueward_adapter_macos::quick_notes::create(&title, &body) {
                     Ok(()) => eprintln!("quick note created: {title}"),
@@ -635,18 +648,20 @@ fn main() {
             }
         },
 
-        Command::Screenshot { ocr, output, display } => {
-            match cueward_adapter_macos::screenshot::capture(ocr, output.as_deref(), display) {
-                Ok(result) => {
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
-                    eprintln!("screenshot saved to {}", result.path);
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
+        Command::Screenshot {
+            ocr,
+            output,
+            display,
+        } => match cueward_adapter_macos::screenshot::capture(ocr, output.as_deref(), display) {
+            Ok(result) => {
+                println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                eprintln!("screenshot saved to {}", result.path);
             }
-        }
+            Err(e) => {
+                eprintln!("error: {e}");
+                process::exit(1);
+            }
+        },
 
         Command::Clipboard { action } => match action {
             ClipboardAction::Get { save_image } => {
@@ -654,7 +669,10 @@ fn main() {
                     Ok(content) => {
                         println!("{}", serde_json::to_string_pretty(&content).unwrap());
                         match content.content_type.as_str() {
-                            "image" => eprintln!("clipboard image saved to {}", content.path.unwrap_or_default()),
+                            "image" => eprintln!(
+                                "clipboard image saved to {}",
+                                content.path.unwrap_or_default()
+                            ),
                             _ => eprintln!("clipboard text read"),
                         }
                     }
@@ -664,15 +682,13 @@ fn main() {
                     }
                 }
             }
-            ClipboardAction::Set { text } => {
-                match cueward_adapter_macos::clipboard::set(&text) {
-                    Ok(()) => eprintln!("copied to clipboard"),
-                    Err(e) => {
-                        eprintln!("error: {e}");
-                        process::exit(1);
-                    }
+            ClipboardAction::Set { text } => match cueward_adapter_macos::clipboard::set(&text) {
+                Ok(()) => eprintln!("copied to clipboard"),
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
                 }
-            }
+            },
         },
 
         Command::Calendar { action } => match action {
@@ -702,11 +718,26 @@ fn main() {
 
             CalendarAction::List { from, to, calendar } => {
                 let now = Local::now();
-                let from_dt = from.as_deref().and_then(parse_datetime).unwrap_or(now);
-                let to_dt = to
-                    .as_deref()
-                    .and_then(parse_datetime)
-                    .unwrap_or_else(|| from_dt + chrono::Duration::hours(24));
+                let from_dt = match from.as_deref() {
+                    Some(value) => match parse_required_datetime_arg("--from", Some(value)) {
+                        Ok(dt) => dt,
+                        Err(err) => {
+                            eprintln!("{err}");
+                            process::exit(1);
+                        }
+                    },
+                    None => now,
+                };
+                let to_dt = match to.as_deref() {
+                    Some(value) => match parse_required_datetime_arg("--to", Some(value)) {
+                        Ok(dt) => dt,
+                        Err(err) => {
+                            eprintln!("{err}");
+                            process::exit(1);
+                        }
+                    },
+                    None => from_dt + chrono::Duration::hours(24),
+                };
                 match cueward_adapter_macos::calendar::list_events(
                     from_dt,
                     to_dt,
@@ -731,17 +762,17 @@ fn main() {
                 notes,
                 location,
             } => {
-                let start_dt = match parse_datetime(&start) {
-                    Some(dt) => dt,
-                    None => {
-                        eprintln!("error: invalid start datetime '{start}'");
+                let start_dt = match parse_datetime_arg("start", &start) {
+                    Ok(dt) => dt,
+                    Err(err) => {
+                        eprintln!("{err}");
                         process::exit(1);
                     }
                 };
-                let end_dt = match parse_datetime(&end) {
-                    Some(dt) => dt,
-                    None => {
-                        eprintln!("error: invalid end datetime '{end}'");
+                let end_dt = match parse_datetime_arg("end", &end) {
+                    Ok(dt) => dt,
+                    Err(err) => {
+                        eprintln!("{err}");
                         process::exit(1);
                     }
                 };
@@ -766,10 +797,10 @@ fn main() {
                 start,
                 calendar,
             } => {
-                let start_dt = match parse_datetime(&start) {
-                    Some(dt) => dt,
-                    None => {
-                        eprintln!("error: invalid start datetime '{start}'");
+                let start_dt = match parse_datetime_arg("start", &start) {
+                    Ok(dt) => dt,
+                    Err(err) => {
+                        eprintln!("{err}");
                         process::exit(1);
                     }
                 };
@@ -782,5 +813,20 @@ fn main() {
                 }
             }
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_required_datetime_arg;
+
+    #[test]
+    fn parse_required_datetime_arg_rejects_invalid_values() {
+        let result = parse_required_datetime_arg("--from", Some("April 11"));
+
+        assert_eq!(
+            result,
+            Err("error: invalid --from datetime 'April 11'".to_string())
+        );
     }
 }
