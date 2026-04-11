@@ -7,6 +7,7 @@ pub mod send;
 pub mod plan;
 pub mod ocr;
 pub mod quick_notes;
+pub mod screenshot;
 mod error;
 
 pub use error::MacosError;
