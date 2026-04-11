@@ -548,6 +548,12 @@ fn build_gemini_ai_action(
     prompt: Option<&str>,
     auto_confirm: bool,
 ) -> Result<GeminiAiAction, &'static str> {
+    if auto_confirm
+        && !matches!((&mode, prompt), (Some(GeminiMode::DeepResearch), Some(_)))
+    {
+        return Err("--auto-confirm requires --mode deep-research and --prompt");
+    }
+
     match (mode, prompt) {
         (Some(GeminiMode::DeepResearch), Some(prompt)) => {
             Ok(GeminiAiAction::DeepResearchPlan(prompt.to_string(), auto_confirm))
@@ -1393,6 +1399,18 @@ mod tests {
         assert_eq!(
             build_gemini_ai_action(None, None, false),
             Err("--mode or --prompt is required for Gemini Safari AI workflow")
+        );
+    }
+
+    #[test]
+    fn build_gemini_ai_action_rejects_invalid_auto_confirm_usage() {
+        assert_eq!(
+            build_gemini_ai_action(Some(GeminiMode::Image), None, true),
+            Err("--auto-confirm requires --mode deep-research and --prompt")
+        );
+        assert_eq!(
+            build_gemini_ai_action(None, Some("hi"), true),
+            Err("--auto-confirm requires --mode deep-research and --prompt")
         );
     }
 
