@@ -96,6 +96,17 @@ enum Command {
         #[command(subcommand)]
         action: CalendarAction,
     },
+
+    /// Capture a screenshot of the entire screen
+    Screenshot {
+        /// Also run OCR on the captured image
+        #[arg(long)]
+        ocr: bool,
+
+        /// Output path (default: ~/.cueward/cache/screenshots/<timestamp>.png)
+        #[arg(long)]
+        output: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -597,6 +608,19 @@ fn main() {
                 }
             }
         },
+
+        Command::Screenshot { ocr, output } => {
+            match cueward_adapter_macos::screenshot::capture(ocr, output.as_deref()) {
+                Ok(result) => {
+                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    eprintln!("screenshot saved to {}", result.path);
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            }
+        }
 
         Command::Calendar { action } => match action {
             CalendarAction::Today { calendar } => {
