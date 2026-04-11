@@ -525,6 +525,25 @@ fn to_adapter_gemini_mode(mode: GeminiMode) -> cueward_adapter_macos::safari::Ge
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum GeminiAiAction {
+    ModeOnly(GeminiMode),
+    PromptOnly(String),
+    ModeThenPrompt(GeminiMode, String),
+}
+
+fn build_gemini_ai_action(
+    mode: Option<GeminiMode>,
+    prompt: Option<&str>,
+) -> Result<GeminiAiAction, &'static str> {
+    match (mode, prompt) {
+        (Some(mode), Some(prompt)) => Ok(GeminiAiAction::ModeThenPrompt(mode, prompt.to_string())),
+        (Some(mode), None) => Ok(GeminiAiAction::ModeOnly(mode)),
+        (None, Some(prompt)) => Ok(GeminiAiAction::PromptOnly(prompt.to_string())),
+        (None, None) => Err("--mode or --prompt is required for Gemini Safari AI workflow"),
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -880,33 +899,58 @@ fn main() {
                 prompt,
             } => match provider {
                 SafariAiProvider::Gemini => {
-                    if let Some(mode) = mode {
-                        match cueward_adapter_macos::safari::prepare_gemini_mode(
-                            to_adapter_gemini_mode(mode),
-                        ) {
-                            Ok(result) => {
-                                println!("{}", serde_json::to_string_pretty(&result).unwrap());
-                                eprintln!("gemini mode ready");
-                            }
-                            Err(e) => {
-                                eprintln!("error: {e}");
-                                process::exit(1);
+                    let action = match build_gemini_ai_action(mode, prompt.as_deref()) {
+                        Ok(action) => action,
+                        Err(err) => {
+                            eprintln!("error: {err}");
+                            process::exit(1);
+                        }
+                    };
+
+                    match action {
+                        GeminiAiAction::ModeOnly(mode) => {
+                            match cueward_adapter_macos::safari::prepare_gemini_mode(
+                                to_adapter_gemini_mode(mode),
+                            ) {
+                                Ok(result) => {
+                                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                                    eprintln!("gemini mode ready");
+                                }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
                             }
                         }
-                    } else {
-                        let Some(prompt) = prompt.as_deref() else {
-                            eprintln!("error: --prompt is required for Gemini chat workflow");
-                            process::exit(1);
-                        };
-
-                        match cueward_adapter_macos::safari::send_gemini_prompt(prompt) {
-                            Ok(result) => {
-                                println!("{}", serde_json::to_string_pretty(&result).unwrap());
-                                eprintln!("gemini response ready");
+                        GeminiAiAction::PromptOnly(prompt) => {
+                            match cueward_adapter_macos::safari::send_gemini_prompt(&prompt) {
+                                Ok(result) => {
+                                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                                    eprintln!("gemini response ready");
+                                }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
                             }
-                            Err(e) => {
+                        }
+                        GeminiAiAction::ModeThenPrompt(mode, prompt) => {
+                            if let Err(e) = cueward_adapter_macos::safari::prepare_gemini_mode(
+                                to_adapter_gemini_mode(mode),
+                            ) {
                                 eprintln!("error: {e}");
                                 process::exit(1);
+                            }
+
+                            match cueward_adapter_macos::safari::send_gemini_prompt(&prompt) {
+                                Ok(result) => {
+                                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                                    eprintln!("gemini response ready");
+                                }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
                             }
                         }
                     }
@@ -1188,8 +1232,8 @@ mod tests {
     use clap::Parser;
 
     use super::{
-        Cli, Command, GeminiMode, SafariAction, SafariAiProvider, local_day_bounds,
-        validate_optional_output_path,
+        Cli, Command, GeminiAiAction, GeminiMode, SafariAction, SafariAiProvider,
+        build_gemini_ai_action, local_day_bounds, validate_optional_output_path,
     };
 
     #[test]
@@ -1286,5 +1330,21 @@ mod tests {
             }
             _ => panic!("unexpected command"),
         }
+    }
+
+    #[test]
+    fn build_gemini_ai_action_allows_mode_and_prompt_together() {
+        assert_eq!(
+            build_gemini_ai_action(Some(GeminiMode::DeepResearch), Some("研究主題")).unwrap(),
+            GeminiAiAction::ModeThenPrompt(GeminiMode::DeepResearch, "研究主題".to_string())
+        );
+    }
+
+    #[test]
+    fn build_gemini_ai_action_requires_mode_or_prompt() {
+        assert_eq!(
+            build_gemini_ai_action(None, None),
+            Err("--mode or --prompt is required for Gemini Safari AI workflow")
+        );
     }
 }

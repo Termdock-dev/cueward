@@ -414,22 +414,39 @@ fn selector_fill_js(selector: &str, text: &str) -> String {
     )
 }
 
-fn gemini_mode_label(mode: GeminiMode) -> &'static str {
+fn gemini_mode_labels(mode: GeminiMode) -> &'static [&'static str] {
     match mode {
-        GeminiMode::Image => "建立圖像",
-        GeminiMode::DeepResearch => "Deep Research",
-        GeminiMode::Video => "建立影片",
-        GeminiMode::Music => "創作音樂",
+        GeminiMode::Image => &["建立圖像", "Create image", "Create Image"],
+        GeminiMode::DeepResearch => &["Deep Research"],
+        GeminiMode::Video => &["建立影片", "Create video", "Create Video"],
+        GeminiMode::Music => &["創作音樂", "Create music", "Create Music"],
     }
 }
 
-fn gemini_mode_placeholder(mode: GeminiMode) -> &'static str {
+fn gemini_mode_placeholders(mode: GeminiMode) -> &'static [&'static str] {
     match mode {
-        GeminiMode::Image => "請輸入圖片說明",
-        GeminiMode::DeepResearch => "你想研究什麼？",
-        GeminiMode::Video => "描述影片",
-        GeminiMode::Music => "描述音樂",
+        GeminiMode::Image => &[
+            "請輸入圖片說明",
+            "Describe the image",
+            "Describe the image you want to create",
+        ],
+        GeminiMode::DeepResearch => &["你想研究什麼？", "What do you want to research?"],
+        GeminiMode::Video => &["描述影片", "Describe the video"],
+        GeminiMode::Music => &["描述音樂", "Describe the music"],
     }
+}
+
+fn js_string_array(values: &[&str]) -> String {
+    let escaped = values
+        .iter()
+        .map(|value| format!("\"{}\"", escape_js_string(value)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("[{escaped}]")
+}
+
+fn should_skip_gemini_response(trimmed: &str, prompt: &str) -> bool {
+    trimmed.is_empty() || trimmed == prompt.trim()
 }
 
 fn gemini_mode_slug(mode: GeminiMode) -> &'static str {
@@ -442,12 +459,12 @@ fn gemini_mode_slug(mode: GeminiMode) -> &'static str {
 }
 
 fn build_gemini_mode_switch_js(mode: GeminiMode) -> String {
-    let mode_label = escape_js_string(gemini_mode_label(mode));
-    let expected_placeholder = escape_js_string(gemini_mode_placeholder(mode));
+    let mode_labels = js_string_array(gemini_mode_labels(mode));
+    let expected_placeholders = js_string_array(gemini_mode_placeholders(mode));
     format!(
         r#"(() => {{
-            const modeLabel = "{mode_label}";
-            const expectedPlaceholder = "{expected_placeholder}";
+            const modeLabels = {mode_labels};
+            const expectedPlaceholders = {expected_placeholders};
             const clickableSelector = [
               "button",
               "[role='button']",
@@ -472,8 +489,8 @@ fn build_gemini_mode_switch_js(mode: GeminiMode) -> String {
             }};
 
             clickByText(["工具", "Tools", "模式", "Mode"]);
-            if (!clickByText([modeLabel])) {{
-              throw new Error(`gemini mode not found: ${{modeLabel}}`);
+            if (!clickByText(modeLabels)) {{
+              throw new Error(`gemini mode not found: ${{modeLabels.join(", ")}}`);
             }}
 
             const input = document.querySelector(
@@ -489,11 +506,11 @@ fn build_gemini_mode_switch_js(mode: GeminiMode) -> String {
               input.getAttribute("aria-label") ||
               ""
             );
-            if (!placeholder.includes(expectedPlaceholder)) {{
+            if (!expectedPlaceholders.some((value) => placeholder.includes(value))) {{
               throw new Error(`placeholder mismatch: ${{placeholder}}`);
             }}
 
-            return expectedPlaceholder;
+            return placeholder;
         }})()"#
     )
 }
@@ -707,8 +724,10 @@ pub fn wait(selector: &str, timeout_seconds: u64) -> Result<SafariWaitResult, Ma
 
 pub fn prepare_gemini_mode(mode: GeminiMode) -> Result<SafariAiReadyResult, MacosError> {
     let placeholder = execute_js(&build_gemini_mode_switch_js(mode), "safari_gemini_mode")?;
-    let expected_placeholder = gemini_mode_placeholder(mode);
-    if !placeholder.contains(expected_placeholder) {
+    if !gemini_mode_placeholders(mode)
+        .iter()
+        .any(|value| placeholder.contains(value))
+    {
         return Err(MacosError::Other(format!(
             "unexpected Gemini placeholder after mode switch: {placeholder}"
         )));
@@ -738,7 +757,7 @@ pub fn send_gemini_prompt(prompt: &str) -> Result<SafariAiResponseResult, MacosE
         thread::sleep(Duration::from_secs(1));
         let text = execute_js(&response_js, "safari_gemini_response")?;
         let trimmed = text.trim();
-        if trimmed.is_empty() || trimmed == prompt {
+        if should_skip_gemini_response(trimmed, prompt) {
             continue;
         }
 
@@ -760,7 +779,7 @@ pub fn send_gemini_prompt(prompt: &str) -> Result<SafariAiResponseResult, MacosE
     if !last_text.is_empty() {
         return Ok(SafariAiResponseResult {
             provider: "gemini".to_string(),
-            status: "complete".to_string(),
+            status: "timeout".to_string(),
             response: last_text,
         });
     }
@@ -782,6 +801,7 @@ mod tests {
         build_gemini_chat_prompt_js, build_gemini_mode_switch_js, build_open_script,
         build_tabs_script, extract_profile, gemini_response_extract_js, parse_tab_line,
         parse_tabs_output, selector_click_js, selector_fill_js, selector_text_js,
+        should_skip_gemini_response,
     };
 
     #[test]
@@ -877,6 +897,7 @@ mod tests {
         let script = build_gemini_mode_switch_js(GeminiMode::DeepResearch);
 
         assert!(script.contains("Deep Research"));
+        assert!(script.contains("What do you want to research?"));
         assert!(script.contains("你想研究什麼？"));
         assert!(script.contains("document.querySelector"));
     }
@@ -897,5 +918,11 @@ mod tests {
         assert!(script.contains(".model-response-text"));
         assert!(script.contains("querySelectorAll"));
         assert!(script.contains("elements[elements.length - 1]"));
+    }
+
+    #[test]
+    fn should_skip_gemini_response_trims_prompt_whitespace() {
+        assert!(should_skip_gemini_response("hello", "  hello  "));
+        assert!(!should_skip_gemini_response("world", "  hello  "));
     }
 }
