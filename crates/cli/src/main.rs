@@ -88,6 +88,12 @@ enum Command {
         path: String,
     },
 
+    /// Read current Safari tabs and active tab
+    Safari {
+        #[command(subcommand)]
+        action: SafariAction,
+    },
+
     /// Manage Apple Notes (update, delete, move)
     Notes {
         #[command(subcommand)]
@@ -186,6 +192,19 @@ enum NotesAction {
         #[arg(long)]
         to: String,
     },
+}
+
+#[derive(Subcommand)]
+enum SafariAction {
+    /// List all current Safari tabs
+    Tabs {
+        /// Filter by Safari profile name parsed from window title
+        #[arg(long)]
+        profile: Option<String>,
+    },
+
+    /// Show the current active tab in the front Safari window
+    Active,
 }
 
 #[derive(Subcommand)]
@@ -642,6 +661,33 @@ fn main() {
                 eprintln!("error: {e}");
                 process::exit(1);
             }
+        },
+
+        Command::Safari { action } => match action {
+            SafariAction::Tabs { profile } => match cueward_adapter_macos::safari::tabs(profile.as_deref()) {
+                Ok(tabs) => {
+                    println!("{}", serde_json::to_string_pretty(&tabs).unwrap());
+                    eprintln!("{} tab(s)", tabs.len());
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+            SafariAction::Active => match cueward_adapter_macos::safari::active() {
+                Ok(tab) => {
+                    println!("{}", serde_json::to_string_pretty(&tab).unwrap());
+                    if tab.is_some() {
+                        eprintln!("active tab");
+                    } else {
+                        eprintln!("no Safari window");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
         },
 
         Command::Notes { action } => match action {
