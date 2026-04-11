@@ -1,6 +1,6 @@
 use std::process;
 
-use chrono::Utc;
+use chrono::{DateTime, Local, TimeZone, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
 
 use cueward_adapter_macos::MacosAdapter;
@@ -89,6 +89,12 @@ enum Command {
     QuickNotes {
         #[command(subcommand)]
         action: QuickNotesAction,
+    },
+
+    /// Query and manage Apple Calendar events
+    Calendar {
+        #[command(subcommand)]
+        action: CalendarAction,
     },
 }
 
@@ -182,12 +188,101 @@ enum QuickNotesAction {
     },
 }
 
+#[derive(Subcommand)]
+enum CalendarAction {
+    /// List events in a time range (default: next 24h)
+    List {
+        /// Start datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        from: Option<String>,
+
+        /// End datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        to: Option<String>,
+
+        /// Filter by calendar name
+        #[arg(long)]
+        calendar: Option<String>,
+    },
+
+    /// List today's events (00:00 to 23:59)
+    Today {
+        /// Filter by calendar name
+        #[arg(long)]
+        calendar: Option<String>,
+    },
+
+    /// Create a calendar event
+    Create {
+        /// Event title
+        #[arg(long)]
+        title: String,
+
+        /// Start datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        start: String,
+
+        /// End datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        end: String,
+
+        /// Calendar name (uses default calendar if omitted)
+        #[arg(long)]
+        calendar: Option<String>,
+
+        /// Notes/description
+        #[arg(long)]
+        notes: Option<String>,
+
+        /// Location
+        #[arg(long)]
+        location: Option<String>,
+    },
+
+    /// Delete a calendar event by title and start datetime
+    Delete {
+        /// Event title
+        #[arg(long)]
+        title: String,
+
+        /// Start datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        start: String,
+
+        /// Calendar name
+        #[arg(long)]
+        calendar: String,
+    },
+}
+
 #[derive(Clone, ValueEnum)]
 enum Source {
     Safari,
     Notes,
     Messages,
     All,
+}
+
+fn parse_datetime(s: &str) -> Option<DateTime<Local>> {
+    use chrono::NaiveDateTime;
+
+    // Try RFC 3339 first
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Some(dt.with_timezone(&Local));
+    }
+    // Try "YYYY-MM-DD HH:MM:SS"
+    if let Ok(ndt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
+        if let Some(dt) = Local.from_local_datetime(&ndt).single() {
+            return Some(dt);
+        }
+    }
+    // Try "YYYY-MM-DD HH:MM"
+    if let Ok(ndt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M") {
+        if let Some(dt) = Local.from_local_datetime(&ndt).single() {
+            return Some(dt);
+        }
+    }
+    None
 }
 
 fn parse_duration(s: &str) -> Option<chrono::Duration> {
@@ -495,6 +590,114 @@ fn main() {
             QuickNotesAction::Archive { title, to } => {
                 match cueward_adapter_macos::quick_notes::archive(&title, &to) {
                     Ok(()) => eprintln!("quick note archived: {title} -> {to}"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+        },
+
+        Command::Calendar { action } => match action {
+            CalendarAction::Today { calendar } => {
+                let now = Local::now();
+                let from = now
+                    .date_naive()
+                    .and_hms_opt(0, 0, 0)
+                    .and_then(|dt| Local.from_local_datetime(&dt).single())
+                    .unwrap_or(now);
+                let to = now
+                    .date_naive()
+                    .and_hms_opt(23, 59, 59)
+                    .and_then(|dt| Local.from_local_datetime(&dt).single())
+                    .unwrap_or(now);
+                match cueward_adapter_macos::calendar::list_events(from, to, calendar.as_deref()) {
+                    Ok(events) => {
+                        println!("{}", serde_json::to_string_pretty(&events).unwrap());
+                        eprintln!("{} event(s)", events.len());
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+
+            CalendarAction::List { from, to, calendar } => {
+                let now = Local::now();
+                let from_dt = from.as_deref().and_then(parse_datetime).unwrap_or(now);
+                let to_dt = to
+                    .as_deref()
+                    .and_then(parse_datetime)
+                    .unwrap_or_else(|| from_dt + chrono::Duration::hours(24));
+                match cueward_adapter_macos::calendar::list_events(
+                    from_dt,
+                    to_dt,
+                    calendar.as_deref(),
+                ) {
+                    Ok(events) => {
+                        println!("{}", serde_json::to_string_pretty(&events).unwrap());
+                        eprintln!("{} event(s)", events.len());
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+
+            CalendarAction::Create {
+                title,
+                start,
+                end,
+                calendar,
+                notes,
+                location,
+            } => {
+                let start_dt = match parse_datetime(&start) {
+                    Some(dt) => dt,
+                    None => {
+                        eprintln!("error: invalid start datetime '{start}'");
+                        process::exit(1);
+                    }
+                };
+                let end_dt = match parse_datetime(&end) {
+                    Some(dt) => dt,
+                    None => {
+                        eprintln!("error: invalid end datetime '{end}'");
+                        process::exit(1);
+                    }
+                };
+                match cueward_adapter_macos::calendar::create_event(
+                    &title,
+                    start_dt,
+                    end_dt,
+                    calendar.as_deref(),
+                    notes.as_deref(),
+                    location.as_deref(),
+                ) {
+                    Ok(()) => eprintln!("event created: {title}"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+
+            CalendarAction::Delete {
+                title,
+                start,
+                calendar,
+            } => {
+                let start_dt = match parse_datetime(&start) {
+                    Some(dt) => dt,
+                    None => {
+                        eprintln!("error: invalid start datetime '{start}'");
+                        process::exit(1);
+                    }
+                };
+                match cueward_adapter_macos::calendar::delete_event(&title, start_dt, &calendar) {
+                    Ok(()) => eprintln!("event deleted: {title}"),
                     Err(e) => {
                         eprintln!("error: {e}");
                         process::exit(1);
