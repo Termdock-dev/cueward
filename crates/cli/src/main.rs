@@ -330,6 +330,27 @@ enum SafariAction {
         #[arg(long)]
         profile: Option<String>,
     },
+
+    /// Save AI-generated images from a Gemini conversation as PNG files
+    AiSaveImages {
+        /// Conversation URL
+        url: String,
+        /// Output directory for saved images
+        #[arg(long, default_value = ".")]
+        output: String,
+        /// Restrict operations to a Safari profile name parsed from the window title
+        #[arg(long)]
+        profile: Option<String>,
+    },
+
+    /// Get the video download URL from a Gemini conversation
+    AiVideoUrl {
+        /// Conversation URL
+        url: String,
+        /// Restrict operations to a Safari profile name parsed from the window title
+        #[arg(long)]
+        profile: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1073,6 +1094,34 @@ fn main() {
                     Ok(result) => {
                         println!("{}", serde_json::to_string_pretty(&result).unwrap());
                         eprintln!("conversation read");
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            SafariAction::AiSaveImages { url, output, profile } => {
+                match cueward_adapter_macos::safari::gemini_save_images(&url, &output, profile.as_deref()) {
+                    Ok(paths) => {
+                        println!("{}", serde_json::to_string_pretty(&paths).unwrap());
+                        eprintln!("{} image(s) saved", paths.len());
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            SafariAction::AiVideoUrl { url, profile } => {
+                match cueward_adapter_macos::safari::gemini_get_video_url(&url, profile.as_deref()) {
+                    Ok(Some(video_url)) => {
+                        println!("{}", serde_json::to_string_pretty(&serde_json::json!({ "url": video_url })).unwrap());
+                        eprintln!("video URL found");
+                    }
+                    Ok(None) => {
+                        eprintln!("no video found in conversation");
+                        process::exit(1);
                     }
                     Err(e) => {
                         eprintln!("error: {e}");
