@@ -817,29 +817,40 @@ pub fn gemini_save_images(
     Ok(saved)
 }
 
-pub fn gemini_get_video_url(
+pub fn gemini_save_media(
     conversation_url: &str,
     profile_filter: Option<&str>,
-) -> Result<Option<String>, MacosError> {
+) -> Result<SafariAiResponseResult, MacosError> {
     let nav_js = format!(
         r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
         url = escape_js_string(conversation_url),
     );
-    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_video_navigate")?;
-    thread::sleep(Duration::from_millis(3000));
+    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_media_navigate")?;
+    thread::sleep(Duration::from_millis(5000));
 
     let js = r#"(() => {
         const video = document.querySelector("video");
-        if (!video) return "";
-        return video.src || video.currentSrc || "";
+        if (!video) return JSON.stringify({ status: "error", response: "no media found" });
+        const src = video.src || video.currentSrc || "";
+        if (!src) return JSON.stringify({ status: "error", response: "no media source" });
+        const a = document.createElement("a");
+        a.href = src;
+        a.download = "gemini_media.mp4";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return JSON.stringify({ status: "downloading", response: src });
     })()"#;
-    let url = execute_js_for_profile(js, profile_filter, "safari_gemini_video_url")?;
-    let url = url.trim();
-    if url.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(url.to_string()))
-    }
+    let raw = execute_js_for_profile(js, profile_filter, "safari_gemini_media_download")?;
+    let value: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|e| MacosError::Other(format!("failed to parse media result: {e}")))?;
+    let status = value.get("status").and_then(|v| v.as_str()).unwrap_or("error");
+    let response = value.get("response").and_then(|v| v.as_str()).unwrap_or("");
+    Ok(SafariAiResponseResult {
+        provider: "gemini".to_string(),
+        status: status.to_string(),
+        response: response.to_string(),
+    })
 }
 
 pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
