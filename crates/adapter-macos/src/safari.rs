@@ -332,7 +332,11 @@ fn build_exec_script(js_code: &str) -> String {
                 return ""
             end if
             set jsCode to {js_expr}
-            set rawResult to (do JavaScript jsCode in current tab of front window) as string
+            set rawResult to do JavaScript jsCode in current tab of front window
+            if rawResult is missing value then
+                return ""
+            end if
+            set rawResult to rawResult as string
             return my encode_field(rawResult)
         end tell
     "#,
@@ -498,7 +502,10 @@ pub fn exec(js_code: &str) -> Result<SafariEvalResult, MacosError> {
 }
 
 pub fn click(selector: &str) -> Result<SafariClickResult, MacosError> {
-    execute_js(&selector_click_js(selector), "safari_click")?;
+    let result = execute_js(&selector_click_js(selector), "safari_click")?;
+    if result.trim() != "true" {
+        return Err(MacosError::Other(result));
+    }
     Ok(SafariClickResult {
         clicked: true,
         selector: selector.to_string(),
@@ -506,7 +513,10 @@ pub fn click(selector: &str) -> Result<SafariClickResult, MacosError> {
 }
 
 pub fn fill(selector: &str, text: &str) -> Result<SafariFillResult, MacosError> {
-    execute_js(&selector_fill_js(selector, text), "safari_fill")?;
+    let result = execute_js(&selector_fill_js(selector, text), "safari_fill")?;
+    if result.trim() != "true" {
+        return Err(MacosError::Other(result));
+    }
     Ok(SafariFillResult {
         filled: true,
         selector: selector.to_string(),
@@ -519,6 +529,11 @@ pub fn wait(selector: &str, timeout_seconds: u64) -> Result<SafariWaitResult, Ma
     let js = selector_exists_js(selector);
     loop {
         let exists = execute_js(&js, "safari_wait")?;
+        if exists.is_empty() {
+            return Err(MacosError::Other(
+                "no Safari window or active tab available".to_string(),
+            ));
+        }
         if exists.trim() == "true" {
             return Ok(SafariWaitResult {
                 found: true,
@@ -625,6 +640,7 @@ mod tests {
         assert!(script.contains("set jsCode to"));
         assert!(script.contains("do JavaScript jsCode"));
         assert!(script.contains("& linefeed &"));
+        assert!(script.contains("if rawResult is missing value then"));
     }
 
     #[test]
