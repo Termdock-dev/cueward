@@ -757,7 +757,7 @@ pub fn gemini_save_images(
         url = escape_js_string(conversation_url),
     );
     let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_save_img_navigate")?;
-    thread::sleep(Duration::from_millis(3000));
+    thread::sleep(Duration::from_millis(5000));
 
     let count_js = r#"(() => {
         const imgs = document.querySelectorAll('img[alt*="AI"], img[alt*="生成"]');
