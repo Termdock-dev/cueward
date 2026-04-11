@@ -43,6 +43,17 @@
 - [x] cueward plan（建立 Reminders 提醒事項）
 - [x] cueward ocr（Vision Framework OCR，支援圖片 + PDF）
 
+## Phase 7：Safari AI Provider Automation
+- [x] URL-based mode navigation (bypasses DOM clicking entirely)
+- [x] execCommand('insertText') for prompt input (no focus stealing)
+- [x] Deep Research: full flow (prompt → plan → confirm via "ok" → poll → report)
+- [x] Image generation: prompt → canvas → base64 → PNG save
+- [x] Video/Music: prompt → browser-native download via `<a download>`
+- [x] Conversation list/read from sidebar
+- [x] Provider-based CLI structure (`--provider gemini/chatgpt`)
+- [ ] ChatGPT provider implementation
+- [ ] Grok provider implementation
+
 ## Phase 6+（未來）
 - [ ] 靈動島 Notch UI
 - [ ] Windows adapter
