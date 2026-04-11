@@ -72,6 +72,28 @@ pub struct SafariWaitResult {
     pub timeout_seconds: u64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GeminiMode {
+    Image,
+    DeepResearch,
+    Video,
+    Music,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariAiReadyResult {
+    pub provider: String,
+    pub mode: String,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariAiResponseResult {
+    pub provider: String,
+    pub status: String,
+    pub response: String,
+}
+
 fn history_db_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_default();
     PathBuf::from(home).join("Library/Safari/History.db")
@@ -392,6 +414,139 @@ fn selector_fill_js(selector: &str, text: &str) -> String {
     )
 }
 
+fn gemini_mode_label(mode: GeminiMode) -> &'static str {
+    match mode {
+        GeminiMode::Image => "建立圖像",
+        GeminiMode::DeepResearch => "Deep Research",
+        GeminiMode::Video => "建立影片",
+        GeminiMode::Music => "創作音樂",
+    }
+}
+
+fn gemini_mode_placeholder(mode: GeminiMode) -> &'static str {
+    match mode {
+        GeminiMode::Image => "請輸入圖片說明",
+        GeminiMode::DeepResearch => "你想研究什麼？",
+        GeminiMode::Video => "描述影片",
+        GeminiMode::Music => "描述音樂",
+    }
+}
+
+fn gemini_mode_slug(mode: GeminiMode) -> &'static str {
+    match mode {
+        GeminiMode::Image => "image",
+        GeminiMode::DeepResearch => "deep-research",
+        GeminiMode::Video => "video",
+        GeminiMode::Music => "music",
+    }
+}
+
+fn build_gemini_mode_switch_js(mode: GeminiMode) -> String {
+    let mode_label = escape_js_string(gemini_mode_label(mode));
+    let expected_placeholder = escape_js_string(gemini_mode_placeholder(mode));
+    format!(
+        r#"(() => {{
+            const modeLabel = "{mode_label}";
+            const expectedPlaceholder = "{expected_placeholder}";
+            const clickableSelector = [
+              "button",
+              "[role='button']",
+              "[role='option']",
+              "mat-option",
+              "li",
+              "span"
+            ].join(",");
+            const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+            const clickByText = (labels) => {{
+              const wanted = labels.map(normalize).filter(Boolean);
+              const nodes = [...document.querySelectorAll(clickableSelector)];
+              for (const node of nodes) {{
+                const text = normalize(node.innerText || node.textContent);
+                if (!text) continue;
+                if (!wanted.some((label) => text.includes(label))) continue;
+                const clickable = node.closest("button,[role='button'],[role='option'],mat-option,li") || node;
+                clickable.click();
+                return true;
+              }}
+              return false;
+            }};
+
+            clickByText(["工具", "Tools", "模式", "Mode"]);
+            if (!clickByText([modeLabel])) {{
+              throw new Error(`gemini mode not found: ${{modeLabel}}`);
+            }}
+
+            const input = document.querySelector(
+              ".ql-editor, rich-textarea .ProseMirror, div[role='textbox'][contenteditable='true'], div[contenteditable='true']"
+            );
+            if (!input) {{
+              throw new Error("gemini input not found after mode switch");
+            }}
+
+            const placeholder = normalize(
+              input.getAttribute("data-placeholder") ||
+              input.getAttribute("placeholder") ||
+              input.getAttribute("aria-label") ||
+              ""
+            );
+            if (!placeholder.includes(expectedPlaceholder)) {{
+              throw new Error(`placeholder mismatch: ${{placeholder}}`);
+            }}
+
+            return expectedPlaceholder;
+        }})()"#
+    )
+}
+
+fn build_gemini_chat_prompt_js(prompt: &str) -> String {
+    let prompt = escape_js_string(prompt);
+    format!(
+        r#"(() => {{
+            const promptText = "{prompt}";
+            const input = document.querySelector(
+              ".ql-editor, rich-textarea .ProseMirror, div[role='textbox'][contenteditable='true'], div[contenteditable='true']"
+            );
+            if (!input) {{
+              throw new Error("gemini input not found");
+            }}
+
+            input.focus();
+            if ("value" in input) {{
+              input.value = promptText;
+            }} else {{
+              input.textContent = promptText;
+            }}
+            input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+            input.dispatchEvent(new Event("change", {{ bubbles: true }}));
+
+            input.dispatchEvent(new KeyboardEvent("keydown", {{ key: "Enter", bubbles: true }}));
+            input.dispatchEvent(new KeyboardEvent("keypress", {{ key: "Enter", bubbles: true }}));
+            input.dispatchEvent(new KeyboardEvent("keyup", {{ key: "Enter", bubbles: true }}));
+            return "true";
+        }})()"#
+    )
+}
+
+fn gemini_response_extract_js() -> String {
+    r#"(() => {
+        const selectors = [
+          ".model-response-text",
+          ".message-content",
+          ".markdown",
+          "div[data-test-id='message-content']"
+        ];
+        for (const selector of selectors) {
+          const elements = document.querySelectorAll(selector);
+          if (!elements.length) continue;
+          const last = elements[elements.length - 1];
+          const text = (last.innerText || last.textContent || "").trim();
+          if (text) return text;
+        }
+        return "";
+    })()"#
+        .to_string()
+}
+
 pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
     let db_path = history_db_path();
 
@@ -550,6 +705,71 @@ pub fn wait(selector: &str, timeout_seconds: u64) -> Result<SafariWaitResult, Ma
     }
 }
 
+pub fn prepare_gemini_mode(mode: GeminiMode) -> Result<SafariAiReadyResult, MacosError> {
+    let placeholder = execute_js(&build_gemini_mode_switch_js(mode), "safari_gemini_mode")?;
+    let expected_placeholder = gemini_mode_placeholder(mode);
+    if !placeholder.contains(expected_placeholder) {
+        return Err(MacosError::Other(format!(
+            "unexpected Gemini placeholder after mode switch: {placeholder}"
+        )));
+    }
+
+    Ok(SafariAiReadyResult {
+        provider: "gemini".to_string(),
+        mode: gemini_mode_slug(mode).to_string(),
+        status: "ready".to_string(),
+    })
+}
+
+pub fn send_gemini_prompt(prompt: &str) -> Result<SafariAiResponseResult, MacosError> {
+    let sent = execute_js(&build_gemini_chat_prompt_js(prompt), "safari_gemini_prompt")?;
+    if sent.trim() != "true" {
+        return Err(MacosError::Other(format!(
+            "failed to trigger Gemini prompt submission: {sent}"
+        )));
+    }
+
+    let mut last_text = String::new();
+    let mut stable_count = 0;
+    let deadline = Instant::now() + Duration::from_secs(60);
+    let response_js = gemini_response_extract_js();
+
+    while Instant::now() < deadline {
+        thread::sleep(Duration::from_secs(1));
+        let text = execute_js(&response_js, "safari_gemini_response")?;
+        let trimmed = text.trim();
+        if trimmed.is_empty() || trimmed == prompt {
+            continue;
+        }
+
+        if trimmed == last_text {
+            stable_count += 1;
+            if stable_count >= 2 {
+                return Ok(SafariAiResponseResult {
+                    provider: "gemini".to_string(),
+                    status: "complete".to_string(),
+                    response: trimmed.to_string(),
+                });
+            }
+        } else {
+            last_text = trimmed.to_string();
+            stable_count = 0;
+        }
+    }
+
+    if !last_text.is_empty() {
+        return Ok(SafariAiResponseResult {
+            provider: "gemini".to_string(),
+            status: "complete".to_string(),
+            response: last_text,
+        });
+    }
+
+    Err(MacosError::Other(
+        "timeout waiting for Gemini response".to_string(),
+    ))
+}
+
 fn execute_js(js_code: &str, context: &str) -> Result<String, MacosError> {
     let stdout = run_capture(&build_exec_script(js_code), context)?;
     Ok(decode_field(stdout.trim()))
@@ -558,9 +778,10 @@ fn execute_js(js_code: &str, context: &str) -> Result<String, MacosError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        TAB_SEPARATOR, build_active_tab_script, build_close_script, build_exec_script,
-        build_open_script, build_tabs_script, extract_profile, parse_tab_line, parse_tabs_output,
-        selector_click_js, selector_fill_js, selector_text_js,
+        GeminiMode, TAB_SEPARATOR, build_active_tab_script, build_close_script, build_exec_script,
+        build_gemini_chat_prompt_js, build_gemini_mode_switch_js, build_open_script,
+        build_tabs_script, extract_profile, gemini_response_extract_js, parse_tab_line,
+        parse_tabs_output, selector_click_js, selector_fill_js, selector_text_js,
     };
 
     #[test]
@@ -572,8 +793,7 @@ mod tests {
 
     #[test]
     fn parse_tab_line_decodes_fields() {
-        let line =
-            "61998\tRyugu — Google\\tGemini\t0\tGoogle\\tGemini\thttps://gemini.google.com/app\ttrue";
+        let line = "61998\tRyugu — Google\\tGemini\t0\tGoogle\\tGemini\thttps://gemini.google.com/app\ttrue";
 
         let tab = parse_tab_line(line).expect("tab");
 
@@ -650,5 +870,32 @@ mod tests {
         let fill = selector_fill_js("input[name=q]", "hello");
         assert!(fill.contains("input[name=q]"));
         assert!(fill.contains("hello"));
+    }
+
+    #[test]
+    fn gemini_mode_switch_script_targets_requested_mode() {
+        let script = build_gemini_mode_switch_js(GeminiMode::DeepResearch);
+
+        assert!(script.contains("Deep Research"));
+        assert!(script.contains("你想研究什麼？"));
+        assert!(script.contains("document.querySelector"));
+    }
+
+    #[test]
+    fn gemini_chat_prompt_script_targets_editor_and_send() {
+        let script = build_gemini_chat_prompt_js("hello world");
+
+        assert!(script.contains(".ql-editor"));
+        assert!(script.contains("hello world"));
+        assert!(script.contains("KeyboardEvent"));
+    }
+
+    #[test]
+    fn gemini_response_extract_script_targets_latest_response() {
+        let script = gemini_response_extract_js();
+
+        assert!(script.contains(".model-response-text"));
+        assert!(script.contains("querySelectorAll"));
+        assert!(script.contains("elements[elements.length - 1]"));
     }
 }
