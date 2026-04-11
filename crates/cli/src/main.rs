@@ -76,6 +76,12 @@ enum Command {
         list: String,
     },
 
+    /// Read Apple Reminders
+    Reminders {
+        #[command(subcommand)]
+        action: RemindersAction,
+    },
+
     /// Extract text from images or PDFs via Vision OCR
     Ocr {
         /// Path to image or PDF file
@@ -226,6 +232,19 @@ enum QuickNotesAction {
         #[arg(long)]
         to: String,
     },
+}
+
+#[derive(Subcommand)]
+enum RemindersAction {
+    /// List reminders, optionally filtered by list name
+    List {
+        /// Filter by reminders list name
+        #[arg(long)]
+        list: Option<String>,
+    },
+
+    /// List reminders due today
+    Today,
 }
 
 #[derive(Subcommand)]
@@ -587,6 +606,31 @@ fn main() {
                 }
             }
         }
+
+        Command::Reminders { action } => match action {
+            RemindersAction::List { list } => {
+                match cueward_adapter_macos::reminders::list(list.as_deref()) {
+                    Ok(reminders) => {
+                        println!("{}", serde_json::to_string_pretty(&reminders).unwrap());
+                        eprintln!("{} reminder(s)", reminders.len());
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            RemindersAction::Today => match cueward_adapter_macos::reminders::today() {
+                Ok(reminders) => {
+                    println!("{}", serde_json::to_string_pretty(&reminders).unwrap());
+                    eprintln!("{} reminder(s) due today", reminders.len());
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+        },
 
         Command::Ocr { path } => match cueward_adapter_macos::ocr::capture(&path) {
             Ok(cues) => {
