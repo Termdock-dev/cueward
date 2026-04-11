@@ -107,6 +107,28 @@ enum Command {
         #[arg(long)]
         output: Option<String>,
     },
+
+    /// Read or write the system clipboard
+    Clipboard {
+        #[command(subcommand)]
+        action: ClipboardAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum ClipboardAction {
+    /// Read clipboard content (text or image)
+    Get {
+        /// Save image to this path instead of default cache dir
+        #[arg(long)]
+        save_image: Option<String>,
+    },
+
+    /// Write text to clipboard
+    Set {
+        /// Text to copy to clipboard
+        text: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -621,6 +643,33 @@ fn main() {
                 }
             }
         }
+
+        Command::Clipboard { action } => match action {
+            ClipboardAction::Get { save_image } => {
+                match cueward_adapter_macos::clipboard::get(save_image.as_deref()) {
+                    Ok(content) => {
+                        println!("{}", serde_json::to_string_pretty(&content).unwrap());
+                        match content.content_type.as_str() {
+                            "image" => eprintln!("clipboard image saved to {}", content.path.unwrap_or_default()),
+                            _ => eprintln!("clipboard text read"),
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            ClipboardAction::Set { text } => {
+                match cueward_adapter_macos::clipboard::set(&text) {
+                    Ok(()) => eprintln!("copied to clipboard"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+        },
 
         Command::Calendar { action } => match action {
             CalendarAction::Today { calendar } => {
