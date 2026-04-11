@@ -87,12 +87,10 @@ fn parse_tab_line(line: &str) -> Option<SafariTab> {
     let title = decode_field(parts[3]);
     let url = decode_field(parts[4]);
     let active = parts[5].trim() == "true";
-    let profile = extract_profile(&window_name, &title);
-
     Some(SafariTab {
         window_id,
         window_name,
-        profile,
+        profile: None,
         index,
         title,
         url,
@@ -101,11 +99,26 @@ fn parse_tab_line(line: &str) -> Option<SafariTab> {
 }
 
 fn parse_tabs_output(stdout: &str) -> Vec<SafariTab> {
-    stdout
+    let mut tabs: Vec<SafariTab> = stdout
         .split(TAB_SEPARATOR)
         .filter(|line| !line.trim().is_empty())
         .filter_map(parse_tab_line)
-        .collect()
+        .collect();
+
+    let mut profiles_by_window = HashMap::new();
+    for tab in &tabs {
+        if tab.active {
+            if let Some(profile) = extract_profile(&tab.window_name, &tab.title) {
+                profiles_by_window.insert(tab.window_id, profile);
+            }
+        }
+    }
+
+    for tab in &mut tabs {
+        tab.profile = profiles_by_window.get(&tab.window_id).cloned();
+    }
+
+    tabs
 }
 
 fn safari_script_prelude() -> String {
@@ -276,7 +289,7 @@ mod tests {
 
         assert_eq!(tab.window_id, 61998);
         assert_eq!(tab.window_name, "Ryugu — Google\tGemini");
-        assert_eq!(tab.profile.as_deref(), Some("Ryugu"));
+        assert_eq!(tab.profile, None);
         assert_eq!(tab.index, 0);
         assert_eq!(tab.title, "Google\tGemini");
         assert_eq!(tab.url, "https://gemini.google.com/app");
@@ -295,6 +308,8 @@ mod tests {
         assert_eq!(tabs.len(), 2);
         assert_eq!(tabs[0].title, "Mail");
         assert_eq!(tabs[1].title, "Docs");
+        assert_eq!(tabs[0].profile.as_deref(), Some("Work"));
+        assert_eq!(tabs[1].profile.as_deref(), Some("Work"));
     }
 
     #[test]
