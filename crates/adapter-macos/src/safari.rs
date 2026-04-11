@@ -545,7 +545,7 @@ fn build_gemini_go_home_js() -> String {
         .to_string()
 }
 
-fn ensure_gemini_home(profile_filter: Option<&str>) -> Result<(), MacosError> {
+pub fn ensure_gemini_home(profile_filter: Option<&str>) -> Result<(), MacosError> {
     let _ = execute_js_for_profile(
         &build_gemini_go_home_js(),
         profile_filter,
@@ -1102,7 +1102,7 @@ pub fn start_gemini_deep_research(
         result.plan = Some(prompt.to_string());
     }
 
-    if auto_confirm {
+    if auto_confirm && result.status == "plan_ready" {
         let filled = execute_js_for_profile(
             &build_gemini_fill_input_js("ok"),
             profile_filter,
@@ -1159,8 +1159,6 @@ pub fn send_gemini_prompt(
     prompt: &str,
     profile_filter: Option<&str>,
 ) -> Result<SafariAiResponseResult, MacosError> {
-    ensure_gemini_home(profile_filter)?;
-
     let filled = execute_js_for_profile(
         &build_gemini_fill_input_js(prompt),
         profile_filter,

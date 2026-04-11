@@ -978,6 +978,9 @@ fn main() {
                             };
                             match gemini_action {
                                 GeminiAiAction::PromptOnly(prompt) => {
+                                    if let Err(e) = cueward_adapter_macos::safari::ensure_gemini_home(p) {
+                                        eprintln!("error: {e}"); process::exit(1);
+                                    }
                                     match cueward_adapter_macos::safari::send_gemini_prompt(&prompt, p) {
                                         Ok(r) => { println!("{}", serde_json::to_string_pretty(&r).unwrap()); eprintln!("gemini response ready"); }
                                         Err(e) => { eprintln!("error: {e}"); process::exit(1); }
