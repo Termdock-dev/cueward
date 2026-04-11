@@ -21,6 +21,9 @@ const CACHE_DIR: &str = ".cueward/cache/clipboard";
 
 fn validate_user_output_path(path: &str) -> Result<&Path, String> {
     let candidate = Path::new(path);
+    if path.contains('\n') || path.contains('\r') {
+        return Err("path must not contain control characters".into());
+    }
     if candidate
         .components()
         .any(|component| matches!(component, Component::ParentDir))
@@ -95,7 +98,10 @@ fn save_clipboard_image(save_path: &str) -> Result<(), MacosError> {
 pub fn get(save_image_path: Option<&str>) -> Result<ClipboardContent, MacosError> {
     if has_image() {
         let path = match save_image_path {
-            Some(p) => p.to_string(),
+            Some(p) => {
+                validate_user_output_path(p).map_err(MacosError::Other)?;
+                p.to_string()
+            }
             None => {
                 let dir = ensure_cache_dir()?;
                 let ts = Local::now().format("%Y%m%d-%H%M%S").to_string();
@@ -142,6 +148,7 @@ pub fn set(text: &str) -> Result<(), MacosError> {
     stdin
         .write_all(text.as_bytes())
         .map_err(|e| MacosError::Other(format!("failed to write to pbcopy: {e}")))?;
+    drop(stdin);
 
     let status = child
         .wait()
@@ -165,6 +172,13 @@ mod tests {
         let err = validate_user_output_path("../../etc/passwd").expect_err("should reject");
 
         assert!(err.contains("parent directory"));
+    }
+
+    #[test]
+    fn validate_user_output_path_rejects_control_characters() {
+        let err = validate_user_output_path("bad\npath.png").expect_err("should reject");
+
+        assert!(err.contains("control characters"));
     }
 
     #[test]

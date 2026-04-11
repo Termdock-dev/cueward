@@ -19,6 +19,9 @@ const CACHE_DIR: &str = ".cueward/cache/screenshots";
 
 fn validate_user_output_path(path: &str) -> Result<&Path, String> {
     let candidate = Path::new(path);
+    if path.contains('\n') || path.contains('\r') {
+        return Err("path must not contain control characters".into());
+    }
     if candidate
         .components()
         .any(|component| matches!(component, Component::ParentDir))
@@ -26,6 +29,17 @@ fn validate_user_output_path(path: &str) -> Result<&Path, String> {
         return Err("path must not contain parent directory components".into());
     }
     Ok(candidate)
+}
+
+fn validate_display(display: Option<u32>) -> Result<(), String> {
+    if let Some(display) = display {
+        if !(1..=10).contains(&display) {
+            return Err(format!(
+                "invalid display number {display}: must be between 1 and 10"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn ensure_screenshot_file_exists(path: &Path) -> Result<(), String> {
@@ -56,6 +70,8 @@ pub fn capture(
     output: Option<&str>,
     display: Option<u32>,
 ) -> Result<ScreenshotResult, MacosError> {
+    validate_display(display).map_err(MacosError::Other)?;
+
     let now = Local::now();
     let timestamp = now.format("%Y%m%d-%H%M%S").to_string();
 
@@ -118,7 +134,7 @@ pub fn capture(
 mod tests {
     use std::path::Path;
 
-    use super::{ensure_screenshot_file_exists, validate_user_output_path};
+    use super::{ensure_screenshot_file_exists, validate_display, validate_user_output_path};
 
     #[test]
     fn validate_user_output_path_rejects_parent_components() {
@@ -133,5 +149,12 @@ mod tests {
             .expect_err("should fail");
 
         assert!(err.contains("was not created"));
+    }
+
+    #[test]
+    fn validate_display_rejects_out_of_range_values() {
+        let err = validate_display(Some(11)).expect_err("should reject");
+
+        assert!(err.contains("between 1 and 10"));
     }
 }

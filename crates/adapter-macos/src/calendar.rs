@@ -2,7 +2,7 @@ use chrono::{DateTime, Local};
 use serde::Serialize;
 
 use crate::MacosError;
-use crate::applescript::{escape, run, run_capture};
+use crate::applescript::{escape, escape_body, run, run_capture};
 
 const EVENT_SEPARATOR: &str = "---EVENT_SEP---";
 
@@ -49,8 +49,8 @@ fn decode_field(value: &str) -> String {
 /// Parse a tab-separated event line from the AppleScript output.
 /// Fields: title \t start \t end \t calendar \t location \t notes \t all_day
 pub fn parse_event_line(line: &str) -> Option<CalendarEvent> {
-    let parts: Vec<&str> = line.splitn(7, '\t').collect();
-    if parts.len() < 7 {
+    let parts: Vec<&str> = line.split('\t').collect();
+    if parts.len() != 7 {
         return None;
     }
     let title = decode_field(parts[0]);
@@ -128,7 +128,7 @@ pub fn list_events(
             {cal_filter_block}
             repeat with aCal in targetCals
                 set calName to my encode_field(name of aCal)
-                set evts to (events of aCal whose start date >= fromDate and start date <= toDate)
+                set evts to (events of aCal whose (start date < toDate) and (end date > fromDate))
                 repeat with evt in evts
                     set evtTitle to my encode_field(summary of evt)
                     set evtStart to (start date of evt) as «class isot» as string
@@ -172,10 +172,10 @@ pub fn create_event(
     let end_str = format_for_applescript(&end);
 
     let notes_prop = notes
-        .map(|n| format!(r#", description:"{}""#, escape(n)))
+        .map(|n| format!(r#", description:{}"#, escape_body(n)))
         .unwrap_or_default();
     let location_prop = location
-        .map(|l| format!(r#", location:"{}""#, escape(l)))
+        .map(|l| format!(r#", location:{}"#, escape_body(l)))
         .unwrap_or_default();
 
     let target_cal_block = match calendar_name {
@@ -255,5 +255,12 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].notes, "Line 1\nLine 2");
+    }
+
+    #[test]
+    fn create_event_script_uses_escape_body_for_multiline_fields() {
+        let escaped = crate::applescript::escape_body("Line 1\nLine 2");
+
+        assert_eq!(escaped, "\"Line 1\" & linefeed & \"Line 2\"");
     }
 }

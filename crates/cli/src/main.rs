@@ -312,13 +312,23 @@ fn parse_datetime(s: &str) -> Option<DateTime<Local>> {
     }
     // Try "YYYY-MM-DD HH:MM:SS"
     if let Ok(ndt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
-        if let Some(dt) = Local.from_local_datetime(&ndt).single() {
+        if let Some(dt) = Local
+            .from_local_datetime(&ndt)
+            .single()
+            .or_else(|| Local.from_local_datetime(&ndt).earliest())
+            .or_else(|| Local.from_local_datetime(&ndt).latest())
+        {
             return Some(dt);
         }
     }
     // Try "YYYY-MM-DD HH:MM"
     if let Ok(ndt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M") {
-        if let Some(dt) = Local.from_local_datetime(&ndt).single() {
+        if let Some(dt) = Local
+            .from_local_datetime(&ndt)
+            .single()
+            .or_else(|| Local.from_local_datetime(&ndt).earliest())
+            .or_else(|| Local.from_local_datetime(&ndt).latest())
+        {
             return Some(dt);
         }
     }
@@ -885,5 +895,12 @@ mod tests {
         assert_eq!(to.hour(), 23);
         assert_eq!(to.minute(), 59);
         assert_eq!(to.second(), 59);
+    }
+
+    #[test]
+    fn parse_datetime_accepts_ambiguous_local_time() {
+        let parsed = super::parse_datetime("2026-11-01 01:30");
+
+        assert!(parsed.is_some());
     }
 }
