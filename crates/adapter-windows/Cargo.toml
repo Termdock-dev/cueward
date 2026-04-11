@@ -2,6 +2,13 @@
 name = "cueward-adapter-windows"
 version.workspace = true
 edition.workspace = true
+publish = false
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+description = "Reserved Windows adapter crate for future Cueward platform support."
 
 [dependencies]
-cueward-core = { path = "../core" }
+cueward-core = { version = "0.1.0", path = "../core" }
