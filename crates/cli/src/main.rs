@@ -757,7 +757,11 @@ fn main() {
             SafariAction::Close { index } => match cueward_adapter_macos::safari::close(index) {
                 Ok(result) => {
                     println!("{}", serde_json::to_string_pretty(&result).unwrap());
-                    eprintln!("tab closed");
+                    if result.closed {
+                        eprintln!("tab closed");
+                    } else {
+                        eprintln!("no Safari window");
+                    }
                 }
                 Err(e) => {
                     eprintln!("error: {e}");
