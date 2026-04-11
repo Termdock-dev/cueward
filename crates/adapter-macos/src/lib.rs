@@ -2,10 +2,13 @@ mod safari;
 mod notes;
 mod messages;
 pub mod applescript;
+pub mod calendar;
+pub mod clipboard;
 pub mod send;
 pub mod plan;
 pub mod ocr;
 pub mod quick_notes;
+pub mod screenshot;
 mod error;
 
 pub use error::MacosError;

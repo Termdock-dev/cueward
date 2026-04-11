@@ -72,6 +72,7 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
             url: Some(url),
             title,
             tags: Vec::new(),
+            attachment_segments: Vec::new(),
             metadata: HashMap::new(),
         })
         .collect();

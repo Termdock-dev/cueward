@@ -71,6 +71,7 @@ pub fn capture(path: &str) -> Result<Vec<Cue>, MacosError> {
         url: Some(format!("file://{}", abs_path.display())),
         title: filename,
         tags: Vec::new(),
+        attachment_segments: Vec::new(),
         metadata: HashMap::from([("ocr".into(), "true".into())]),
     }])
 }

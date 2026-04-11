@@ -16,6 +16,22 @@ pub fn escape_body(s: &str) -> String {
     parts.join(" & linefeed & ")
 }
 
+/// Run an AppleScript and return its stdout on success.
+pub fn run_capture(script: &str, context: &str) -> Result<String, MacosError> {
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .map_err(|e| MacosError::Other(format!("osascript: {e}")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(MacosError::Other(format!("{context}: {stderr}")));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
 /// Run an AppleScript and return Ok or a descriptive error.
 pub fn run(script: &str, context: &str) -> Result<(), MacosError> {
     let output = Command::new("osascript")

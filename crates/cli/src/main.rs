@@ -1,13 +1,16 @@
 use std::process;
 
-use chrono::Utc;
+use chrono::{DateTime, Local, TimeZone, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
 
 use cueward_adapter_macos::MacosAdapter;
-use cueward_core::{inbox, CueIndex, PlatformAdapter, State, Tagger};
+use cueward_core::{CueIndex, PlatformAdapter, State, Tagger, inbox};
 
 #[derive(Parser)]
-#[command(name = "cueward", about = "Capture and triage your scattered knowledge")]
+#[command(
+    name = "cueward",
+    about = "Capture and triage your scattered knowledge"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -89,6 +92,49 @@ enum Command {
     QuickNotes {
         #[command(subcommand)]
         action: QuickNotesAction,
+    },
+
+    /// Query and manage Apple Calendar events
+    Calendar {
+        #[command(subcommand)]
+        action: CalendarAction,
+    },
+
+    /// Capture a screenshot of the screen
+    Screenshot {
+        /// Also run OCR on the captured image
+        #[arg(long)]
+        ocr: bool,
+
+        /// Output path (default: ~/.cueward/cache/screenshots/<timestamp>.png)
+        #[arg(long)]
+        output: Option<String>,
+
+        /// Display number (1 = main, 2 = secondary, 3 = third)
+        #[arg(long)]
+        display: Option<u32>,
+    },
+
+    /// Read or write the system clipboard
+    Clipboard {
+        #[command(subcommand)]
+        action: ClipboardAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum ClipboardAction {
+    /// Read clipboard content (text or image)
+    Get {
+        /// Save image to this path instead of default cache dir
+        #[arg(long)]
+        save_image: Option<String>,
+    },
+
+    /// Write text to clipboard
+    Set {
+        /// Text to copy to clipboard
+        text: String,
     },
 }
 
@@ -182,12 +228,153 @@ enum QuickNotesAction {
     },
 }
 
+#[derive(Subcommand)]
+enum CalendarAction {
+    /// List events in a time range (default: next 24h)
+    List {
+        /// Start datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        from: Option<String>,
+
+        /// End datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        to: Option<String>,
+
+        /// Filter by calendar name
+        #[arg(long)]
+        calendar: Option<String>,
+    },
+
+    /// List today's events (00:00 to 23:59)
+    Today {
+        /// Filter by calendar name
+        #[arg(long)]
+        calendar: Option<String>,
+    },
+
+    /// Create a calendar event
+    Create {
+        /// Event title
+        #[arg(long)]
+        title: String,
+
+        /// Start datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        start: String,
+
+        /// End datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        end: String,
+
+        /// Calendar name (uses default calendar if omitted)
+        #[arg(long)]
+        calendar: Option<String>,
+
+        /// Notes/description
+        #[arg(long)]
+        notes: Option<String>,
+
+        /// Location
+        #[arg(long)]
+        location: Option<String>,
+    },
+
+    /// Delete a calendar event by title and start datetime
+    Delete {
+        /// Event title
+        #[arg(long)]
+        title: String,
+
+        /// Start datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        start: String,
+
+        /// Calendar name
+        #[arg(long)]
+        calendar: String,
+    },
+}
+
 #[derive(Clone, ValueEnum)]
 enum Source {
     Safari,
     Notes,
     Messages,
     All,
+}
+
+fn parse_datetime(s: &str) -> Option<DateTime<Local>> {
+    use chrono::NaiveDateTime;
+
+    // Try RFC 3339 first
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Some(dt.with_timezone(&Local));
+    }
+    // Try "YYYY-MM-DD HH:MM:SS"
+    if let Ok(ndt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
+        if let Some(dt) = Local
+            .from_local_datetime(&ndt)
+            .single()
+            .or_else(|| Local.from_local_datetime(&ndt).earliest())
+            .or_else(|| Local.from_local_datetime(&ndt).latest())
+        {
+            return Some(dt);
+        }
+    }
+    // Try "YYYY-MM-DD HH:MM"
+    if let Ok(ndt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M") {
+        if let Some(dt) = Local
+            .from_local_datetime(&ndt)
+            .single()
+            .or_else(|| Local.from_local_datetime(&ndt).earliest())
+            .or_else(|| Local.from_local_datetime(&ndt).latest())
+        {
+            return Some(dt);
+        }
+    }
+    None
+}
+
+fn parse_datetime_arg(label: &str, value: &str) -> Result<DateTime<Local>, String> {
+    parse_datetime(value).ok_or_else(|| format!("error: invalid {label} datetime '{value}'"))
+}
+
+fn parse_required_datetime_arg(
+    label: &str,
+    value: Option<&str>,
+) -> Result<DateTime<Local>, String> {
+    match value {
+        Some(value) => parse_datetime_arg(label, value),
+        None => Err(format!("error: missing {label} datetime")),
+    }
+}
+
+fn validate_optional_output_path(label: &str, value: Option<&str>) -> Result<(), String> {
+    if let Some(path) = value {
+        if std::path::Path::new(path)
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+        {
+            return Err(format!(
+                "error: {label} path must not contain parent directory components"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn local_day_bounds(now: DateTime<Local>) -> Result<(DateTime<Local>, DateTime<Local>), String> {
+    let from = now
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .and_then(|dt| Local.from_local_datetime(&dt).single())
+        .ok_or_else(|| "error: could not determine start of today".to_string())?;
+    let to = now
+        .date_naive()
+        .and_hms_opt(23, 59, 59)
+        .and_then(|dt| Local.from_local_datetime(&dt).single())
+        .ok_or_else(|| "error: could not determine end of today".to_string())?;
+    Ok((from, to))
 }
 
 fn parse_duration(s: &str) -> Option<chrono::Duration> {
@@ -363,7 +550,9 @@ fn main() {
             let body = body.unwrap_or_else(|| {
                 use std::io::Read;
                 let mut buf = String::new();
-                std::io::stdin().read_to_string(&mut buf).unwrap_or_default();
+                std::io::stdin()
+                    .read_to_string(&mut buf)
+                    .unwrap_or_default();
                 buf
             });
 
@@ -399,34 +588,30 @@ fn main() {
             }
         }
 
-        Command::Ocr { path } => {
-            match cueward_adapter_macos::ocr::capture(&path) {
-                Ok(cues) => {
-                    let json = serde_json::to_string_pretty(&cues).unwrap();
-                    println!("{json}");
-                    eprintln!("extracted {} cues", cues.len());
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
+        Command::Ocr { path } => match cueward_adapter_macos::ocr::capture(&path) {
+            Ok(cues) => {
+                let json = serde_json::to_string_pretty(&cues).unwrap();
+                println!("{json}");
+                eprintln!("extracted {} cues", cues.len());
             }
-        }
+            Err(e) => {
+                eprintln!("error: {e}");
+                process::exit(1);
+            }
+        },
 
         Command::Notes { action } => match action {
             NotesAction::Update {
                 title,
                 body,
                 folder,
-            } => {
-                match cueward_adapter_macos::send::update_note(&title, &body, &folder) {
-                    Ok(()) => eprintln!("note updated: {title}"),
-                    Err(e) => {
-                        eprintln!("error: {e}");
-                        process::exit(1);
-                    }
+            } => match cueward_adapter_macos::send::update_note(&title, &body, &folder) {
+                Ok(()) => eprintln!("note updated: {title}"),
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
                 }
-            }
+            },
             NotesAction::Delete { title, folder } => {
                 match cueward_adapter_macos::send::delete_note(&title, &folder) {
                     Ok(()) => eprintln!("note deleted: {title}"),
@@ -448,23 +633,21 @@ fn main() {
         },
 
         Command::QuickNotes { action } => match action {
-            QuickNotesAction::List => {
-                match cueward_adapter_macos::quick_notes::list() {
-                    Ok(notes) => {
-                        if notes.is_empty() {
-                            eprintln!("no quick notes found");
-                        } else {
-                            let count = notes.len();
-                            println!("{}", serde_json::to_string_pretty(&notes).unwrap());
-                            eprintln!("{count} quick note(s)");
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("error: {e}");
-                        process::exit(1);
+            QuickNotesAction::List => match cueward_adapter_macos::quick_notes::list() {
+                Ok(notes) => {
+                    if notes.is_empty() {
+                        eprintln!("no quick notes found");
+                    } else {
+                        let count = notes.len();
+                        println!("{}", serde_json::to_string_pretty(&notes).unwrap());
+                        eprintln!("{count} quick note(s)");
                     }
                 }
-            }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
             QuickNotesAction::Create { title, body } => {
                 match cueward_adapter_macos::quick_notes::create(&title, &body) {
                     Ok(()) => eprintln!("quick note created: {title}"),
@@ -502,5 +685,222 @@ fn main() {
                 }
             }
         },
+
+        Command::Screenshot {
+            ocr,
+            output,
+            display,
+        } => {
+            if let Err(err) = validate_optional_output_path("--output", output.as_deref()) {
+                eprintln!("{err}");
+                process::exit(1);
+            }
+            match cueward_adapter_macos::screenshot::capture(ocr, output.as_deref(), display) {
+                Ok(result) => {
+                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    eprintln!("screenshot saved to {}", result.path);
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            }
+        }
+
+        Command::Clipboard { action } => match action {
+            ClipboardAction::Get { save_image } => {
+                if let Err(err) =
+                    validate_optional_output_path("--save-image", save_image.as_deref())
+                {
+                    eprintln!("{err}");
+                    process::exit(1);
+                }
+                match cueward_adapter_macos::clipboard::get(save_image.as_deref()) {
+                    Ok(content) => {
+                        println!("{}", serde_json::to_string_pretty(&content).unwrap());
+                        match content.content_type.as_str() {
+                            "image" => eprintln!(
+                                "clipboard image saved to {}",
+                                content.path.unwrap_or_default()
+                            ),
+                            _ => eprintln!("clipboard text read"),
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            ClipboardAction::Set { text } => match cueward_adapter_macos::clipboard::set(&text) {
+                Ok(()) => eprintln!("copied to clipboard"),
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            },
+        },
+
+        Command::Calendar { action } => match action {
+            CalendarAction::Today { calendar } => {
+                let now = Local::now();
+                let (from, to) = match local_day_bounds(now) {
+                    Ok(bounds) => bounds,
+                    Err(err) => {
+                        eprintln!("{err}");
+                        process::exit(1);
+                    }
+                };
+                match cueward_adapter_macos::calendar::list_events(from, to, calendar.as_deref()) {
+                    Ok(events) => {
+                        println!("{}", serde_json::to_string_pretty(&events).unwrap());
+                        eprintln!("{} event(s)", events.len());
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+
+            CalendarAction::List { from, to, calendar } => {
+                let now = Local::now();
+                let from_dt = match from.as_deref() {
+                    Some(value) => match parse_required_datetime_arg("--from", Some(value)) {
+                        Ok(dt) => dt,
+                        Err(err) => {
+                            eprintln!("{err}");
+                            process::exit(1);
+                        }
+                    },
+                    None => now,
+                };
+                let to_dt = match to.as_deref() {
+                    Some(value) => match parse_required_datetime_arg("--to", Some(value)) {
+                        Ok(dt) => dt,
+                        Err(err) => {
+                            eprintln!("{err}");
+                            process::exit(1);
+                        }
+                    },
+                    None => from_dt + chrono::Duration::hours(24),
+                };
+                match cueward_adapter_macos::calendar::list_events(
+                    from_dt,
+                    to_dt,
+                    calendar.as_deref(),
+                ) {
+                    Ok(events) => {
+                        println!("{}", serde_json::to_string_pretty(&events).unwrap());
+                        eprintln!("{} event(s)", events.len());
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+
+            CalendarAction::Create {
+                title,
+                start,
+                end,
+                calendar,
+                notes,
+                location,
+            } => {
+                let start_dt = match parse_datetime_arg("start", &start) {
+                    Ok(dt) => dt,
+                    Err(err) => {
+                        eprintln!("{err}");
+                        process::exit(1);
+                    }
+                };
+                let end_dt = match parse_datetime_arg("end", &end) {
+                    Ok(dt) => dt,
+                    Err(err) => {
+                        eprintln!("{err}");
+                        process::exit(1);
+                    }
+                };
+                match cueward_adapter_macos::calendar::create_event(
+                    &title,
+                    start_dt,
+                    end_dt,
+                    calendar.as_deref(),
+                    notes.as_deref(),
+                    location.as_deref(),
+                ) {
+                    Ok(()) => eprintln!("event created: {title}"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+
+            CalendarAction::Delete {
+                title,
+                start,
+                calendar,
+            } => {
+                let start_dt = match parse_datetime_arg("start", &start) {
+                    Ok(dt) => dt,
+                    Err(err) => {
+                        eprintln!("{err}");
+                        process::exit(1);
+                    }
+                };
+                match cueward_adapter_macos::calendar::delete_event(&title, start_dt, &calendar) {
+                    Ok(()) => eprintln!("event deleted: {title}"),
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Timelike;
+    use chrono::{Local, TimeZone};
+
+    use super::{local_day_bounds, validate_optional_output_path};
+
+    #[test]
+    fn validate_optional_output_path_rejects_parent_components() {
+        let result = validate_optional_output_path("--output", Some("../secret.png"));
+
+        assert_eq!(
+            result,
+            Err("error: --output path must not contain parent directory components".to_string())
+        );
+    }
+
+    #[test]
+    fn local_day_bounds_covers_full_day() {
+        let now = Local
+            .with_ymd_and_hms(2026, 4, 11, 10, 30, 0)
+            .single()
+            .expect("local dt");
+
+        let (from, to) = local_day_bounds(now).expect("bounds");
+
+        assert_eq!(from.hour(), 0);
+        assert_eq!(from.minute(), 0);
+        assert_eq!(from.second(), 0);
+        assert_eq!(to.hour(), 23);
+        assert_eq!(to.minute(), 59);
+        assert_eq!(to.second(), 59);
+    }
+
+    #[test]
+    fn parse_datetime_accepts_ambiguous_local_time() {
+        let parsed = super::parse_datetime("2026-11-01 01:30");
+
+        assert!(parsed.is_some());
     }
 }
