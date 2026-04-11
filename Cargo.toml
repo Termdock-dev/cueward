@@ -15,3 +15,8 @@ repository = "https://github.com/HCYT/cueward"
 homepage = "https://github.com/HCYT/cueward"
 readme = "README.md"
 rust-version = "1.85"
+
+[workspace.dependencies]
+cueward-core = { version = "0.1.0", path = "crates/core" }
+cueward-adapter-macos = { version = "0.1.0", path = "crates/adapter-macos" }
+cueward-adapter-windows = { version = "0.1.0", path = "crates/adapter-windows" }

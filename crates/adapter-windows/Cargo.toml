@@ -11,4 +11,4 @@ rust-version.workspace = true
 description = "Reserved Windows adapter crate for future Cueward platform support."
 
 [dependencies]
-cueward-core = { version = "0.1.0", path = "../core" }
+cueward-core = { workspace = true }
