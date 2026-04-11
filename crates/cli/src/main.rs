@@ -218,12 +218,19 @@ enum SafariAction {
     },
 
     /// Show the current active tab in the front Safari window
-    Active,
+    Active {
+        /// Restrict operations to a Safari profile name parsed from the window title
+        #[arg(long)]
+        profile: Option<String>,
+    },
 
     /// Open a URL in a new Safari tab
     Open {
         /// URL to open
         url: String,
+        /// Restrict operations to a Safari profile name parsed from the window title
+        #[arg(long)]
+        profile: Option<String>,
     },
 
     /// Close a tab in the front Safari window
@@ -238,15 +245,25 @@ enum SafariAction {
         /// Optional CSS selector to extract a specific element's text
         #[arg(long)]
         selector: Option<String>,
+        /// Restrict operations to a Safari profile name parsed from the window title
+        #[arg(long)]
+        profile: Option<String>,
     },
 
     /// Read the full HTML source of the current active tab
-    Source,
+    Source {
+        /// Restrict operations to a Safari profile name parsed from the window title
+        #[arg(long)]
+        profile: Option<String>,
+    },
 
     /// Execute JavaScript in the current active tab
     Exec {
         /// JavaScript code to execute
         js_code: String,
+        /// Restrict operations to a Safari profile name parsed from the window title
+        #[arg(long)]
+        profile: Option<String>,
     },
 
     /// Click an element in the current active tab
@@ -277,6 +294,9 @@ enum SafariAction {
         /// AI provider to target
         #[arg(long)]
         provider: SafariAiProvider,
+        /// Restrict operations to a Safari profile name parsed from the window title
+        #[arg(long)]
+        profile: Option<String>,
         /// Optional Gemini mode to switch into before interaction
         #[arg(long)]
         mode: Option<GeminiMode>,
@@ -293,6 +313,22 @@ enum SafariAction {
         /// Timeout in seconds
         #[arg(long, default_value = "900")]
         timeout: u64,
+    },
+
+    /// List Gemini conversations from the sidebar
+    AiList {
+        /// Restrict operations to a Safari profile name parsed from the window title
+        #[arg(long)]
+        profile: Option<String>,
+    },
+
+    /// Read a Gemini conversation by URL
+    AiRead {
+        /// Conversation URL (e.g. https://gemini.google.com/app/abc123)
+        url: String,
+        /// Restrict operations to a Safari profile name parsed from the window title
+        #[arg(long)]
+        profile: Option<String>,
     },
 }
 
@@ -804,7 +840,7 @@ fn main() {
                     }
                 }
             }
-            SafariAction::Active => match cueward_adapter_macos::safari::active() {
+            SafariAction::Active { profile } => match cueward_adapter_macos::safari::active(profile.as_deref()) {
                 Ok(tab) => {
                     println!("{}", serde_json::to_string_pretty(&tab).unwrap());
                     if tab.is_some() {
@@ -818,7 +854,7 @@ fn main() {
                     process::exit(1);
                 }
             },
-            SafariAction::Open { url } => match cueward_adapter_macos::safari::open(&url) {
+            SafariAction::Open { url, .. } => match cueward_adapter_macos::safari::open(&url) {
                 Ok(tab) => {
                     println!("{}", serde_json::to_string_pretty(&tab).unwrap());
                     if tab.is_some() {
@@ -846,7 +882,7 @@ fn main() {
                     process::exit(1);
                 }
             },
-            SafariAction::Read { selector } => {
+            SafariAction::Read { selector, .. } => {
                 match cueward_adapter_macos::safari::read(selector.as_deref()) {
                     Ok(result) => {
                         println!("{}", serde_json::to_string_pretty(&result).unwrap());
@@ -858,7 +894,7 @@ fn main() {
                     }
                 }
             }
-            SafariAction::Source => match cueward_adapter_macos::safari::source() {
+            SafariAction::Source { .. } => match cueward_adapter_macos::safari::source() {
                 Ok(result) => {
                     println!("{}", serde_json::to_string_pretty(&result).unwrap());
                     eprintln!("read page source");
@@ -868,7 +904,7 @@ fn main() {
                     process::exit(1);
                 }
             },
-            SafariAction::Exec { js_code } => match cueward_adapter_macos::safari::exec(&js_code) {
+            SafariAction::Exec { js_code, profile } => match cueward_adapter_macos::safari::exec(&js_code, profile.as_deref()) {
                 Ok(result) => {
                     println!("{}", serde_json::to_string_pretty(&result).unwrap());
                     eprintln!("executed javascript");
@@ -916,9 +952,11 @@ fn main() {
             }
             SafariAction::Ai {
                 provider,
+                profile,
                 mode,
                 prompt,
                 auto_confirm,
+                ..
             } => match provider {
                 SafariAiProvider::Gemini => {
                     let action = match build_gemini_ai_action(mode, prompt.as_deref(), auto_confirm) {
@@ -933,6 +971,7 @@ fn main() {
                         GeminiAiAction::ModeOnly(mode) => {
                             match cueward_adapter_macos::safari::prepare_gemini_mode(
                                 to_adapter_gemini_mode(mode),
+                                profile.as_deref(),
                             ) {
                                 Ok(result) => {
                                     println!("{}", serde_json::to_string_pretty(&result).unwrap());
@@ -945,7 +984,10 @@ fn main() {
                             }
                         }
                         GeminiAiAction::PromptOnly(prompt) => {
-                            match cueward_adapter_macos::safari::send_gemini_prompt(&prompt) {
+                            match cueward_adapter_macos::safari::send_gemini_prompt(
+                                &prompt,
+                                profile.as_deref(),
+                            ) {
                                 Ok(result) => {
                                     println!("{}", serde_json::to_string_pretty(&result).unwrap());
                                     eprintln!("gemini response ready");
@@ -959,12 +1001,16 @@ fn main() {
                         GeminiAiAction::ModeThenPrompt(mode, prompt) => {
                             if let Err(e) = cueward_adapter_macos::safari::prepare_gemini_mode(
                                 to_adapter_gemini_mode(mode),
+                                profile.as_deref(),
                             ) {
                                 eprintln!("error: {e}");
                                 process::exit(1);
                             }
 
-                            match cueward_adapter_macos::safari::send_gemini_prompt(&prompt) {
+                            match cueward_adapter_macos::safari::send_gemini_prompt(
+                                &prompt,
+                                profile.as_deref(),
+                            ) {
                                 Ok(result) => {
                                     println!("{}", serde_json::to_string_pretty(&result).unwrap());
                                     eprintln!("gemini response ready");
@@ -979,6 +1025,7 @@ fn main() {
                             match cueward_adapter_macos::safari::start_gemini_deep_research(
                                 &prompt,
                                 auto_confirm,
+                                profile.as_deref(),
                             ) {
                                 Ok(result) => {
                                     println!("{}", serde_json::to_string_pretty(&result).unwrap());
@@ -998,10 +1045,34 @@ fn main() {
                 }
             },
                         SafariAction::AiPoll { timeout } => {
-                match cueward_adapter_macos::safari::poll_gemini_deep_research(timeout) {
+                match cueward_adapter_macos::safari::poll_gemini_deep_research(timeout, None) {
                     Ok(result) => {
                         println!("{}", serde_json::to_string_pretty(&result).unwrap());
                         eprintln!("gemini deep research polled");
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            SafariAction::AiList { profile } => {
+                match cueward_adapter_macos::safari::gemini_list_conversations(profile.as_deref()) {
+                    Ok(convos) => {
+                        println!("{}", serde_json::to_string_pretty(&convos).unwrap());
+                        eprintln!("{} conversation(s)", convos.len());
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            SafariAction::AiRead { url, profile } => {
+                match cueward_adapter_macos::safari::gemini_read_conversation(&url, profile.as_deref()) {
+                    Ok(result) => {
+                        println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                        eprintln!("conversation read");
                     }
                     Err(e) => {
                         eprintln!("error: {e}");
@@ -1321,6 +1392,49 @@ mod tests {
     }
 
     #[test]
+    fn cli_parses_safari_exec_with_profile() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "exec",
+            "--profile",
+            "Ryugu",
+            "1+1",
+        ])
+        .expect("parse safari exec with profile");
+
+        match cli.command {
+            Command::Safari {
+                action: SafariAction::Exec { js_code, profile },
+            } => {
+                assert_eq!(js_code, "1+1");
+                assert_eq!(profile.as_deref(), Some("Ryugu"));
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+
+    #[test]
+    fn cli_parses_safari_active_with_profile() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "active",
+            "--profile",
+            "Ryugu",
+        ])
+        .expect("parse safari active with profile");
+
+        match cli.command {
+            Command::Safari {
+                action: SafariAction::Active { profile },
+            } => assert_eq!(profile.as_deref(), Some("Ryugu")),
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
     fn cli_parses_gemini_mode_switch_command() {
         let cli = Cli::try_parse_from([
             "cueward",
@@ -1340,9 +1454,11 @@ mod tests {
                 action:
                     SafariAction::Ai {
                         provider,
+                        profile: _,
                         mode,
                         prompt,
                         auto_confirm,
+                        ..
                     },
             } => {
                 assert_eq!(provider, SafariAiProvider::Gemini);
@@ -1372,9 +1488,11 @@ mod tests {
                 action:
                     SafariAction::Ai {
                         provider,
+                        profile: _,
                         mode,
                         prompt,
                         auto_confirm,
+                        ..
                     },
             } => {
                 assert_eq!(provider, SafariAiProvider::Gemini);
@@ -1415,6 +1533,43 @@ mod tests {
     }
 
     #[test]
+    fn cli_parses_gemini_ai_with_profile() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "ai",
+            "--provider",
+            "gemini",
+            "--profile",
+            "Ryugu",
+            "--prompt",
+            "hi",
+        ])
+        .expect("parse safari ai with profile");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Ai {
+                        provider,
+                        profile,
+                        mode,
+                        prompt,
+                        auto_confirm,
+                        ..
+                    },
+            } => {
+                assert_eq!(provider, SafariAiProvider::Gemini);
+                assert_eq!(profile.as_deref(), Some("Ryugu"));
+                assert_eq!(mode, None);
+                assert_eq!(prompt.as_deref(), Some("hi"));
+                assert!(!auto_confirm);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
     fn cli_parses_gemini_deep_research_auto_confirm_command() {
         let cli = Cli::try_parse_from([
             "cueward",
@@ -1435,9 +1590,11 @@ mod tests {
                 action:
                     SafariAction::Ai {
                         provider,
+                        profile: _,
                         mode,
                         prompt,
                         auto_confirm,
+                        ..
                     },
             } => {
                 assert_eq!(provider, SafariAiProvider::Gemini);
