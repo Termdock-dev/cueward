@@ -1250,9 +1250,9 @@ pub fn focus_tab(
         return Err(MacosError::Other("no Safari tabs found".to_string()));
     }
 
-    // Try parsing as index first
+    // Try parsing as index first (position in the flat tab list)
     let matched = if let Ok(index) = tab_selector.parse::<usize>() {
-        all_tabs.into_iter().find(|t| t.index == index)
+        all_tabs.into_iter().nth(index)
     } else {
         // Match by URL or title substring
         let query = tab_selector.to_lowercase();
