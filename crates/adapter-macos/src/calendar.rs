@@ -17,7 +17,29 @@ pub struct CalendarEvent {
     pub all_day: bool,
 }
 
-/// Format a local datetime as "YYYY-MM-DD HH:MM:SS" for AppleScript date parsing.
+/// Build an AppleScript snippet that constructs a date object locale-independently.
+/// Returns a variable assignment like: `set varName to current date \n set year of varName to ...`
+fn applescript_date_block(var_name: &str, dt: &DateTime<Local>) -> String {
+    format!(
+        r#"set {var_name} to current date
+            set day of {var_name} to 1
+            set year of {var_name} to {y}
+            set month of {var_name} to {m}
+            set day of {var_name} to {d}
+            set hours of {var_name} to {h}
+            set minutes of {var_name} to {min}
+            set seconds of {var_name} to {s}"#,
+        var_name = var_name,
+        y = dt.format("%Y"),
+        m = dt.format("%-m"),
+        d = dt.format("%-d"),
+        h = dt.format("%-H"),
+        min = dt.format("%-M"),
+        s = dt.format("%-S"),
+    )
+}
+
+/// Format a local datetime as "YYYY-MM-DD HH:MM:SS" for AppleScript date string matching.
 fn format_for_applescript(dt: &DateTime<Local>) -> String {
     dt.format("%Y-%m-%d %H:%M:%S").to_string()
 }
@@ -82,8 +104,8 @@ pub fn list_events(
     to: DateTime<Local>,
     calendar_filter: Option<&str>,
 ) -> Result<Vec<CalendarEvent>, MacosError> {
-    let from_str = format_for_applescript(&from);
-    let to_str = format_for_applescript(&to);
+    let from_block = applescript_date_block("fromDate", &from);
+    let to_block = applescript_date_block("toDate", &to);
 
     let cal_filter_block = match calendar_filter {
         Some(name) => {
@@ -121,9 +143,10 @@ pub fn list_events(
             return escaped_text
         end encode_field
 
+        {from_block}
+        {to_block}
+
         tell application "Calendar"
-            set fromDate to date "{from_str}"
-            set toDate to date "{to_str}"
             set output to ""
             {cal_filter_block}
             repeat with aCal in targetCals
@@ -168,8 +191,8 @@ pub fn create_event(
     location: Option<&str>,
 ) -> Result<(), MacosError> {
     let escaped_title = escape(title);
-    let start_str = format_for_applescript(&start);
-    let end_str = format_for_applescript(&end);
+    let start_block = applescript_date_block("startDate", &start);
+    let end_block = applescript_date_block("endDate", &end);
 
     let notes_prop = notes
         .map(|n| format!(r#", description:{}"#, escape_body(n)))
@@ -183,14 +206,16 @@ pub fn create_event(
             let escaped = escape(name);
             format!(r#"set targetCal to calendar "{escaped}""#)
         }
-        None => "set targetCal to default calendar".to_string(),
+        None => "set targetCal to first calendar".to_string(),
     };
 
     let script = format!(
         r#"
+        {start_block}
+        {end_block}
         tell application "Calendar"
             {target_cal_block}
-            make new event at end of events of targetCal with properties {{summary:"{escaped_title}", start date:date "{start_str}", end date:date "{end_str}"{notes_prop}{location_prop}}}
+            make new event at end of events of targetCal with properties {{summary:"{escaped_title}", start date:startDate, end date:endDate{notes_prop}{location_prop}}}
         end tell
         "#
     );
@@ -206,13 +231,13 @@ pub fn delete_event(
 ) -> Result<(), MacosError> {
     let escaped_title = escape(title);
     let escaped_cal = escape(calendar_name);
-    let start_str = format_for_applescript(&start);
+    let start_block = applescript_date_block("startDate", &start);
 
     let script = format!(
         r#"
+        {start_block}
         tell application "Calendar"
             set targetCal to calendar "{escaped_cal}"
-            set startDate to date "{start_str}"
             set matchingEvts to (events of targetCal whose summary is "{escaped_title}" and start date is startDate)
             if matchingEvts is {{}} then
                 error "event not found: {escaped_title}"
