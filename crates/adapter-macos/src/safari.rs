@@ -42,6 +42,20 @@ pub struct SafariReadResult {
     pub content: String,
 }
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+pub struct SafariScrollReadChunk {
+    pub iteration: u64,
+    pub content: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariScrollReadResult {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selector: Option<String>,
+    pub times: u64,
+    pub chunks: Vec<SafariScrollReadChunk>,
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct SafariSourceResult {
     pub html: String,
@@ -1409,7 +1423,13 @@ pub fn focus_tab(
         window_id = tab.window_id,
         one_based = tab.index + 1,
     );
-    run_capture(&script, "safari_focus_tab")?;
+    let result = run_capture(&script, "safari_focus_tab")?;
+    if result.trim() != "true" {
+        return Err(MacosError::Other(format!(
+            "failed to focus tab '{}'",
+            tab_selector
+        )));
+    }
 
     Ok(tab)
 }
@@ -1487,6 +1507,68 @@ pub fn read(
     })
 }
 
+fn block_fingerprint(text: &str) -> String {
+    text.chars().take(120).collect()
+}
+
+fn scroll_read_new_content_blocks(content: &str, seen: &[String]) -> Vec<String> {
+    let seen_fps: Vec<String> = seen.iter().map(|s| block_fingerprint(s)).collect();
+    let mut new_blocks = Vec::new();
+    let mut new_fps = Vec::new();
+    for block in content
+        .split("\n\n")
+        .map(str::trim)
+        .filter(|block| !block.is_empty())
+    {
+        let fp = block_fingerprint(block);
+        if seen_fps.iter().any(|existing| *existing == fp)
+            || new_fps.iter().any(|existing: &String| *existing == fp)
+        {
+            continue;
+        }
+        new_fps.push(fp);
+        new_blocks.push(block.to_string());
+    }
+    new_blocks
+}
+
+fn scroll_read_snapshot_blocks(
+    snapshot: &SafariScrollReadSnapshot,
+    seen: &[String],
+) -> Vec<String> {
+    if !snapshot.blocks.is_empty() {
+        let seen_fps: Vec<String> = seen.iter().map(|s| block_fingerprint(s)).collect();
+        let mut new_blocks = Vec::new();
+        let mut new_fps = Vec::new();
+        for block in &snapshot.blocks {
+            let trimmed = block.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let fp = block_fingerprint(trimmed);
+            if seen_fps.iter().any(|existing| *existing == fp)
+                || new_fps.iter().any(|existing: &String| *existing == fp)
+            {
+                continue;
+            }
+            new_fps.push(fp);
+            new_blocks.push(trimmed.to_string());
+        }
+        return new_blocks;
+    }
+
+    scroll_read_new_content_blocks(&snapshot.content, seen)
+}
+
+fn scroll_read_detects_new_content(
+    previous_text: &str,
+    previous_count: usize,
+    current_text: &str,
+    current_count: usize,
+) -> bool {
+    current_count > previous_count || current_text.trim() != previous_text.trim()
+}
+
 pub fn exec(js_code: &str, profile_filter: Option<&str>) -> Result<SafariEvalResult, MacosError> {
     let result = execute_js_for_profile(js_code, profile_filter, "safari_exec")?;
     Ok(SafariEvalResult { result })
@@ -1547,6 +1629,14 @@ pub struct SafariScrollResult {
     pub scroll_y: i64,
 }
 
+#[derive(Debug, serde::Deserialize, PartialEq, Eq)]
+struct SafariScrollReadSnapshot {
+    item_count: usize,
+    content: String,
+    #[serde(default)]
+    blocks: Vec<String>,
+}
+
 pub fn scroll(
     direction: &str,
     amount: Option<i64>,
@@ -1566,6 +1656,139 @@ pub fn scroll(
     Ok(SafariScrollResult {
         scroll_x: value.get("x").and_then(|v| v.as_i64()).unwrap_or(0),
         scroll_y: value.get("y").and_then(|v| v.as_i64()).unwrap_or(0),
+    })
+}
+
+fn scroll_read_poll_js(selector: Option<&str>) -> String {
+    let scope_expr = match selector {
+        Some(selector) => format!(
+            "document.querySelector(\"{}\")",
+            escape_js_string(selector)
+        ),
+        None => "document.body".to_string(),
+    };
+    format!(
+        r#"(() => {{
+            const scope = {scope_expr};
+            if (!scope) return JSON.stringify({{ item_count: 0, content: "", blocks: [] }});
+            const text = (scope.innerText || scope.textContent || "").trim();
+            const isVisible = (node) => {{
+              const rect = node.getBoundingClientRect();
+              return rect.bottom > 0 && rect.top < window.innerHeight;
+            }};
+            // Phase 1: semantic selectors (Reddit, etc.)
+            let itemNodes = [
+              ...scope.querySelectorAll("shreddit-post"),
+              ...scope.querySelectorAll("[data-testid='post-container']"),
+              ...scope.querySelectorAll("article"),
+              ...scope.querySelectorAll("[role='article']")
+            ];
+            // Phase 2: heuristic fallback for CSR sites (Threads, X, etc.)
+            if (itemNodes.length === 0) {{
+              const MIN_TEXT = 50;
+              const MAX_TEXT = 3000;
+              itemNodes = [...scope.querySelectorAll("div")].filter(el => {{
+                const t = (el.innerText || "").trim();
+                if (t.length < MIN_TEXT || t.length > MAX_TEXT) return false;
+                // Skip wrappers: if any direct child div holds >80% of this text, it's a wrapper
+                const kids = el.querySelectorAll(":scope > div");
+                for (const c of kids) {{
+                  if ((c.innerText || "").trim().length > t.length * 0.8) return false;
+                }}
+                return true;
+              }});
+            }}
+            const visibleItemNodes = itemNodes.filter(isVisible);
+            const blocks = [];
+            const seen = new Set();
+            for (const node of visibleItemNodes) {{
+              const block = (node.innerText || node.textContent || "").trim();
+              if (!block || block.length < 20) continue;
+              const key = block.slice(0, 120);
+              if (seen.has(key)) continue;
+              seen.add(key);
+              blocks.push(block);
+            }}
+            const itemCount = visibleItemNodes.length
+              || scope.querySelectorAll("li").length
+              || scope.children.length
+              || 0;
+            return JSON.stringify({{
+              item_count: itemCount,
+              content: text,
+              blocks
+            }});
+        }})()"#
+    )
+}
+
+fn parse_scroll_read_snapshot(payload: &str) -> Result<SafariScrollReadSnapshot, MacosError> {
+    serde_json::from_str(payload)
+        .map_err(|error| MacosError::Other(format!("invalid scroll/read payload: {error}: {payload}")))
+}
+
+fn poll_scroll_read_snapshot(
+    selector: Option<&str>,
+    previous: &SafariScrollReadSnapshot,
+    profile_filter: Option<&str>,
+    timeout: Duration,
+) -> Result<SafariScrollReadSnapshot, MacosError> {
+    let deadline = Instant::now() + timeout;
+    let js = scroll_read_poll_js(selector);
+
+    while Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(500));
+        let payload = execute_js_for_profile(&js, profile_filter, "safari_scroll_read_poll")?;
+        let snapshot = parse_scroll_read_snapshot(&payload)?;
+        if scroll_read_detects_new_content(
+            &previous.content,
+            previous.item_count,
+            &snapshot.content,
+            snapshot.item_count,
+        ) {
+            return Ok(snapshot);
+        }
+    }
+
+    let payload = execute_js_for_profile(&js, profile_filter, "safari_scroll_read_poll")?;
+    parse_scroll_read_snapshot(&payload)
+}
+
+pub fn scroll_and_read(
+    times: u64,
+    amount: Option<i64>,
+    selector: Option<&str>,
+    profile_filter: Option<&str>,
+) -> Result<SafariScrollReadResult, MacosError> {
+    let js = scroll_read_poll_js(selector);
+    let payload = execute_js_for_profile(&js, profile_filter, "safari_scroll_read_initial")?;
+    let mut snapshot = parse_scroll_read_snapshot(&payload)?;
+    let mut seen = scroll_read_snapshot_blocks(&snapshot, &[]);
+    let mut chunks = Vec::new();
+
+    for iteration in 1..=times {
+        scroll("down", amount, profile_filter)?;
+        snapshot = poll_scroll_read_snapshot(
+            selector,
+            &snapshot,
+            profile_filter,
+            Duration::from_secs(5),
+        )?;
+        let new_blocks = scroll_read_snapshot_blocks(&snapshot, &seen);
+        if new_blocks.is_empty() {
+            continue;
+        }
+        seen.extend(new_blocks.iter().cloned());
+        chunks.push(SafariScrollReadChunk {
+            iteration,
+            content: new_blocks.join("\n\n"),
+        });
+    }
+
+    Ok(SafariScrollReadResult {
+        selector: selector.map(ToOwned::to_owned),
+        times,
+        chunks,
     })
 }
 
@@ -1952,14 +2175,16 @@ fn execute_js_for_profile(
 #[cfg(test)]
 mod tests {
     use super::{
-        SafariAiImage, SafariAiImageResult, TAB_SEPARATOR, build_active_tab_script,
+        SafariAiImage, SafariAiImageResult, SafariScrollReadSnapshot, TAB_SEPARATOR, build_active_tab_script,
         build_chatgpt_click_send_js, build_chatgpt_fill_input_js, build_chatgpt_go_home_js,
         build_close_script, build_exec_script, build_gemini_fill_input_js, build_gemini_go_home_js,
         build_open_script, build_tab_return_block, build_tabs_script, chatgpt_image_extract_js,
         chatgpt_image_list_js, chatgpt_image_result_is_ready, chatgpt_response_extract_js,
         chatgpt_should_return_empty_complete_result, extract_profile, gemini_deep_research_poll_js,
         gemini_response_extract_js, parse_chatgpt_image_payload, parse_deep_research_payload,
-        parse_tab_line, parse_tabs_output, selector_click_js, selector_fill_js, selector_text_js,
+        parse_tab_line, parse_tabs_output, scroll_read_detects_new_content,
+        scroll_read_poll_js, scroll_read_new_content_blocks, scroll_read_snapshot_blocks,
+        selector_click_js, selector_fill_js, selector_text_js,
         should_skip_chatgpt_response, should_skip_gemini_response,
     };
     use std::time::Duration;
@@ -2285,6 +2510,79 @@ mod tests {
             Duration::from_secs(8),
             3
         ));
+    }
+
+    #[test]
+    fn scroll_read_dedup_keeps_only_new_blocks() {
+        let seen = vec!["alpha".to_string(), "beta".to_string()];
+        let content = "alpha\n\nbeta\n\ngamma\n\ndelta\n\ngamma";
+
+        let blocks = scroll_read_new_content_blocks(content, &seen);
+
+        assert_eq!(blocks, vec!["gamma".to_string(), "delta".to_string()]);
+    }
+
+    #[test]
+    fn scroll_read_change_detection_uses_count_or_text() {
+        assert!(scroll_read_detects_new_content("same", 2, "same", 3));
+        assert!(scroll_read_detects_new_content("before", 2, "after", 2));
+        assert!(!scroll_read_detects_new_content("same", 2, "same", 2));
+    }
+
+    #[test]
+    fn scroll_read_snapshot_blocks_prefers_structured_blocks() {
+        let snapshot = SafariScrollReadSnapshot {
+            item_count: 2,
+            content: "alpha\n\nbeta\n\ngamma".to_string(),
+            blocks: vec!["alpha".to_string(), "gamma".to_string()],
+        };
+
+        let blocks = scroll_read_snapshot_blocks(&snapshot, &["alpha".to_string()]);
+
+        assert_eq!(blocks, vec!["gamma".to_string()]);
+    }
+
+    #[test]
+    fn scroll_read_poll_script_exposes_count_and_text() {
+        let script = scroll_read_poll_js(Some("main"));
+
+        assert!(script.contains("item_count"));
+        assert!(script.contains("content"));
+        assert!(script.contains("blocks"));
+        assert!(script.contains("querySelectorAll(\"article\")"));
+        assert!(script.contains("document.querySelector(\"main\")"));
+    }
+
+    #[test]
+    fn scroll_read_poll_script_uses_visible_items() {
+        let script = scroll_read_poll_js(None);
+
+        assert!(script.contains("getBoundingClientRect"));
+        assert!(script.contains("window.innerHeight"));
+        assert!(script.contains("rect.bottom > 0"));
+    }
+
+    #[test]
+    fn scroll_read_poll_script_has_heuristic_fallback() {
+        let script = scroll_read_poll_js(None);
+
+        // Should fall back to div heuristic when no semantic selectors match
+        assert!(script.contains("itemNodes.length === 0"));
+        assert!(script.contains("querySelectorAll(\"div\")"));
+    }
+
+    #[test]
+    fn scroll_read_fingerprint_dedup_handles_suffix_changes() {
+        // CSR sites may re-render with slightly different suffixes.
+        // Fingerprint uses first 120 chars, so blocks sharing a long prefix get deduped.
+        let long_prefix = "a]".repeat(61); // 122 chars — first 120 identical
+        let seen = vec![format!("{long_prefix}ORIGINAL_SUFFIX")];
+        let content = format!("{long_prefix}UPDATED_SUFFIX\n\ngenuinely new block");
+
+        let blocks = scroll_read_new_content_blocks(&content, &seen);
+
+        // First block matches by prefix fingerprint, should be deduped
+        assert_eq!(blocks, vec!["genuinely new block".to_string()]);
     }
 
     #[test]
