@@ -287,6 +287,28 @@ enum SafariAction {
         index: Option<usize>,
     },
 
+    /// Scroll the current page
+    Scroll {
+        /// Direction: up, down, top, bottom
+        direction: String,
+        /// Pixels to scroll (default 500, ignored for top/bottom)
+        #[arg(long)]
+        amount: Option<i64>,
+        /// Restrict operations to a Safari profile
+        #[arg(long)]
+        profile: Option<String>,
+    },
+
+    /// Close multiple tabs, optionally filtered by profile and/or URL pattern
+    CloseTabs {
+        /// Restrict to a Safari profile name
+        #[arg(long)]
+        profile: Option<String>,
+        /// Only close tabs whose URL contains this string
+        #[arg(long)]
+        url: Option<String>,
+    },
+
     /// Read page content from the current active tab
     Read {
         /// Optional CSS selector to extract a specific element's text
@@ -902,6 +924,30 @@ fn main() {
                     process::exit(1);
                 }
             },
+            SafariAction::Scroll { direction, amount, profile } => {
+                match cueward_adapter_macos::safari::scroll(&direction, amount, profile.as_deref()) {
+                    Ok(result) => {
+                        println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                        eprintln!("scrolled {direction}");
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            SafariAction::CloseTabs { profile, url } => {
+                match cueward_adapter_macos::safari::close_tabs(profile.as_deref(), url.as_deref()) {
+                    Ok(count) => {
+                        println!("{}", serde_json::to_string_pretty(&serde_json::json!({ "closed": count })).unwrap());
+                        eprintln!("{count} tab(s) closed");
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
             SafariAction::Read { selector, profile } => {
                 match cueward_adapter_macos::safari::read(selector.as_deref(), profile.as_deref()) {
                     Ok(result) => {
