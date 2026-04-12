@@ -101,9 +101,11 @@ pub struct SafariAiResponseResult {
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct SafariAiImage {
     pub url: String,
+    #[serde(default)]
+    pub loaded: bool,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct SafariAiImageResult {
     pub provider: String,
     pub mode: String,
@@ -850,7 +852,8 @@ fn chatgpt_image_list_js() -> String {
             alt: img.alt || "",
             src: img.src || "",
             width: img.naturalWidth || img.width || 0,
-            height: img.naturalHeight || img.height || 0
+            height: img.naturalHeight || img.height || 0,
+            loaded: Boolean(img.complete && img.naturalWidth > 0 && img.naturalHeight > 0)
           }))
           .filter((img) => {
             if (!img.src) return false;
@@ -864,7 +867,7 @@ fn chatgpt_image_list_js() -> String {
         for (const img of candidates) {
           if (seen.has(img.src)) continue;
           seen.add(img.src);
-          deduped.push({ url: img.src });
+          deduped.push({ url: img.src, loaded: img.loaded });
         }
 
         const controls = [...document.querySelectorAll('button,[role="button"]')]
@@ -915,15 +918,16 @@ fn poll_chatgpt_images(
         }
         last_result.status = result.status.clone();
 
-        if result.status == "complete" && !result.images.is_empty() {
+        if chatgpt_image_result_is_ready(&result) {
             return Ok(result);
         }
 
-        if result.status == "complete" {
-            if started_at.elapsed() >= Duration::from_secs(empty_complete_grace_seconds) {
-                return Ok(last_result);
-            }
-            continue;
+        if chatgpt_should_return_empty_complete_result(
+            &result,
+            started_at.elapsed(),
+            empty_complete_grace_seconds,
+        ) {
+            return Ok(last_result);
         }
     }
 
@@ -952,6 +956,22 @@ fn chatgpt_image_extract_js(url: &str) -> String {
     )
 }
 
+fn chatgpt_image_result_is_ready(result: &SafariAiImageResult) -> bool {
+    result.status == "complete"
+        && !result.images.is_empty()
+        && result.images.iter().all(|image| image.loaded)
+}
+
+fn chatgpt_should_return_empty_complete_result(
+    result: &SafariAiImageResult,
+    elapsed: Duration,
+    empty_complete_grace_seconds: u64,
+) -> bool {
+    result.status == "complete"
+        && result.images.is_empty()
+        && elapsed >= Duration::from_secs(empty_complete_grace_seconds)
+}
+
 fn parse_chatgpt_image_payload(payload: &str) -> Result<SafariAiImageResult, MacosError> {
     let value: Value = serde_json::from_str(payload).map_err(|error| {
         MacosError::Other(format!("invalid chatgpt image payload: {error}: {payload}"))
@@ -971,9 +991,13 @@ fn parse_chatgpt_image_payload(payload: &str) -> Result<SafariAiImageResult, Mac
         .map(|items| {
             items
                 .iter()
-                .filter_map(|item| item.get("url").and_then(Value::as_str))
-                .map(|url| SafariAiImage {
-                    url: url.to_string(),
+                .filter_map(|item| {
+                    let url = item.get("url")?.as_str()?;
+                    let loaded = item.get("loaded").and_then(Value::as_bool).unwrap_or(false);
+                    Some(SafariAiImage {
+                        url: url.to_string(),
+                        loaded,
+                    })
                 })
                 .collect::<Vec<_>>()
         })
@@ -1172,7 +1196,9 @@ pub fn gemini_save_media(
     })
 }
 
-pub fn threads_extract_feed(profile_filter: Option<&str>) -> Result<Vec<SocialFeedPost>, MacosError> {
+pub fn threads_extract_feed(
+    profile_filter: Option<&str>,
+) -> Result<Vec<SocialFeedPost>, MacosError> {
     // Auto-focus to Threads tab
     let _ = focus_tab("threads.com", profile_filter);
 
@@ -1358,14 +1384,13 @@ pub fn focus_tab(
     } else {
         // Match by URL or title substring
         let query = tab_selector.to_lowercase();
-        all_tabs
-            .into_iter()
-            .find(|t| t.url.to_lowercase().contains(&query) || t.title.to_lowercase().contains(&query))
+        all_tabs.into_iter().find(|t| {
+            t.url.to_lowercase().contains(&query) || t.title.to_lowercase().contains(&query)
+        })
     };
 
-    let tab = matched.ok_or_else(|| {
-        MacosError::Other(format!("no tab matching '{tab_selector}'"))
-    })?;
+    let tab =
+        matched.ok_or_else(|| MacosError::Other(format!("no tab matching '{tab_selector}'")))?;
 
     // Set as current tab
     let script = format!(
@@ -1397,7 +1422,10 @@ pub fn close(index: Option<usize>) -> Result<SafariCloseResult, MacosError> {
     })
 }
 
-pub fn close_tabs(profile_filter: Option<&str>, url_pattern: Option<&str>) -> Result<usize, MacosError> {
+pub fn close_tabs(
+    profile_filter: Option<&str>,
+    url_pattern: Option<&str>,
+) -> Result<usize, MacosError> {
     let all_tabs = tabs(profile_filter)?;
     let to_close: Vec<&SafariTab> = all_tabs
         .iter()
@@ -1924,15 +1952,17 @@ fn execute_js_for_profile(
 #[cfg(test)]
 mod tests {
     use super::{
-        TAB_SEPARATOR, build_active_tab_script, build_chatgpt_click_send_js,
-        build_chatgpt_fill_input_js, build_chatgpt_go_home_js, build_close_script,
-        build_exec_script, build_gemini_fill_input_js, build_gemini_go_home_js, build_open_script,
-        build_tab_return_block, build_tabs_script, chatgpt_image_extract_js, chatgpt_image_list_js,
-        chatgpt_response_extract_js, extract_profile, gemini_deep_research_poll_js,
+        SafariAiImage, SafariAiImageResult, TAB_SEPARATOR, build_active_tab_script,
+        build_chatgpt_click_send_js, build_chatgpt_fill_input_js, build_chatgpt_go_home_js,
+        build_close_script, build_exec_script, build_gemini_fill_input_js, build_gemini_go_home_js,
+        build_open_script, build_tab_return_block, build_tabs_script, chatgpt_image_extract_js,
+        chatgpt_image_list_js, chatgpt_image_result_is_ready, chatgpt_response_extract_js,
+        chatgpt_should_return_empty_complete_result, extract_profile, gemini_deep_research_poll_js,
         gemini_response_extract_js, parse_chatgpt_image_payload, parse_deep_research_payload,
         parse_tab_line, parse_tabs_output, selector_click_js, selector_fill_js, selector_text_js,
         should_skip_chatgpt_response, should_skip_gemini_response,
     };
+    use std::time::Duration;
 
     #[test]
     fn extract_profile_from_window_name() {
@@ -2141,6 +2171,14 @@ mod tests {
     }
 
     #[test]
+    fn chatgpt_image_list_script_includes_loaded_signal() {
+        let script = chatgpt_image_list_js();
+
+        assert!(script.contains("img.complete"));
+        assert!(script.contains("loaded"));
+    }
+
+    #[test]
     fn chatgpt_image_extract_script_targets_url() {
         let script = chatgpt_image_extract_js("https://example.com/img.png");
 
@@ -2164,6 +2202,89 @@ mod tests {
             result.images[0].url,
             "https://chatgpt.com/backend-api/estuary/content?id=file_123"
         );
+    }
+
+    #[test]
+    fn parse_chatgpt_image_payload_reads_loaded_state() {
+        let payload = r#"{"status":"complete","conversation_url":"https://chatgpt.com/c/test","images":[{"url":"https://chatgpt.com/backend-api/estuary/content?id=file_123","loaded":true},{"url":"https://chatgpt.com/backend-api/estuary/content?id=file_456","loaded":false}]}"#;
+        let result = parse_chatgpt_image_payload(payload).expect("parse payload");
+
+        assert_eq!(result.images.len(), 2);
+        assert!(result.images[0].loaded);
+        assert!(!result.images[1].loaded);
+    }
+
+    #[test]
+    fn chatgpt_image_result_requires_all_images_to_be_ready() {
+        let unloaded = SafariAiImageResult {
+            provider: "chatgpt".to_string(),
+            mode: "image".to_string(),
+            status: "complete".to_string(),
+            conversation_url: Some("https://chatgpt.com/c/test".to_string()),
+            images: vec![SafariAiImage {
+                url: "https://chatgpt.com/backend-api/estuary/content?id=file_123".to_string(),
+                loaded: false,
+            }],
+        };
+        let mixed = SafariAiImageResult {
+            images: vec![
+                SafariAiImage {
+                    url: "https://chatgpt.com/backend-api/estuary/content?id=file_123".to_string(),
+                    loaded: true,
+                },
+                SafariAiImage {
+                    url: "https://chatgpt.com/backend-api/estuary/content?id=file_456".to_string(),
+                    loaded: false,
+                },
+            ],
+            ..unloaded.clone()
+        };
+        let loaded = SafariAiImageResult {
+            images: vec![
+                SafariAiImage {
+                    url: "https://chatgpt.com/backend-api/estuary/content?id=file_123".to_string(),
+                    loaded: true,
+                },
+                SafariAiImage {
+                    url: "https://chatgpt.com/backend-api/estuary/content?id=file_456".to_string(),
+                    loaded: true,
+                },
+            ],
+            ..unloaded.clone()
+        };
+
+        assert!(!chatgpt_image_result_is_ready(&unloaded));
+        assert!(!chatgpt_image_result_is_ready(&mixed));
+        assert!(chatgpt_image_result_is_ready(&loaded));
+    }
+
+    #[test]
+    fn chatgpt_empty_complete_grace_only_applies_without_images() {
+        let complete_without_images = SafariAiImageResult {
+            provider: "chatgpt".to_string(),
+            mode: "image".to_string(),
+            status: "complete".to_string(),
+            conversation_url: Some("https://chatgpt.com/c/test".to_string()),
+            images: Vec::new(),
+        };
+        let complete_with_unloaded_images = SafariAiImageResult {
+            images: vec![SafariAiImage {
+                url: "https://chatgpt.com/backend-api/estuary/content?id=file_123".to_string(),
+                loaded: false,
+            }],
+            ..complete_without_images.clone()
+        };
+
+        assert!(chatgpt_should_return_empty_complete_result(
+            &complete_without_images,
+            Duration::from_secs(8),
+            3
+        ));
+        assert!(!chatgpt_should_return_empty_complete_result(
+            &complete_with_unloaded_images,
+            Duration::from_secs(8),
+            3
+        ));
     }
 
     #[test]
