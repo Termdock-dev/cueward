@@ -653,9 +653,11 @@ fn build_gemini_ai_action(
 
 /// Wrap JSON output with <external> tags for LLM prompt defense.
 /// Content inside the tags is treated as untrusted data, not instructions.
+/// Any `</external>` in the content is escaped to prevent tag boundary bypass.
 fn print_external(source: &str, json: &str) {
+    let safe = json.replace("</external>", "&lt;/external&gt;");
     println!("<external source=\"cueward/{source}\">");
-    println!("{json}");
+    println!("{safe}");
     println!("</external>");
 }
 
