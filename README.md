@@ -77,6 +77,11 @@ cueward safari click "#submit"
 cueward safari fill "textarea" "hello from cueward"
 cueward safari wait ".result" --timeout 30
 
+# Target a specific tab by index or URL/title match
+cueward safari read --tab "gemini.google.com" --profile Ryugu
+cueward safari exec "document.title" --tab 2
+cueward safari source --tab "ChatGPT"
+
 # Scroll the page
 cueward safari scroll down
 cueward safari scroll up --amount 1000

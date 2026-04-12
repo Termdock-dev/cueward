@@ -1239,6 +1239,54 @@ pub fn open(url: &str, profile_filter: Option<&str>) -> Result<Option<SafariTab>
     }))
 }
 
+/// Focus a specific tab by index or by matching URL/title substring.
+/// This sets the matched tab as the current tab so subsequent operations target it.
+pub fn focus_tab(
+    tab_selector: &str,
+    profile_filter: Option<&str>,
+) -> Result<SafariTab, MacosError> {
+    let all_tabs = tabs(profile_filter)?;
+    if all_tabs.is_empty() {
+        return Err(MacosError::Other("no Safari tabs found".to_string()));
+    }
+
+    // Try parsing as index first
+    let matched = if let Ok(index) = tab_selector.parse::<usize>() {
+        all_tabs.into_iter().find(|t| t.index == index)
+    } else {
+        // Match by URL or title substring
+        let query = tab_selector.to_lowercase();
+        all_tabs
+            .into_iter()
+            .find(|t| t.url.to_lowercase().contains(&query) || t.title.to_lowercase().contains(&query))
+    };
+
+    let tab = matched.ok_or_else(|| {
+        MacosError::Other(format!("no tab matching '{tab_selector}'"))
+    })?;
+
+    // Set as current tab
+    let script = format!(
+        r#"
+        tell application "Safari"
+            repeat with w in every window
+                if (id of w) is {window_id} then
+                    set current tab of w to tab {one_based} of w
+                    set index of w to 1
+                    return "true"
+                end if
+            end repeat
+            return "false"
+        end tell
+        "#,
+        window_id = tab.window_id,
+        one_based = tab.index + 1,
+    );
+    run_capture(&script, "safari_focus_tab")?;
+
+    Ok(tab)
+}
+
 pub fn close(index: Option<usize>) -> Result<SafariCloseResult, MacosError> {
     let stdout = run_capture(&build_close_script(index), "safari_close")?;
     Ok(SafariCloseResult {
