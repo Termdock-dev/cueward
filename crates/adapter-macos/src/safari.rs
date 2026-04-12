@@ -98,6 +98,22 @@ pub struct SafariAiResponseResult {
     pub conversation_url: Option<String>,
 }
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+pub struct SafariAiImage {
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariAiImageResult {
+    pub provider: String,
+    pub mode: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversation_url: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub images: Vec<SafariAiImage>,
+}
+
 #[derive(Debug, Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct SafariConversation {
     pub title: String,
@@ -811,6 +827,114 @@ fn chatgpt_response_extract_js() -> String {
         .to_string()
 }
 
+fn chatgpt_image_list_js() -> String {
+    r#"(() => {
+        const getConversationUrl = () => {
+          const url = window.location.href || "";
+          return /chatgpt\.com\/c\/[a-z0-9-]+/i.test(url) ? url : null;
+        };
+        const candidates = [...document.querySelectorAll("img")]
+          .map((img) => ({
+            alt: img.alt || "",
+            src: img.src || "",
+            width: img.naturalWidth || img.width || 0,
+            height: img.naturalHeight || img.height || 0
+          }))
+          .filter((img) => {
+            if (!img.src) return false;
+            if (!/^https:\/\/chatgpt\.com\/backend-api\/estuary\/content/.test(img.src)) return false;
+            if (img.width < 256 || img.height < 256) return false;
+            return img.alt.includes("已產生圖像") || img.alt.includes("Generated image") || img.alt === "";
+          });
+
+        const deduped = [];
+        const seen = new Set();
+        for (const img of candidates) {
+          if (seen.has(img.src)) continue;
+          seen.add(img.src);
+          deduped.push({ url: img.src });
+        }
+
+        const controls = [...document.querySelectorAll('button,[role="button"]')]
+          .map((button) => [
+            button.getAttribute("aria-label"),
+            button.getAttribute("title"),
+            button.innerText,
+            button.textContent
+          ].filter(Boolean).join(" "))
+          .join(" ");
+        const isRunning = /Stop generating|Stop streaming|停止生成|停止串流/.test(controls);
+
+        return JSON.stringify({
+          status: deduped.length > 0 ? (isRunning ? "running" : "complete") : "running",
+          conversation_url: getConversationUrl(),
+          images: deduped
+        });
+    })()"#
+        .to_string()
+}
+
+fn chatgpt_image_extract_js(index: usize) -> String {
+    format!(
+        r#"(() => {{
+            const urls = [...new Set(
+              [...document.querySelectorAll("img")]
+                .map((img) => img.src || "")
+                .filter((src) => /^https:\/\/chatgpt\.com\/backend-api\/estuary\/content/.test(src))
+            )];
+            const target = urls[{index}];
+            if (!target) return "";
+            const img = [...document.querySelectorAll("img")].find((node) => (node.src || "") === target);
+            if (!img) return "";
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth || img.width;
+            canvas.height = img.naturalHeight || img.height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return "";
+            ctx.drawImage(img, 0, 0);
+            const dataUrl = canvas.toDataURL("image/png");
+            const idx = dataUrl.indexOf(",");
+            return idx >= 0 ? dataUrl.substring(idx + 1) : "";
+        }})()"#
+    )
+}
+
+fn parse_chatgpt_image_payload(payload: &str) -> Result<SafariAiImageResult, MacosError> {
+    let value: Value = serde_json::from_str(payload).map_err(|error| {
+        MacosError::Other(format!("invalid chatgpt image payload: {error}: {payload}"))
+    })?;
+    let status = value
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("running")
+        .to_string();
+    let conversation_url = value
+        .get("conversation_url")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned);
+    let images = value
+        .get("images")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.get("url").and_then(Value::as_str))
+                .map(|url| SafariAiImage {
+                    url: url.to_string(),
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    Ok(SafariAiImageResult {
+        provider: "chatgpt".to_string(),
+        mode: "image".to_string(),
+        status,
+        conversation_url,
+        images,
+    })
+}
+
 fn get_gemini_conversation_url(profile_filter: Option<&str>) -> Result<String, MacosError> {
     let js = r#"(() => {
         const url = window.location.href || "";
@@ -1448,6 +1572,113 @@ pub fn send_chatgpt_prompt(
     })
 }
 
+pub fn send_chatgpt_image_prompt(
+    prompt: &str,
+    profile_filter: Option<&str>,
+) -> Result<SafariAiImageResult, MacosError> {
+    let filled = execute_js_for_profile(
+        &build_chatgpt_fill_input_js(prompt),
+        profile_filter,
+        "safari_chatgpt_image_fill",
+    )?;
+    if filled.trim() != "true" {
+        return Err(MacosError::Other(format!(
+            "failed to fill ChatGPT image prompt: {filled}"
+        )));
+    }
+
+    wait_and_click_chatgpt_send(profile_filter)?;
+
+    let deadline = Instant::now() + Duration::from_secs(180);
+    let image_js = chatgpt_image_list_js();
+    let mut last_result = SafariAiImageResult {
+        provider: "chatgpt".to_string(),
+        mode: "image".to_string(),
+        status: "running".to_string(),
+        conversation_url: None,
+        images: Vec::new(),
+    };
+
+    while Instant::now() < deadline {
+        thread::sleep(Duration::from_secs(1));
+        let payload =
+            execute_js_for_profile(&image_js, profile_filter, "safari_chatgpt_image_poll")?;
+        let result = parse_chatgpt_image_payload(&payload)?;
+        if result.conversation_url.is_some() {
+            last_result.conversation_url = result.conversation_url.clone();
+        }
+        if !result.images.is_empty() {
+            last_result.images = result.images.clone();
+        }
+        last_result.status = result.status.clone();
+
+        if result.status == "complete" && !result.images.is_empty() {
+            return Ok(result);
+        }
+    }
+
+    last_result.status = "timeout".to_string();
+    Ok(last_result)
+}
+
+pub fn chatgpt_save_images(
+    conversation_url: &str,
+    output_dir: &str,
+    profile_filter: Option<&str>,
+) -> Result<Vec<String>, MacosError> {
+    let nav_js = format!(
+        r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
+        url = escape_js_string(conversation_url),
+    );
+    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_chatgpt_save_img_navigate")?;
+    thread::sleep(Duration::from_millis(5000));
+
+    let payload = execute_js_for_profile(
+        &chatgpt_image_list_js(),
+        profile_filter,
+        "safari_chatgpt_img_list",
+    )?;
+    let result = parse_chatgpt_image_payload(&payload)?;
+    if result.images.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let out_path = std::path::Path::new(output_dir);
+    if !out_path.exists() {
+        std::fs::create_dir_all(out_path)
+            .map_err(|e| MacosError::Other(format!("failed to create output dir: {e}")))?;
+    }
+
+    use base64::Engine;
+    let engine = base64::engine::general_purpose::STANDARD;
+    let mut saved = Vec::new();
+
+    for (i, _) in result.images.iter().enumerate() {
+        let b64 = execute_js_for_profile(
+            &chatgpt_image_extract_js(i),
+            profile_filter,
+            "safari_chatgpt_img_extract",
+        )?;
+        let b64 = b64.trim();
+        if b64.is_empty() {
+            continue;
+        }
+
+        let bytes = engine
+            .decode(b64)
+            .map_err(|e| MacosError::Other(format!("base64 decode failed for image {i}: {e}")))?;
+
+        let filename = format!("chatgpt_image_{i}.png");
+        let filepath = out_path.join(&filename);
+        std::fs::write(&filepath, &bytes).map_err(|e| {
+            MacosError::Other(format!("failed to write {}: {e}", filepath.display()))
+        })?;
+        saved.push(filepath.to_string_lossy().into_owned());
+    }
+
+    Ok(saved)
+}
+
 fn execute_js(js_code: &str, context: &str) -> Result<String, MacosError> {
     execute_js_for_profile(js_code, None, context)
 }
@@ -1470,8 +1701,9 @@ mod tests {
         TAB_SEPARATOR, build_active_tab_script, build_chatgpt_click_send_js,
         build_chatgpt_fill_input_js, build_chatgpt_go_home_js, build_close_script,
         build_exec_script, build_gemini_fill_input_js, build_gemini_go_home_js, build_open_script,
-        build_tab_return_block, build_tabs_script, chatgpt_response_extract_js, extract_profile,
-        gemini_deep_research_poll_js, gemini_response_extract_js, parse_deep_research_payload,
+        build_tab_return_block, build_tabs_script, chatgpt_image_extract_js, chatgpt_image_list_js,
+        chatgpt_response_extract_js, extract_profile, gemini_deep_research_poll_js,
+        gemini_response_extract_js, parse_chatgpt_image_payload, parse_deep_research_payload,
         parse_tab_line, parse_tabs_output, selector_click_js, selector_fill_js, selector_text_js,
         should_skip_chatgpt_response, should_skip_gemini_response,
     };
@@ -1671,6 +1903,41 @@ mod tests {
         assert!(script.contains("conversation_url"));
         assert!(script.contains("window.location.href"));
         assert!(script.contains("complete"));
+    }
+
+    #[test]
+    fn chatgpt_image_list_script_reads_generated_images() {
+        let script = chatgpt_image_list_js();
+
+        assert!(script.contains("已產生圖像"));
+        assert!(script.contains("chatgpt\\.com\\/backend-api\\/estuary\\/content"));
+        assert!(script.contains("conversation_url"));
+    }
+
+    #[test]
+    fn chatgpt_image_extract_script_targets_unique_index() {
+        let script = chatgpt_image_extract_js(2);
+
+        assert!(script.contains("new Set"));
+        assert!(script.contains("drawImage"));
+        assert!(script.contains("[2]"));
+    }
+
+    #[test]
+    fn parse_chatgpt_image_payload_reads_images() {
+        let payload = r#"{"status":"complete","conversation_url":"https://chatgpt.com/c/test","images":[{"url":"https://chatgpt.com/backend-api/estuary/content?id=file_123"}]}"#;
+        let result = parse_chatgpt_image_payload(payload).expect("parse payload");
+
+        assert_eq!(result.status, "complete");
+        assert_eq!(
+            result.conversation_url.as_deref(),
+            Some("https://chatgpt.com/c/test")
+        );
+        assert_eq!(result.images.len(), 1);
+        assert_eq!(
+            result.images[0].url,
+            "https://chatgpt.com/backend-api/estuary/content?id=file_123"
+        );
     }
 
     #[test]

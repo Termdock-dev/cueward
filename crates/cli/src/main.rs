@@ -1120,10 +1120,6 @@ fn main() {
                             mode,
                             auto_confirm,
                         } => {
-                            if mode.is_some() {
-                                eprintln!("error: ChatGPT prompt does not support --mode yet");
-                                process::exit(1);
-                            }
                             if auto_confirm {
                                 eprintln!("error: ChatGPT prompt does not support --auto-confirm");
                                 process::exit(1);
@@ -1132,10 +1128,56 @@ fn main() {
                                 eprintln!("error: {e}");
                                 process::exit(1);
                             }
-                            match cueward_adapter_macos::safari::send_chatgpt_prompt(&prompt, p) {
-                                Ok(r) => {
-                                    println!("{}", serde_json::to_string_pretty(&r).unwrap());
-                                    eprintln!("chatgpt response ready");
+                            match mode {
+                                None => match cueward_adapter_macos::safari::send_chatgpt_prompt(
+                                    &prompt, p,
+                                ) {
+                                    Ok(r) => {
+                                        println!("{}", serde_json::to_string_pretty(&r).unwrap());
+                                        eprintln!("chatgpt response ready");
+                                    }
+                                    Err(e) => {
+                                        eprintln!("error: {e}");
+                                        process::exit(1);
+                                    }
+                                },
+                                Some(GeminiMode::Image) => {
+                                    match cueward_adapter_macos::safari::send_chatgpt_image_prompt(
+                                        &prompt, p,
+                                    ) {
+                                        Ok(r) => {
+                                            println!(
+                                                "{}",
+                                                serde_json::to_string_pretty(&r).unwrap()
+                                            );
+                                            eprintln!("chatgpt image response ready");
+                                        }
+                                        Err(e) => {
+                                            eprintln!("error: {e}");
+                                            process::exit(1);
+                                        }
+                                    }
+                                }
+                                Some(other) => {
+                                    let mode_name = other
+                                        .to_possible_value()
+                                        .map(|v| v.get_name().to_string())
+                                        .unwrap_or_else(|| "unknown".to_string());
+                                    eprintln!(
+                                        "error: ChatGPT prompt does not support --mode {} yet",
+                                        mode_name
+                                    );
+                                    process::exit(1);
+                                }
+                            }
+                        }
+                        SafariAiAction::SaveImages { url, output } => {
+                            match cueward_adapter_macos::safari::chatgpt_save_images(
+                                &url, &output, p,
+                            ) {
+                                Ok(paths) => {
+                                    println!("{}", serde_json::to_string_pretty(&paths).unwrap());
+                                    eprintln!("{} image(s) saved", paths.len());
                                 }
                                 Err(e) => {
                                     eprintln!("error: {e}");
@@ -1144,7 +1186,9 @@ fn main() {
                             }
                         }
                         _ => {
-                            eprintln!("error: ChatGPT currently supports only prompt");
+                            eprintln!(
+                                "error: ChatGPT currently supports only prompt and save-images"
+                            );
                             process::exit(1);
                         }
                     },
@@ -1588,6 +1632,45 @@ mod tests {
                 assert_eq!(provider, SafariAiProvider::Chatgpt);
                 assert_eq!(prompt, "哈囉 ChatGPT");
                 assert_eq!(mode, None);
+                assert!(!auto_confirm);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_chatgpt_prompt_with_image_mode() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "ai",
+            "--provider",
+            "chatgpt",
+            "prompt",
+            "--prompt",
+            "畫一隻貓",
+            "--mode",
+            "image",
+        ])
+        .expect("parse");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Ai {
+                        provider,
+                        action:
+                            SafariAiAction::Prompt {
+                                prompt,
+                                mode,
+                                auto_confirm,
+                            },
+                        ..
+                    },
+            } => {
+                assert_eq!(provider, SafariAiProvider::Chatgpt);
+                assert_eq!(prompt, "畫一隻貓");
+                assert_eq!(mode, Some(GeminiMode::Image));
                 assert!(!auto_confirm);
             }
             _ => panic!("unexpected command"),
