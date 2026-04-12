@@ -114,6 +114,18 @@ pub struct SafariAiImageResult {
     pub images: Vec<SafariAiImage>,
 }
 
+#[derive(Clone, Debug, Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct SocialFeedPost {
+    pub author: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub handle: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time: Option<String>,
+    pub content: String,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub metrics: Vec<String>,
+}
+
 #[derive(Debug, Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct SafariConversation {
     pub title: String,
@@ -1158,6 +1170,96 @@ pub fn gemini_save_media(
         response: response.to_string(),
         conversation_url: None,
     })
+}
+
+pub fn threads_extract_feed(profile_filter: Option<&str>) -> Result<Vec<SocialFeedPost>, MacosError> {
+    // Auto-focus to Threads tab
+    let _ = focus_tab("threads.com", profile_filter);
+
+    let js = r#"(() => {
+        const authorLinks = [...document.querySelectorAll('a[href^="/@"]')];
+        const seen = new Set();
+        const posts = [];
+
+        for (const link of authorLinks) {
+            const href = link.getAttribute("href") || "";
+            if (href.split("/").length > 3) continue;
+
+            let container = link;
+            for (let i = 0; i < 12; i++) {
+                if (!container.parentElement) break;
+                container = container.parentElement;
+                if ((container.innerText || "").length > 30 && container.querySelector("time")) break;
+            }
+
+            const key = container.innerText.substring(0, 80);
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            const author = href.replace("/", "");
+            const timeEl = container.querySelector("time");
+            const time = timeEl ? (timeEl.getAttribute("datetime") || timeEl.innerText || "") : "";
+            const contentSpans = [...container.querySelectorAll('span[dir="auto"], div[dir="auto"]')];
+            let content = "";
+            for (const span of contentSpans) {
+                const t = (span.innerText || "").trim();
+                if (t.length > 20) { content = t; break; }
+            }
+            if (content) {
+                posts.push({ author, time: time || null, content: content.substring(0, 500) });
+            }
+        }
+        return JSON.stringify(posts);
+    })()"#;
+    let raw = execute_js_for_profile(js, profile_filter, "safari_threads_feed")?;
+    let posts: Vec<SocialFeedPost> = serde_json::from_str(&raw)
+        .map_err(|e| MacosError::Other(format!("failed to parse threads feed: {e}")))?;
+    Ok(posts)
+}
+
+pub fn x_extract_feed(profile_filter: Option<&str>) -> Result<Vec<SocialFeedPost>, MacosError> {
+    // Auto-focus to X tab
+    let _ = focus_tab("x.com", profile_filter);
+
+    let js = r#"(() => {
+        const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+        const posts = [];
+        const seen = new Set();
+
+        for (const tweet of tweets) {
+            const timeEl = tweet.querySelector("time");
+            const time = timeEl ? (timeEl.getAttribute("datetime") || "") : "";
+            const tweetText = tweet.querySelector('div[data-testid="tweetText"]');
+            const content = tweetText ? (tweetText.innerText || "").trim() : "";
+
+            const key = content.substring(0, 50);
+            if (seen.has(key) || !content) continue;
+            seen.add(key);
+
+            const userCell = tweet.querySelector('div[data-testid="User-Name"]');
+            const userText = userCell ? (userCell.innerText || "") : "";
+            const author = userText.split("\n")[0] || "";
+            const handle = (userText.match(/@\w+/) || [""])[0];
+
+            const groups = tweet.querySelectorAll('div[role="group"] button');
+            const metrics = [...groups]
+                .map(b => (b.getAttribute("aria-label") || "").trim())
+                .filter(Boolean);
+
+            posts.push({
+                author,
+                handle: handle || null,
+                time: time || null,
+                content: content.substring(0, 500),
+                metrics
+            });
+        }
+        return JSON.stringify(posts);
+    })()"#;
+    let raw = execute_js_for_profile(js, profile_filter, "safari_x_feed")?;
+    let posts: Vec<SocialFeedPost> = serde_json::from_str(&raw)
+        .map_err(|e| MacosError::Other(format!("failed to parse x feed: {e}")))?;
+    Ok(posts)
 }
 
 pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {

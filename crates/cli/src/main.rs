@@ -198,6 +198,8 @@ enum NotesAction {
 enum SafariAiProvider {
     Gemini,
     Chatgpt,
+    Threads,
+    X,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, ValueEnum)]
@@ -1271,6 +1273,36 @@ fn main() {
                             eprintln!(
                                 "error: ChatGPT currently supports only prompt and save-images"
                             );
+                            process::exit(1);
+                        }
+                    },
+                    SafariAiProvider::Threads => match action {
+                        SafariAiAction::List => {
+                            match cueward_adapter_macos::safari::threads_extract_feed(p) {
+                                Ok(posts) => {
+                                    print_external("safari/threads/feed", &serde_json::to_string_pretty(&posts).unwrap());
+                                    eprintln!("{} post(s)", posts.len());
+                                }
+                                Err(e) => { eprintln!("error: {e}"); process::exit(1); }
+                            }
+                        }
+                        _ => {
+                            eprintln!("error: Threads currently supports only list");
+                            process::exit(1);
+                        }
+                    },
+                    SafariAiProvider::X => match action {
+                        SafariAiAction::List => {
+                            match cueward_adapter_macos::safari::x_extract_feed(p) {
+                                Ok(posts) => {
+                                    print_external("safari/x/feed", &serde_json::to_string_pretty(&posts).unwrap());
+                                    eprintln!("{} post(s)", posts.len());
+                                }
+                                Err(e) => { eprintln!("error: {e}"); process::exit(1); }
+                            }
+                        }
+                        _ => {
+                            eprintln!("error: X currently supports only list");
                             process::exit(1);
                         }
                     },
