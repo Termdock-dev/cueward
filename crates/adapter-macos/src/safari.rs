@@ -62,7 +62,6 @@ impl SafariAutomationSession {
         guard.depth = 1;
         guard.lock_owner_pid = Some(std::process::id());
         guard.lock_path = Some(lock_path);
-        guard.last_operation_at = None;
 
         Ok(Self { outermost: true })
     }
@@ -89,7 +88,6 @@ impl Drop for SafariAutomationSession {
         }
         guard.lock_path = None;
         guard.lock_owner_pid = None;
-        guard.last_operation_at = None;
     }
 }
 
@@ -126,16 +124,30 @@ fn acquire_safari_lock(path: &Path, now_ts: i64, pid: u32) -> Result<(), MacosEr
                 let bytes = serde_json::to_vec_pretty(&payload)
                     .map_err(|e| MacosError::Other(format!("failed to encode lock file: {e}")))?;
                 file.write_all(&bytes).map_err(|e| {
+                    let _ = fs::remove_file(path);
                     MacosError::Other(format!("failed to write {}: {e}", path.display()))
                 })?;
                 return Ok(());
             }
             Err(error) if error.kind() == ErrorKind::AlreadyExists => {
-                let existing = read_safari_lock(path);
-                let expired = existing
-                    .as_ref()
-                    .map(|lock| lock.expires_at <= now_ts)
-                    .unwrap_or(true);
+                let existing_raw = match fs::read_to_string(path) {
+                    Ok(raw) => raw,
+                    Err(read_error) if read_error.kind() == ErrorKind::NotFound => continue,
+                    Err(read_error) => {
+                        return Err(MacosError::Other(format!(
+                            "failed to read Safari lock {}: {read_error}",
+                            path.display()
+                        )));
+                    }
+                };
+                let existing: SafariLockFile =
+                    serde_json::from_str(&existing_raw).map_err(|_| {
+                        MacosError::Other(format!(
+                            "Safari automation lock {} exists but is corrupted or unreadable",
+                            path.display()
+                        ))
+                    })?;
+                let expired = existing.expires_at <= now_ts;
                 if expired {
                     match fs::remove_file(path) {
                         Ok(()) => continue,
@@ -149,15 +161,9 @@ fn acquire_safari_lock(path: &Path, now_ts: i64, pid: u32) -> Result<(), MacosEr
                     }
                 }
 
-                let lock = existing.ok_or_else(|| {
-                    MacosError::Other(format!(
-                        "Safari automation lock {} is invalid and could not be replaced",
-                        path.display()
-                    ))
-                })?;
                 return Err(MacosError::Other(format!(
                     "Safari automation is locked by pid {} until {}",
-                    lock.pid, lock.expires_at
+                    existing.pid, existing.expires_at
                 )));
             }
             Err(error) => {
@@ -197,26 +203,34 @@ fn read_safari_lock(path: &Path) -> Option<SafariLockFile> {
     serde_json::from_str(&raw).ok()
 }
 
+fn compute_next_safari_operation(
+    now: Instant,
+    last_operation_at: Option<Instant>,
+) -> (Option<Duration>, Instant) {
+    match last_operation_at {
+        Some(last) if now < last + SAFARI_OPERATION_DELAY => {
+            let next_allowed = last + SAFARI_OPERATION_DELAY;
+            (Some(next_allowed - now), next_allowed)
+        }
+        _ => (None, now),
+    }
+}
+
 fn throttle_safari_operation() -> Result<(), MacosError> {
     let sleep_for = {
         let state = safari_automation_state();
-        let guard = state
+        let mut guard = state
             .lock()
             .map_err(|_| MacosError::Other("safari automation state poisoned".to_string()))?;
-        guard
-            .last_operation_at
-            .and_then(|instant| SAFARI_OPERATION_DELAY.checked_sub(instant.elapsed()))
+        let now = Instant::now();
+        let (delay, next_allowed) = compute_next_safari_operation(now, guard.last_operation_at);
+        guard.last_operation_at = Some(next_allowed);
+        delay
     };
 
     if let Some(duration) = sleep_for {
         thread::sleep(duration);
     }
-
-    let state = safari_automation_state();
-    let mut guard = state
-        .lock()
-        .map_err(|_| MacosError::Other("safari automation state poisoned".to_string()))?;
-    guard.last_operation_at = Some(Instant::now());
     Ok(())
 }
 
@@ -2535,22 +2549,24 @@ fn execute_js_for_profile(
 #[cfg(test)]
 mod tests {
     use super::{
-        SAFARI_LOCK_TTL_SECS, SafariAiImage, SafariAiImageResult, SafariLockFile,
-        SafariScrollReadSnapshot, TAB_SEPARATOR, acquire_safari_lock, build_active_tab_script,
-        build_chatgpt_click_send_js, build_chatgpt_fill_input_js, build_chatgpt_go_home_js,
-        build_close_script, build_exec_script, build_gemini_fill_input_js, build_gemini_go_home_js,
-        build_open_script, build_tab_return_block, build_tabs_script, chatgpt_image_extract_js,
-        chatgpt_image_list_js, chatgpt_image_result_is_ready, chatgpt_list_conversations_js,
-        chatgpt_response_extract_js, chatgpt_should_return_empty_complete_result, extract_profile,
-        gemini_deep_research_poll_js, gemini_response_extract_js, is_safari_rate_limited,
-        parse_chatgpt_image_payload, parse_deep_research_payload, parse_tab_line,
-        parse_tabs_output, read_safari_lock, release_safari_lock, safari_rate_limit_backoff,
-        scroll_read_detects_new_content, scroll_read_new_content_blocks, scroll_read_poll_js,
-        scroll_read_snapshot_blocks, selector_click_js, selector_fill_js, selector_text_js,
-        should_skip_chatgpt_response, should_skip_gemini_response,
+        SAFARI_LOCK_TTL_SECS, SAFARI_OPERATION_DELAY, SafariAiImage, SafariAiImageResult,
+        SafariAutomationSession, SafariLockFile, SafariScrollReadSnapshot, TAB_SEPARATOR,
+        acquire_safari_lock, build_active_tab_script, build_chatgpt_click_send_js,
+        build_chatgpt_fill_input_js, build_chatgpt_go_home_js, build_close_script,
+        build_exec_script, build_gemini_fill_input_js, build_gemini_go_home_js, build_open_script,
+        build_tab_return_block, build_tabs_script, chatgpt_image_extract_js, chatgpt_image_list_js,
+        chatgpt_image_result_is_ready, chatgpt_list_conversations_js, chatgpt_response_extract_js,
+        chatgpt_should_return_empty_complete_result, compute_next_safari_operation,
+        extract_profile, gemini_deep_research_poll_js, gemini_response_extract_js,
+        is_safari_rate_limited, parse_chatgpt_image_payload, parse_deep_research_payload,
+        parse_tab_line, parse_tabs_output, read_safari_lock, release_safari_lock,
+        safari_automation_state, safari_rate_limit_backoff, scroll_read_detects_new_content,
+        scroll_read_new_content_blocks, scroll_read_poll_js, scroll_read_snapshot_blocks,
+        selector_click_js, selector_fill_js, selector_text_js, should_skip_chatgpt_response,
+        should_skip_gemini_response,
     };
     use std::fs;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
     use tempfile::tempdir;
 
     #[test]
@@ -3039,5 +3055,50 @@ mod tests {
         release_safari_lock(&lock_path, 77).expect("release lock");
 
         assert!(read_safari_lock(&lock_path).is_none());
+    }
+
+    #[test]
+    fn safari_lock_reports_corrupted_active_file() {
+        let dir = tempdir().expect("tempdir");
+        let lock_path = dir.path().join("lock.json");
+        let now = 1_700_000_000;
+
+        fs::write(&lock_path, b"{not-json").expect("write corrupt lock");
+
+        let err = acquire_safari_lock(&lock_path, now, 77)
+            .expect_err("corrupted active lock should fail");
+        assert!(err.to_string().contains("corrupted or unreadable"));
+    }
+
+    #[test]
+    fn throttle_schedule_reserves_next_available_slot() {
+        let now = Instant::now();
+        let last = now;
+
+        let (delay, next_allowed) = compute_next_safari_operation(now, Some(last));
+
+        assert_eq!(delay, Some(SAFARI_OPERATION_DELAY));
+        assert!(next_allowed >= last + SAFARI_OPERATION_DELAY);
+    }
+
+    #[test]
+    fn dropping_outer_session_keeps_last_operation_timestamp() {
+        let state = safari_automation_state();
+        let now = Instant::now();
+
+        {
+            let mut guard = state.lock().expect("state lock");
+            guard.depth = 1;
+            guard.last_operation_at = Some(now);
+            guard.lock_path = None;
+            guard.lock_owner_pid = None;
+        }
+
+        let session = SafariAutomationSession { outermost: true };
+        drop(session);
+
+        let guard = state.lock().expect("state lock");
+        assert_eq!(guard.depth, 0);
+        assert_eq!(guard.last_operation_at, Some(now));
     }
 }
