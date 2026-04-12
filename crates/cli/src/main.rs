@@ -651,6 +651,14 @@ fn build_gemini_ai_action(
     }
 }
 
+/// Wrap JSON output with <external> tags for LLM prompt defense.
+/// Content inside the tags is treated as untrusted data, not instructions.
+fn print_external(source: &str, json: &str) {
+    println!("<external source=\"cueward/{source}\">");
+    println!("{json}");
+    println!("</external>");
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -709,7 +717,7 @@ fn main() {
             }
 
             let json = serde_json::to_string_pretty(&all_cues).unwrap();
-            println!("{json}");
+            print_external("capture", &json);
 
             eprintln!("captured {} cues", all_cues.len());
         }
@@ -868,7 +876,7 @@ fn main() {
         Command::Ocr { path } => match cueward_adapter_macos::ocr::capture(&path) {
             Ok(cues) => {
                 let json = serde_json::to_string_pretty(&cues).unwrap();
-                println!("{json}");
+                print_external("ocr", &json);
                 eprintln!("extracted {} cues", cues.len());
             }
             Err(e) => {
@@ -973,7 +981,7 @@ fn main() {
                 }
                 match cueward_adapter_macos::safari::read(selector.as_deref(), profile.as_deref()) {
                     Ok(result) => {
-                        println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                        print_external("safari/read", &serde_json::to_string_pretty(&result).unwrap());
                         eprintln!("read page content");
                     }
                     Err(e) => {
@@ -990,7 +998,7 @@ fn main() {
                 }
                 match cueward_adapter_macos::safari::source(profile.as_deref()) {
                     Ok(result) => {
-                        println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                        print_external("safari/source", &serde_json::to_string_pretty(&result).unwrap());
                         eprintln!("read page source");
                     }
                     Err(e) => {
@@ -1007,7 +1015,7 @@ fn main() {
                 }
                 match cueward_adapter_macos::safari::exec(&js_code, profile.as_deref()) {
                     Ok(result) => {
-                        println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                        print_external("safari/exec", &serde_json::to_string_pretty(&result).unwrap());
                         eprintln!("executed javascript");
                     }
                     Err(e) => {
@@ -1081,7 +1089,7 @@ fn main() {
                                         eprintln!("error: {e}"); process::exit(1);
                                     }
                                     match cueward_adapter_macos::safari::send_gemini_prompt(&prompt, p) {
-                                        Ok(r) => { println!("{}", serde_json::to_string_pretty(&r).unwrap()); eprintln!("gemini response ready"); }
+                                        Ok(r) => { print_external("safari/ai/gemini", &serde_json::to_string_pretty(&r).unwrap()); eprintln!("gemini response ready"); }
                                         Err(e) => { eprintln!("error: {e}"); process::exit(1); }
                                     }
                                 }
@@ -1090,13 +1098,13 @@ fn main() {
                                         eprintln!("error: {e}"); process::exit(1);
                                     }
                                     match cueward_adapter_macos::safari::send_gemini_prompt(&prompt, p) {
-                                        Ok(r) => { println!("{}", serde_json::to_string_pretty(&r).unwrap()); eprintln!("gemini response ready"); }
+                                        Ok(r) => { print_external("safari/ai/gemini", &serde_json::to_string_pretty(&r).unwrap()); eprintln!("gemini response ready"); }
                                         Err(e) => { eprintln!("error: {e}"); process::exit(1); }
                                     }
                                 }
                                 GeminiAiAction::DeepResearchPlan(prompt, auto_confirm) => {
                                     match cueward_adapter_macos::safari::start_gemini_deep_research(&prompt, auto_confirm, p) {
-                                        Ok(r) => { println!("{}", serde_json::to_string_pretty(&r).unwrap()); eprintln!("gemini deep research state ready"); }
+                                        Ok(r) => { print_external("safari/ai/gemini/deep-research", &serde_json::to_string_pretty(&r).unwrap()); eprintln!("gemini deep research state ready"); }
                                         Err(e) => { eprintln!("error: {e}"); process::exit(1); }
                                     }
                                 }
@@ -1121,10 +1129,7 @@ fn main() {
                             SafariAiAction::List => {
                                 match cueward_adapter_macos::safari::gemini_list_conversations(p) {
                                     Ok(convos) => {
-                                        println!(
-                                            "{}",
-                                            serde_json::to_string_pretty(&convos).unwrap()
-                                        );
+                                        print_external("safari/ai/gemini/list", &serde_json::to_string_pretty(&convos).unwrap());
                                         eprintln!("{} conversation(s)", convos.len());
                                     }
                                     Err(e) => {
@@ -1138,7 +1143,7 @@ fn main() {
                                     &url, p,
                                 ) {
                                     Ok(r) => {
-                                        println!("{}", serde_json::to_string_pretty(&r).unwrap());
+                                        print_external("safari/ai/gemini/read", &serde_json::to_string_pretty(&r).unwrap());
                                         eprintln!("conversation read");
                                     }
                                     Err(e) => {
@@ -1152,7 +1157,7 @@ fn main() {
                                     timeout, p,
                                 ) {
                                     Ok(r) => {
-                                        println!("{}", serde_json::to_string_pretty(&r).unwrap());
+                                        print_external("safari/ai/gemini/poll", &serde_json::to_string_pretty(&r).unwrap());
                                         eprintln!("polled");
                                     }
                                     Err(e) => {
@@ -1211,7 +1216,7 @@ fn main() {
                                     &prompt, p,
                                 ) {
                                     Ok(r) => {
-                                        println!("{}", serde_json::to_string_pretty(&r).unwrap());
+                                        print_external("safari/ai/chatgpt", &serde_json::to_string_pretty(&r).unwrap());
                                         eprintln!("chatgpt response ready");
                                     }
                                     Err(e) => {
@@ -1224,10 +1229,7 @@ fn main() {
                                         &prompt, p,
                                     ) {
                                         Ok(r) => {
-                                            println!(
-                                                "{}",
-                                                serde_json::to_string_pretty(&r).unwrap()
-                                            );
+                                            print_external("safari/ai/chatgpt/image", &serde_json::to_string_pretty(&r).unwrap());
                                             eprintln!("chatgpt image response ready");
                                         }
                                         Err(e) => {
@@ -1371,7 +1373,7 @@ fn main() {
             }
             match cueward_adapter_macos::screenshot::capture(ocr, output.as_deref(), display) {
                 Ok(result) => {
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    print_external("screenshot", &serde_json::to_string_pretty(&result).unwrap());
                     eprintln!("screenshot saved to {}", result.path);
                 }
                 Err(e) => {
@@ -1391,7 +1393,7 @@ fn main() {
                 }
                 match cueward_adapter_macos::clipboard::get(save_image.as_deref()) {
                     Ok(content) => {
-                        println!("{}", serde_json::to_string_pretty(&content).unwrap());
+                        print_external("clipboard/get", &serde_json::to_string_pretty(&content).unwrap());
                         match content.content_type.as_str() {
                             "image" => eprintln!(
                                 "clipboard image saved to {}",
