@@ -825,20 +825,6 @@ fn get_gemini_conversation_url(profile_filter: Option<&str>) -> Result<String, M
     Ok(url.to_string())
 }
 
-fn get_chatgpt_conversation_url(profile_filter: Option<&str>) -> Result<String, MacosError> {
-    let js = r#"(() => {
-        const url = window.location.href || "";
-        if (url.match(/chatgpt\.com\/c\/[a-z0-9-]+/i)) return url;
-        return "";
-    })()"#;
-    let url = execute_js_for_profile(js, profile_filter, "safari_chatgpt_conversation_url")?;
-    let url = url.trim();
-    if url.is_empty() {
-        return Err(MacosError::Other("no conversation URL found".to_string()));
-    }
-    Ok(url.to_string())
-}
-
 pub fn gemini_list_conversations(
     profile_filter: Option<&str>,
 ) -> Result<Vec<SafariConversation>, MacosError> {
@@ -1406,6 +1392,8 @@ pub fn send_chatgpt_prompt(
 
     let deadline = Instant::now() + Duration::from_secs(120);
     let response_js = chatgpt_response_extract_js();
+    let mut last_response = String::new();
+    let mut last_conversation_url: Option<String> = None;
 
     while Instant::now() < deadline {
         thread::sleep(Duration::from_millis(750));
@@ -1424,22 +1412,30 @@ pub fn send_chatgpt_prompt(
             .and_then(Value::as_str)
             .unwrap_or("")
             .trim();
-        if should_skip_chatgpt_response(response, prompt) {
-            continue;
-        }
 
         let conversation_url = value
             .get("conversation_url")
             .and_then(Value::as_str)
-            .map(ToOwned::to_owned)
-            .or_else(|| get_chatgpt_conversation_url(profile_filter).ok());
+            .map(ToOwned::to_owned);
+        if conversation_url.is_some() {
+            last_conversation_url = conversation_url.clone();
+        }
+
+        let should_skip = should_skip_chatgpt_response(response, prompt);
+        if !should_skip {
+            last_response = response.to_string();
+        }
 
         if status == "complete" {
             return Ok(SafariAiResponseResult {
                 provider: "chatgpt".to_string(),
                 status: "complete".to_string(),
-                response: response.to_string(),
-                conversation_url,
+                response: if should_skip {
+                    last_response.clone()
+                } else {
+                    response.to_string()
+                },
+                conversation_url: conversation_url.or_else(|| last_conversation_url.clone()),
             });
         }
     }
@@ -1447,8 +1443,8 @@ pub fn send_chatgpt_prompt(
     Ok(SafariAiResponseResult {
         provider: "chatgpt".to_string(),
         status: "timeout".to_string(),
-        response: String::new(),
-        conversation_url: get_chatgpt_conversation_url(profile_filter).ok(),
+        response: last_response,
+        conversation_url: last_conversation_url,
     })
 }
 
