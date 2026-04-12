@@ -1416,6 +1416,33 @@ fn main() {
                         }
                     },
                     SafariAiProvider::X => match action {
+                        SafariAiAction::Prompt {
+                            prompt,
+                            mode,
+                            auto_confirm,
+                        } => {
+                            if auto_confirm {
+                                eprintln!("error: X prompt does not support --auto-confirm");
+                                process::exit(1);
+                            }
+                            if mode.is_some() {
+                                eprintln!("error: X prompt does not support --mode");
+                                process::exit(1);
+                            }
+                            match cueward_adapter_macos::safari::x_search(&prompt, p) {
+                                Ok(posts) => {
+                                    print_external(
+                                        "safari/x/search",
+                                        &serde_json::to_string_pretty(&posts).unwrap(),
+                                    );
+                                    eprintln!("{} post(s)", posts.len());
+                                }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
+                            }
+                        }
                         SafariAiAction::List => {
                             match cueward_adapter_macos::safari::x_extract_feed(p) {
                                 Ok(posts) => {
@@ -1431,8 +1458,23 @@ fn main() {
                                 }
                             }
                         }
+                        SafariAiAction::Read { url } => {
+                            match cueward_adapter_macos::safari::x_read_post(&url, p) {
+                                Ok(posts) => {
+                                    print_external(
+                                        "safari/x/read",
+                                        &serde_json::to_string_pretty(&posts).unwrap(),
+                                    );
+                                    eprintln!("{} post(s)", posts.len());
+                                }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
+                            }
+                        }
                         _ => {
-                            eprintln!("error: X currently supports only list");
+                            eprintln!("error: X currently supports prompt, list, and read");
                             process::exit(1);
                         }
                     },
@@ -2032,6 +2074,65 @@ mod tests {
                     },
             } => {
                 assert_eq!(provider, SafariAiProvider::Chatgpt);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_x_prompt() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "ai",
+            "--provider",
+            "x",
+            "prompt",
+            "--prompt",
+            "Claude Code",
+        ])
+        .expect("parse");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Ai {
+                        provider,
+                        action: SafariAiAction::Prompt { prompt, .. },
+                        ..
+                    },
+            } => {
+                assert_eq!(provider, SafariAiProvider::X);
+                assert_eq!(prompt, "Claude Code");
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_x_read() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "ai",
+            "--provider",
+            "x",
+            "read",
+            "https://x.com/openai/status/123",
+        ])
+        .expect("parse");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Ai {
+                        provider,
+                        action: SafariAiAction::Read { url },
+                        ..
+                    },
+            } => {
+                assert_eq!(provider, SafariAiProvider::X);
+                assert_eq!(url, "https://x.com/openai/status/123");
             }
             _ => panic!("unexpected command"),
         }
