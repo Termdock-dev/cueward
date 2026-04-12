@@ -1,22 +1,279 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::fs::{self, OpenOptions};
+use std::io::{ErrorKind, Write};
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use chrono::{DateTime, TimeZone, Utc};
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use cueward_core::{Cue, CueSource};
 
 use crate::MacosError;
-use crate::applescript::{escape, escape_body, run_capture};
+use crate::applescript::{escape, escape_body, run_capture as run_applescript_capture};
 
 /// Core Data epoch: 2001-01-01 00:00:00 UTC
 const CORE_DATA_EPOCH: i64 = 978_307_200;
+const SAFARI_OPERATION_DELAY: Duration = Duration::from_secs(1);
+const SAFARI_LOCK_TTL_SECS: i64 = 300;
+const SAFARI_429_MAX_RETRIES: usize = 3;
 const TAB_SEPARATOR: &str = "---TAB_SEP---";
 const FIELD_SEPARATOR: &str = "<<<FIELD_SEP>>>";
+
+static SAFARI_AUTOMATION_STATE: OnceLock<Mutex<SafariAutomationState>> = OnceLock::new();
+
+#[derive(Debug, Default)]
+struct SafariAutomationState {
+    depth: usize,
+    last_operation_at: Option<Instant>,
+    lock_path: Option<PathBuf>,
+    lock_owner_pid: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+struct SafariLockFile {
+    pid: u32,
+    acquired_at: i64,
+    expires_at: i64,
+}
+
+struct SafariAutomationSession {
+    outermost: bool,
+}
+
+impl SafariAutomationSession {
+    fn enter() -> Result<Self, MacosError> {
+        let state = safari_automation_state();
+        let mut guard = state
+            .lock()
+            .map_err(|_| MacosError::Other("safari automation state poisoned".to_string()))?;
+
+        if guard.depth > 0 {
+            guard.depth += 1;
+            return Ok(Self { outermost: false });
+        }
+
+        let lock_path = safari_lock_path()?;
+        acquire_safari_lock(&lock_path, Utc::now().timestamp(), std::process::id())?;
+        guard.depth = 1;
+        guard.lock_owner_pid = Some(std::process::id());
+        guard.lock_path = Some(lock_path);
+        guard.last_operation_at = None;
+
+        Ok(Self { outermost: true })
+    }
+}
+
+impl Drop for SafariAutomationSession {
+    fn drop(&mut self) {
+        let state = safari_automation_state();
+        let Ok(mut guard) = state.lock() else {
+            return;
+        };
+
+        if guard.depth == 0 {
+            return;
+        }
+
+        guard.depth -= 1;
+        if !self.outermost || guard.depth > 0 {
+            return;
+        }
+
+        if let (Some(path), Some(pid)) = (guard.lock_path.as_ref(), guard.lock_owner_pid) {
+            let _ = release_safari_lock(path, pid);
+        }
+        guard.lock_path = None;
+        guard.lock_owner_pid = None;
+        guard.last_operation_at = None;
+    }
+}
+
+fn safari_automation_state() -> &'static Mutex<SafariAutomationState> {
+    SAFARI_AUTOMATION_STATE.get_or_init(|| Mutex::new(SafariAutomationState::default()))
+}
+
+fn with_safari_session<T>(action: impl FnOnce() -> Result<T, MacosError>) -> Result<T, MacosError> {
+    let _session = SafariAutomationSession::enter()?;
+    action()
+}
+
+fn safari_lock_path() -> Result<PathBuf, MacosError> {
+    let home = std::env::var("HOME")
+        .map_err(|_| MacosError::Other("HOME environment variable must be set".into()))?;
+    Ok(PathBuf::from(home).join(".cueward").join("lock.json"))
+}
+
+fn acquire_safari_lock(path: &Path, now_ts: i64, pid: u32) -> Result<(), MacosError> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| MacosError::Other("invalid Safari lock path".to_string()))?;
+    fs::create_dir_all(parent)
+        .map_err(|e| MacosError::Other(format!("failed to create {}: {e}", parent.display())))?;
+
+    for _ in 0..2 {
+        match OpenOptions::new().write(true).create_new(true).open(path) {
+            Ok(mut file) => {
+                let payload = SafariLockFile {
+                    pid,
+                    acquired_at: now_ts,
+                    expires_at: now_ts + SAFARI_LOCK_TTL_SECS,
+                };
+                let bytes = serde_json::to_vec_pretty(&payload)
+                    .map_err(|e| MacosError::Other(format!("failed to encode lock file: {e}")))?;
+                file.write_all(&bytes).map_err(|e| {
+                    MacosError::Other(format!("failed to write {}: {e}", path.display()))
+                })?;
+                return Ok(());
+            }
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+                let existing = read_safari_lock(path);
+                let expired = existing
+                    .as_ref()
+                    .map(|lock| lock.expires_at <= now_ts)
+                    .unwrap_or(true);
+                if expired {
+                    match fs::remove_file(path) {
+                        Ok(()) => continue,
+                        Err(remove_error) if remove_error.kind() == ErrorKind::NotFound => continue,
+                        Err(remove_error) => {
+                            return Err(MacosError::Other(format!(
+                                "failed to clear stale Safari lock {}: {remove_error}",
+                                path.display()
+                            )));
+                        }
+                    }
+                }
+
+                let lock = existing.ok_or_else(|| {
+                    MacosError::Other(format!(
+                        "Safari automation lock {} is invalid and could not be replaced",
+                        path.display()
+                    ))
+                })?;
+                return Err(MacosError::Other(format!(
+                    "Safari automation is locked by pid {} until {}",
+                    lock.pid, lock.expires_at
+                )));
+            }
+            Err(error) => {
+                return Err(MacosError::Other(format!(
+                    "failed to create Safari lock {}: {error}",
+                    path.display()
+                )));
+            }
+        }
+    }
+
+    Err(MacosError::Other(format!(
+        "failed to acquire Safari lock {}",
+        path.display()
+    )))
+}
+
+fn release_safari_lock(path: &Path, pid: u32) -> Result<(), MacosError> {
+    let owner_matches = read_safari_lock(path)
+        .map(|lock| lock.pid == pid)
+        .unwrap_or(false);
+    if !owner_matches {
+        return Ok(());
+    }
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(MacosError::Other(format!(
+            "failed to remove Safari lock {}: {err}",
+            path.display()
+        ))),
+    }
+}
+
+fn read_safari_lock(path: &Path) -> Option<SafariLockFile> {
+    let raw = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
+fn throttle_safari_operation() -> Result<(), MacosError> {
+    let sleep_for = {
+        let state = safari_automation_state();
+        let guard = state
+            .lock()
+            .map_err(|_| MacosError::Other("safari automation state poisoned".to_string()))?;
+        guard
+            .last_operation_at
+            .and_then(|instant| SAFARI_OPERATION_DELAY.checked_sub(instant.elapsed()))
+    };
+
+    if let Some(duration) = sleep_for {
+        thread::sleep(duration);
+    }
+
+    let state = safari_automation_state();
+    let mut guard = state
+        .lock()
+        .map_err(|_| MacosError::Other("safari automation state poisoned".to_string()))?;
+    guard.last_operation_at = Some(Instant::now());
+    Ok(())
+}
+
+fn is_safari_rate_limited(text: &str) -> bool {
+    let normalized = text.to_ascii_lowercase();
+    normalized.contains("too many requests")
+        || normalized.contains("http 429")
+        || normalized.contains("429 too many requests")
+        || normalized.contains("rate limit")
+        || normalized.contains("rate-limited")
+        || normalized.contains("\"status\":429")
+}
+
+fn safari_rate_limit_backoff(attempt: usize) -> Duration {
+    Duration::from_secs(30 * (attempt as u64 + 1))
+}
+
+fn rate_limit_error(context: &str, detail: &str) -> MacosError {
+    MacosError::Other(format!(
+        "{context}: Safari automation hit rate limit: {detail}"
+    ))
+}
+
+fn run_capture(script: &str, context: &str) -> Result<String, MacosError> {
+    let mut last_detail = None;
+
+    for attempt in 0..=SAFARI_429_MAX_RETRIES {
+        throttle_safari_operation()?;
+        match run_applescript_capture(script, context) {
+            Ok(stdout) => {
+                if !is_safari_rate_limited(&stdout) {
+                    return Ok(stdout);
+                }
+                last_detail = Some(stdout.trim().to_string());
+            }
+            Err(err) => {
+                let detail = err.to_string();
+                if !is_safari_rate_limited(&detail) {
+                    return Err(err);
+                }
+                last_detail = Some(detail);
+            }
+        }
+
+        if attempt == SAFARI_429_MAX_RETRIES {
+            break;
+        }
+        thread::sleep(safari_rate_limit_backoff(attempt));
+    }
+
+    Err(rate_limit_error(
+        context,
+        last_detail
+            .as_deref()
+            .unwrap_or("unknown rate limit response"),
+    ))
+}
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct SafariTab {
@@ -608,23 +865,27 @@ fn build_chatgpt_go_home_js() -> String {
 }
 
 pub fn ensure_gemini_home(profile_filter: Option<&str>) -> Result<(), MacosError> {
-    let _ = execute_js_for_profile(
-        &build_gemini_go_home_js(),
-        profile_filter,
-        "safari_gemini_go_home",
-    )?;
-    thread::sleep(Duration::from_millis(2500));
-    Ok(())
+    with_safari_session(|| {
+        let _ = execute_js_for_profile(
+            &build_gemini_go_home_js(),
+            profile_filter,
+            "safari_gemini_go_home",
+        )?;
+        thread::sleep(Duration::from_millis(2500));
+        Ok(())
+    })
 }
 
 pub fn ensure_chatgpt_home(profile_filter: Option<&str>) -> Result<(), MacosError> {
-    let _ = execute_js_for_profile(
-        &build_chatgpt_go_home_js(),
-        profile_filter,
-        "safari_chatgpt_go_home",
-    )?;
-    thread::sleep(Duration::from_millis(2500));
-    Ok(())
+    with_safari_session(|| {
+        let _ = execute_js_for_profile(
+            &build_chatgpt_go_home_js(),
+            profile_filter,
+            "safari_chatgpt_go_home",
+        )?;
+        thread::sleep(Duration::from_millis(2500));
+        Ok(())
+    })
 }
 
 fn build_gemini_placeholder_read_js() -> String {
@@ -1043,7 +1304,8 @@ fn get_gemini_conversation_url(profile_filter: Option<&str>) -> Result<String, M
 pub fn gemini_list_conversations(
     profile_filter: Option<&str>,
 ) -> Result<Vec<SafariConversation>, MacosError> {
-    let js = r#"(() => {
+    with_safari_session(|| {
+        let js = r#"(() => {
         const items = document.querySelectorAll('a[href*="/app/"]');
         const convos = [];
         for (const a of items) {
@@ -1055,10 +1317,11 @@ pub fn gemini_list_conversations(
         }
         return JSON.stringify(convos);
     })()"#;
-    let raw = execute_js_for_profile(js, profile_filter, "safari_gemini_list_conversations")?;
-    let items: Vec<SafariConversation> = serde_json::from_str(&raw)
-        .map_err(|e| MacosError::Other(format!("failed to parse conversations: {e}")))?;
-    Ok(items)
+        let raw = execute_js_for_profile(js, profile_filter, "safari_gemini_list_conversations")?;
+        let items: Vec<SafariConversation> = serde_json::from_str(&raw)
+            .map_err(|e| MacosError::Other(format!("failed to parse conversations: {e}")))?;
+        Ok(items)
+    })
 }
 
 fn chatgpt_list_conversations_js() -> String {
@@ -1088,34 +1351,38 @@ fn chatgpt_list_conversations_js() -> String {
 pub fn chatgpt_list_conversations(
     profile_filter: Option<&str>,
 ) -> Result<Vec<SafariConversation>, MacosError> {
-    let js = chatgpt_list_conversations_js();
-    let deadline = Instant::now() + Duration::from_secs(10);
+    with_safari_session(|| {
+        let js = chatgpt_list_conversations_js();
+        let deadline = Instant::now() + Duration::from_secs(10);
 
-    while Instant::now() < deadline {
-        let raw = execute_js_for_profile(&js, profile_filter, "safari_chatgpt_list_conversations")?;
-        let items: Vec<SafariConversation> = serde_json::from_str(&raw)
-            .map_err(|e| MacosError::Other(format!("failed to parse conversations: {e}")))?;
-        if !items.is_empty() {
-            return Ok(items);
+        while Instant::now() < deadline {
+            let raw =
+                execute_js_for_profile(&js, profile_filter, "safari_chatgpt_list_conversations")?;
+            let items: Vec<SafariConversation> = serde_json::from_str(&raw)
+                .map_err(|e| MacosError::Other(format!("failed to parse conversations: {e}")))?;
+            if !items.is_empty() {
+                return Ok(items);
+            }
+            thread::sleep(Duration::from_millis(500));
         }
-        thread::sleep(Duration::from_millis(500));
-    }
 
-    Ok(Vec::new())
+        Ok(Vec::new())
+    })
 }
 
 pub fn gemini_read_conversation(
     url: &str,
     profile_filter: Option<&str>,
 ) -> Result<SafariAiResponseResult, MacosError> {
-    let nav_js = format!(
-        r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
-        url = escape_js_string(url),
-    );
-    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_read_navigate")?;
-    thread::sleep(Duration::from_millis(3000));
+    with_safari_session(|| {
+        let nav_js = format!(
+            r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
+            url = escape_js_string(url),
+        );
+        let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_read_navigate")?;
+        thread::sleep(Duration::from_millis(3000));
 
-    let read_js = r#"(() => {
+        let read_js = r#"(() => {
         const panels = document.querySelectorAll('.markdown.markdown-main-panel');
         let biggest = null;
         let maxLen = 0;
@@ -1126,19 +1393,20 @@ pub fn gemini_read_conversation(
         if (!biggest || maxLen === 0) return JSON.stringify({ status: "empty", response: "" });
         return JSON.stringify({ status: "complete", response: (biggest.innerText || "").trim() });
     })()"#;
-    let raw = execute_js_for_profile(read_js, profile_filter, "safari_gemini_read_content")?;
-    let value: serde_json::Value = serde_json::from_str(&raw)
-        .map_err(|e| MacosError::Other(format!("failed to parse read result: {e}")))?;
-    let status = value
-        .get("status")
-        .and_then(|v| v.as_str())
-        .unwrap_or("error");
-    let response = value.get("response").and_then(|v| v.as_str()).unwrap_or("");
-    Ok(SafariAiResponseResult {
-        provider: "gemini".to_string(),
-        status: status.to_string(),
-        response: response.to_string(),
-        conversation_url: None,
+        let raw = execute_js_for_profile(read_js, profile_filter, "safari_gemini_read_content")?;
+        let value: serde_json::Value = serde_json::from_str(&raw)
+            .map_err(|e| MacosError::Other(format!("failed to parse read result: {e}")))?;
+        let status = value
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("error");
+        let response = value.get("response").and_then(|v| v.as_str()).unwrap_or("");
+        Ok(SafariAiResponseResult {
+            provider: "gemini".to_string(),
+            status: status.to_string(),
+            response: response.to_string(),
+            conversation_url: None,
+        })
     })
 }
 
@@ -1147,39 +1415,41 @@ pub fn gemini_save_images(
     output_dir: &str,
     profile_filter: Option<&str>,
 ) -> Result<Vec<String>, MacosError> {
-    let nav_js = format!(
-        r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
-        url = escape_js_string(conversation_url),
-    );
-    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_save_img_navigate")?;
-    thread::sleep(Duration::from_millis(5000));
+    with_safari_session(|| {
+        let nav_js = format!(
+            r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
+            url = escape_js_string(conversation_url),
+        );
+        let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_save_img_navigate")?;
+        thread::sleep(Duration::from_millis(5000));
 
-    let count_js = r#"(() => {
+        let count_js = r#"(() => {
         const imgs = document.querySelectorAll('img[alt*="AI"], img[alt*="生成"]');
         return String(imgs.length);
     })()"#;
-    let count: usize = execute_js_for_profile(count_js, profile_filter, "safari_gemini_img_count")?
-        .trim()
-        .parse()
-        .unwrap_or(0);
+        let count: usize =
+            execute_js_for_profile(count_js, profile_filter, "safari_gemini_img_count")?
+                .trim()
+                .parse()
+                .unwrap_or(0);
 
-    if count == 0 {
-        return Ok(Vec::new());
-    }
+        if count == 0 {
+            return Ok(Vec::new());
+        }
 
-    let out_path = std::path::Path::new(output_dir);
-    if !out_path.exists() {
-        std::fs::create_dir_all(out_path)
-            .map_err(|e| MacosError::Other(format!("failed to create output dir: {e}")))?;
-    }
+        let out_path = std::path::Path::new(output_dir);
+        if !out_path.exists() {
+            std::fs::create_dir_all(out_path)
+                .map_err(|e| MacosError::Other(format!("failed to create output dir: {e}")))?;
+        }
 
-    use base64::Engine;
-    let engine = base64::engine::general_purpose::STANDARD;
-    let mut saved = Vec::new();
+        use base64::Engine;
+        let engine = base64::engine::general_purpose::STANDARD;
+        let mut saved = Vec::new();
 
-    for i in 0..count {
-        let extract_js = format!(
-            r#"(() => {{
+        for i in 0..count {
+            let extract_js = format!(
+                r#"(() => {{
                 const imgs = document.querySelectorAll('img[alt*="AI"], img[alt*="生成"]');
                 const img = imgs[{i}];
                 if (!img) return "";
@@ -1191,40 +1461,43 @@ pub fn gemini_save_images(
                 const idx = dataUrl.indexOf(",");
                 return idx >= 0 ? dataUrl.substring(idx + 1) : "";
             }})()"#,
-        );
-        let b64 = execute_js_for_profile(&extract_js, profile_filter, "safari_gemini_img_extract")?;
-        let b64 = b64.trim();
-        if b64.is_empty() {
-            continue;
+            );
+            let b64 =
+                execute_js_for_profile(&extract_js, profile_filter, "safari_gemini_img_extract")?;
+            let b64 = b64.trim();
+            if b64.is_empty() {
+                continue;
+            }
+
+            let bytes = engine.decode(b64).map_err(|e| {
+                MacosError::Other(format!("base64 decode failed for image {i}: {e}"))
+            })?;
+
+            let filename = format!("gemini_image_{i}.png");
+            let filepath = out_path.join(&filename);
+            std::fs::write(&filepath, &bytes).map_err(|e| {
+                MacosError::Other(format!("failed to write {}: {e}", filepath.display()))
+            })?;
+            saved.push(filepath.to_string_lossy().into_owned());
         }
 
-        let bytes = engine
-            .decode(b64)
-            .map_err(|e| MacosError::Other(format!("base64 decode failed for image {i}: {e}")))?;
-
-        let filename = format!("gemini_image_{i}.png");
-        let filepath = out_path.join(&filename);
-        std::fs::write(&filepath, &bytes).map_err(|e| {
-            MacosError::Other(format!("failed to write {}: {e}", filepath.display()))
-        })?;
-        saved.push(filepath.to_string_lossy().into_owned());
-    }
-
-    Ok(saved)
+        Ok(saved)
+    })
 }
 
 pub fn gemini_save_media(
     conversation_url: &str,
     profile_filter: Option<&str>,
 ) -> Result<SafariAiResponseResult, MacosError> {
-    let nav_js = format!(
-        r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
-        url = escape_js_string(conversation_url),
-    );
-    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_media_navigate")?;
-    thread::sleep(Duration::from_millis(5000));
+    with_safari_session(|| {
+        let nav_js = format!(
+            r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
+            url = escape_js_string(conversation_url),
+        );
+        let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_media_navigate")?;
+        thread::sleep(Duration::from_millis(5000));
 
-    let js = r#"(() => {
+        let js = r#"(() => {
         const video = document.querySelector("video");
         if (!video) return JSON.stringify({ status: "error", response: "no media found" });
         const src = video.src || video.currentSrc || "";
@@ -1237,29 +1510,30 @@ pub fn gemini_save_media(
         document.body.removeChild(a);
         return JSON.stringify({ status: "downloading", response: src });
     })()"#;
-    let raw = execute_js_for_profile(js, profile_filter, "safari_gemini_media_download")?;
-    let value: serde_json::Value = serde_json::from_str(&raw)
-        .map_err(|e| MacosError::Other(format!("failed to parse media result: {e}")))?;
-    let status = value
-        .get("status")
-        .and_then(|v| v.as_str())
-        .unwrap_or("error");
-    let response = value.get("response").and_then(|v| v.as_str()).unwrap_or("");
-    Ok(SafariAiResponseResult {
-        provider: "gemini".to_string(),
-        status: status.to_string(),
-        response: response.to_string(),
-        conversation_url: None,
+        let raw = execute_js_for_profile(js, profile_filter, "safari_gemini_media_download")?;
+        let value: serde_json::Value = serde_json::from_str(&raw)
+            .map_err(|e| MacosError::Other(format!("failed to parse media result: {e}")))?;
+        let status = value
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("error");
+        let response = value.get("response").and_then(|v| v.as_str()).unwrap_or("");
+        Ok(SafariAiResponseResult {
+            provider: "gemini".to_string(),
+            status: status.to_string(),
+            response: response.to_string(),
+            conversation_url: None,
+        })
     })
 }
 
 pub fn threads_extract_feed(
     profile_filter: Option<&str>,
 ) -> Result<Vec<SocialFeedPost>, MacosError> {
-    // Auto-focus to Threads tab
-    let _ = focus_tab("threads.com", profile_filter);
+    with_safari_session(|| {
+        let _ = focus_tab("threads.com", profile_filter);
 
-    let js = r#"(() => {
+        let js = r#"(() => {
         const authorLinks = [...document.querySelectorAll('a[href^="/@"]')];
         const seen = new Set();
         const posts = [];
@@ -1294,17 +1568,18 @@ pub fn threads_extract_feed(
         }
         return JSON.stringify(posts);
     })()"#;
-    let raw = execute_js_for_profile(js, profile_filter, "safari_threads_feed")?;
-    let posts: Vec<SocialFeedPost> = serde_json::from_str(&raw)
-        .map_err(|e| MacosError::Other(format!("failed to parse threads feed: {e}")))?;
-    Ok(posts)
+        let raw = execute_js_for_profile(js, profile_filter, "safari_threads_feed")?;
+        let posts: Vec<SocialFeedPost> = serde_json::from_str(&raw)
+            .map_err(|e| MacosError::Other(format!("failed to parse threads feed: {e}")))?;
+        Ok(posts)
+    })
 }
 
 pub fn x_extract_feed(profile_filter: Option<&str>) -> Result<Vec<SocialFeedPost>, MacosError> {
-    // Auto-focus to X tab
-    let _ = focus_tab("x.com", profile_filter);
+    with_safari_session(|| {
+        let _ = focus_tab("x.com", profile_filter);
 
-    let js = r#"(() => {
+        let js = r#"(() => {
         const tweets = document.querySelectorAll('article[data-testid="tweet"]');
         const posts = [];
         const seen = new Set();
@@ -1339,10 +1614,11 @@ pub fn x_extract_feed(profile_filter: Option<&str>) -> Result<Vec<SocialFeedPost
         }
         return JSON.stringify(posts);
     })()"#;
-    let raw = execute_js_for_profile(js, profile_filter, "safari_x_feed")?;
-    let posts: Vec<SocialFeedPost> = serde_json::from_str(&raw)
-        .map_err(|e| MacosError::Other(format!("failed to parse x feed: {e}")))?;
-    Ok(posts)
+        let raw = execute_js_for_profile(js, profile_filter, "safari_x_feed")?;
+        let posts: Vec<SocialFeedPost> = serde_json::from_str(&raw)
+            .map_err(|e| MacosError::Other(format!("failed to parse x feed: {e}")))?;
+        Ok(posts)
+    })
 }
 
 pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
@@ -1400,28 +1676,34 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
 }
 
 pub fn tabs(profile_filter: Option<&str>) -> Result<Vec<SafariTab>, MacosError> {
-    let stdout = run_capture(&build_tabs_script(), "safari_tabs")?;
-    let mut tabs = parse_tabs_output(&stdout);
-    if let Some(profile) = profile_filter {
-        tabs.retain(|tab| tab.profile.as_deref() == Some(profile));
-    }
-    Ok(tabs)
+    with_safari_session(|| {
+        let stdout = run_capture(&build_tabs_script(), "safari_tabs")?;
+        let mut tabs = parse_tabs_output(&stdout);
+        if let Some(profile) = profile_filter {
+            tabs.retain(|tab| tab.profile.as_deref() == Some(profile));
+        }
+        Ok(tabs)
+    })
 }
 
 pub fn active(profile_filter: Option<&str>) -> Result<Option<SafariTab>, MacosError> {
-    let stdout = run_capture(&build_active_tab_script(profile_filter), "safari_active")?;
-    Ok(parse_tab_line(stdout.trim()).map(|mut tab| {
-        tab.profile = extract_profile(&tab.window_name, &tab.title);
-        tab
-    }))
+    with_safari_session(|| {
+        let stdout = run_capture(&build_active_tab_script(profile_filter), "safari_active")?;
+        Ok(parse_tab_line(stdout.trim()).map(|mut tab| {
+            tab.profile = extract_profile(&tab.window_name, &tab.title);
+            tab
+        }))
+    })
 }
 
 pub fn open(url: &str, profile_filter: Option<&str>) -> Result<Option<SafariTab>, MacosError> {
-    let stdout = run_capture(&build_open_script(url, profile_filter), "safari_open")?;
-    Ok(parse_tab_line(stdout.trim()).map(|mut tab| {
-        tab.profile = extract_profile(&tab.window_name, &tab.title);
-        tab
-    }))
+    with_safari_session(|| {
+        let stdout = run_capture(&build_open_script(url, profile_filter), "safari_open")?;
+        Ok(parse_tab_line(stdout.trim()).map(|mut tab| {
+            tab.profile = extract_profile(&tab.window_name, &tab.title);
+            tab
+        }))
+    })
 }
 
 /// Focus a specific tab by index or by matching URL/title substring.
@@ -1430,28 +1712,29 @@ pub fn focus_tab(
     tab_selector: &str,
     profile_filter: Option<&str>,
 ) -> Result<SafariTab, MacosError> {
-    let all_tabs = tabs(profile_filter)?;
-    if all_tabs.is_empty() {
-        return Err(MacosError::Other("no Safari tabs found".to_string()));
-    }
+    with_safari_session(|| {
+        let all_tabs = tabs(profile_filter)?;
+        if all_tabs.is_empty() {
+            return Err(MacosError::Other("no Safari tabs found".to_string()));
+        }
 
-    // Try parsing as index first (position in the flat tab list)
-    let matched = if let Ok(index) = tab_selector.parse::<usize>() {
-        all_tabs.into_iter().nth(index)
-    } else {
-        // Match by URL or title substring
-        let query = tab_selector.to_lowercase();
-        all_tabs.into_iter().find(|t| {
-            t.url.to_lowercase().contains(&query) || t.title.to_lowercase().contains(&query)
-        })
-    };
+        // Try parsing as index first (position in the flat tab list)
+        let matched = if let Ok(index) = tab_selector.parse::<usize>() {
+            all_tabs.into_iter().nth(index)
+        } else {
+            // Match by URL or title substring
+            let query = tab_selector.to_lowercase();
+            all_tabs.into_iter().find(|t| {
+                t.url.to_lowercase().contains(&query) || t.title.to_lowercase().contains(&query)
+            })
+        };
 
-    let tab =
-        matched.ok_or_else(|| MacosError::Other(format!("no tab matching '{tab_selector}'")))?;
+        let tab = matched
+            .ok_or_else(|| MacosError::Other(format!("no tab matching '{tab_selector}'")))?;
 
-    // Set as current tab
-    let script = format!(
-        r#"
+        // Set as current tab
+        let script = format!(
+            r#"
         tell application "Safari"
             repeat with w in every window
                 if (id of w) is {window_id} then
@@ -1463,25 +1746,28 @@ pub fn focus_tab(
             return "false"
         end tell
         "#,
-        window_id = tab.window_id,
-        one_based = tab.index + 1,
-    );
-    let result = run_capture(&script, "safari_focus_tab")?;
-    if result.trim() != "true" {
-        return Err(MacosError::Other(format!(
-            "failed to focus tab '{}'",
-            tab_selector
-        )));
-    }
+            window_id = tab.window_id,
+            one_based = tab.index + 1,
+        );
+        let result = run_capture(&script, "safari_focus_tab")?;
+        if result.trim() != "true" {
+            return Err(MacosError::Other(format!(
+                "failed to focus tab '{}'",
+                tab_selector
+            )));
+        }
 
-    Ok(tab)
+        Ok(tab)
+    })
 }
 
 pub fn close(index: Option<usize>) -> Result<SafariCloseResult, MacosError> {
-    let stdout = run_capture(&build_close_script(index), "safari_close")?;
-    Ok(SafariCloseResult {
-        closed: stdout.trim() == "true",
-        index,
+    with_safari_session(|| {
+        let stdout = run_capture(&build_close_script(index), "safari_close")?;
+        Ok(SafariCloseResult {
+            closed: stdout.trim() == "true",
+            index,
+        })
     })
 }
 
@@ -1489,20 +1775,21 @@ pub fn close_tabs(
     profile_filter: Option<&str>,
     url_pattern: Option<&str>,
 ) -> Result<usize, MacosError> {
-    let all_tabs = tabs(profile_filter)?;
-    let to_close: Vec<&SafariTab> = all_tabs
-        .iter()
-        .filter(|tab| match url_pattern {
-            Some(pattern) => tab.url.contains(pattern),
-            None => true,
-        })
-        .collect();
+    with_safari_session(|| {
+        let all_tabs = tabs(profile_filter)?;
+        let to_close: Vec<&SafariTab> = all_tabs
+            .iter()
+            .filter(|tab| match url_pattern {
+                Some(pattern) => tab.url.contains(pattern),
+                None => true,
+            })
+            .collect();
 
-    // Close from last to first to avoid index shifting
-    let mut closed = 0;
-    for tab in to_close.iter().rev() {
-        let script = format!(
-            r#"
+        // Close from last to first to avoid index shifting
+        let mut closed = 0;
+        for tab in to_close.iter().rev() {
+            let script = format!(
+                r#"
             tell application "Safari"
                 repeat with w in every window
                     if (id of w) is {window_id} then
@@ -1515,38 +1802,43 @@ pub fn close_tabs(
                 end repeat
             end tell
             "#,
-            window_id = tab.window_id,
-            tab_index = tab.index,
-        );
-        if run_capture(&script, "safari_close_tab").is_ok() {
-            closed += 1;
+                window_id = tab.window_id,
+                tab_index = tab.index,
+            );
+            if run_capture(&script, "safari_close_tab").is_ok() {
+                closed += 1;
+            }
         }
-    }
 
-    Ok(closed)
+        Ok(closed)
+    })
 }
 
 pub fn source(profile_filter: Option<&str>) -> Result<SafariSourceResult, MacosError> {
-    let result = execute_js_for_profile(
-        "document.documentElement.outerHTML",
-        profile_filter,
-        "safari_source",
-    )?;
-    Ok(SafariSourceResult { html: result })
+    with_safari_session(|| {
+        let result = execute_js_for_profile(
+            "document.documentElement.outerHTML",
+            profile_filter,
+            "safari_source",
+        )?;
+        Ok(SafariSourceResult { html: result })
+    })
 }
 
 pub fn read(
     selector: Option<&str>,
     profile_filter: Option<&str>,
 ) -> Result<SafariReadResult, MacosError> {
-    let js = match selector {
-        Some(selector) => selector_text_js(selector),
-        None => "(document.body.innerText ?? \"\").trim()".to_string(),
-    };
-    let content = execute_js_for_profile(&js, profile_filter, "safari_read")?;
-    Ok(SafariReadResult {
-        selector: selector.map(ToOwned::to_owned),
-        content,
+    with_safari_session(|| {
+        let js = match selector {
+            Some(selector) => selector_text_js(selector),
+            None => "(document.body.innerText ?? \"\").trim()".to_string(),
+        };
+        let content = execute_js_for_profile(&js, profile_filter, "safari_read")?;
+        Ok(SafariReadResult {
+            selector: selector.map(ToOwned::to_owned),
+            content,
+        })
     })
 }
 
@@ -1613,57 +1905,65 @@ fn scroll_read_detects_new_content(
 }
 
 pub fn exec(js_code: &str, profile_filter: Option<&str>) -> Result<SafariEvalResult, MacosError> {
-    let result = execute_js_for_profile(js_code, profile_filter, "safari_exec")?;
-    Ok(SafariEvalResult { result })
+    with_safari_session(|| {
+        let result = execute_js_for_profile(js_code, profile_filter, "safari_exec")?;
+        Ok(SafariEvalResult { result })
+    })
 }
 
 pub fn click(selector: &str) -> Result<SafariClickResult, MacosError> {
-    let result = execute_js(&selector_click_js(selector), "safari_click")?;
-    if result.trim() != "true" {
-        return Err(MacosError::Other(result));
-    }
-    Ok(SafariClickResult {
-        clicked: true,
-        selector: selector.to_string(),
+    with_safari_session(|| {
+        let result = execute_js(&selector_click_js(selector), "safari_click")?;
+        if result.trim() != "true" {
+            return Err(MacosError::Other(result));
+        }
+        Ok(SafariClickResult {
+            clicked: true,
+            selector: selector.to_string(),
+        })
     })
 }
 
 pub fn fill(selector: &str, text: &str) -> Result<SafariFillResult, MacosError> {
-    let result = execute_js(&selector_fill_js(selector, text), "safari_fill")?;
-    if result.trim() != "true" {
-        return Err(MacosError::Other(result));
-    }
-    Ok(SafariFillResult {
-        filled: true,
-        selector: selector.to_string(),
-        text: text.to_string(),
+    with_safari_session(|| {
+        let result = execute_js(&selector_fill_js(selector, text), "safari_fill")?;
+        if result.trim() != "true" {
+            return Err(MacosError::Other(result));
+        }
+        Ok(SafariFillResult {
+            filled: true,
+            selector: selector.to_string(),
+            text: text.to_string(),
+        })
     })
 }
 
 pub fn wait(selector: &str, timeout_seconds: u64) -> Result<SafariWaitResult, MacosError> {
-    let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
-    let js = selector_exists_js(selector);
-    loop {
-        let exists = execute_js(&js, "safari_wait")?;
-        if exists.is_empty() {
-            return Err(MacosError::Other(
-                "no Safari window or active tab available".to_string(),
-            ));
+    with_safari_session(|| {
+        let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
+        let js = selector_exists_js(selector);
+        loop {
+            let exists = execute_js(&js, "safari_wait")?;
+            if exists.is_empty() {
+                return Err(MacosError::Other(
+                    "no Safari window or active tab available".to_string(),
+                ));
+            }
+            if exists.trim() == "true" {
+                return Ok(SafariWaitResult {
+                    found: true,
+                    selector: selector.to_string(),
+                    timeout_seconds,
+                });
+            }
+            if Instant::now() >= deadline {
+                return Err(MacosError::Other(format!(
+                    "timeout waiting for selector: {selector}"
+                )));
+            }
+            thread::sleep(Duration::from_millis(250));
         }
-        if exists.trim() == "true" {
-            return Ok(SafariWaitResult {
-                found: true,
-                selector: selector.to_string(),
-                timeout_seconds,
-            });
-        }
-        if Instant::now() >= deadline {
-            return Err(MacosError::Other(format!(
-                "timeout waiting for selector: {selector}"
-            )));
-        }
-        thread::sleep(Duration::from_millis(250));
-    }
+    })
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -1685,29 +1985,28 @@ pub fn scroll(
     amount: Option<i64>,
     profile_filter: Option<&str>,
 ) -> Result<SafariScrollResult, MacosError> {
-    let pixels = amount.unwrap_or(500).unsigned_abs();
-    let js = match direction {
-        "down" => format!("(function(){{ window.scrollBy(0, {pixels}); return JSON.stringify({{ x: Math.round(window.scrollX), y: Math.round(window.scrollY) }}); }})()"),
-        "up" => format!("(function(){{ window.scrollBy(0, -{pixels}); return JSON.stringify({{ x: Math.round(window.scrollX), y: Math.round(window.scrollY) }}); }})()"),
-        "top" => "(function(){ window.scrollTo(0, 0); return JSON.stringify({ x: 0, y: 0 }); })()".to_string(),
-        "bottom" => "(function(){ window.scrollTo(0, document.body.scrollHeight); return JSON.stringify({ x: Math.round(window.scrollX), y: Math.round(window.scrollY) }); })()".to_string(),
-        _ => return Err(MacosError::Other(format!("unknown scroll direction: {direction}. Use: up, down, top, bottom"))),
-    };
-    let raw = execute_js_for_profile(&js, profile_filter, "safari_scroll")?;
-    let value: serde_json::Value = serde_json::from_str(&raw)
-        .map_err(|e| MacosError::Other(format!("failed to parse scroll result: {e}")))?;
-    Ok(SafariScrollResult {
-        scroll_x: value.get("x").and_then(|v| v.as_i64()).unwrap_or(0),
-        scroll_y: value.get("y").and_then(|v| v.as_i64()).unwrap_or(0),
+    with_safari_session(|| {
+        let pixels = amount.unwrap_or(500).unsigned_abs();
+        let js = match direction {
+            "down" => format!("(function(){{ window.scrollBy(0, {pixels}); return JSON.stringify({{ x: Math.round(window.scrollX), y: Math.round(window.scrollY) }}); }})()"),
+            "up" => format!("(function(){{ window.scrollBy(0, -{pixels}); return JSON.stringify({{ x: Math.round(window.scrollX), y: Math.round(window.scrollY) }}); }})()"),
+            "top" => "(function(){ window.scrollTo(0, 0); return JSON.stringify({ x: 0, y: 0 }); })()".to_string(),
+            "bottom" => "(function(){ window.scrollTo(0, document.body.scrollHeight); return JSON.stringify({ x: Math.round(window.scrollX), y: Math.round(window.scrollY) }); })()".to_string(),
+            _ => return Err(MacosError::Other(format!("unknown scroll direction: {direction}. Use: up, down, top, bottom"))),
+        };
+        let raw = execute_js_for_profile(&js, profile_filter, "safari_scroll")?;
+        let value: serde_json::Value = serde_json::from_str(&raw)
+            .map_err(|e| MacosError::Other(format!("failed to parse scroll result: {e}")))?;
+        Ok(SafariScrollResult {
+            scroll_x: value.get("x").and_then(|v| v.as_i64()).unwrap_or(0),
+            scroll_y: value.get("y").and_then(|v| v.as_i64()).unwrap_or(0),
+        })
     })
 }
 
 fn scroll_read_poll_js(selector: Option<&str>) -> String {
     let scope_expr = match selector {
-        Some(selector) => format!(
-            "document.querySelector(\"{}\")",
-            escape_js_string(selector)
-        ),
+        Some(selector) => format!("document.querySelector(\"{}\")", escape_js_string(selector)),
         None => "document.body".to_string(),
     };
     format!(
@@ -1766,8 +2065,9 @@ fn scroll_read_poll_js(selector: Option<&str>) -> String {
 }
 
 fn parse_scroll_read_snapshot(payload: &str) -> Result<SafariScrollReadSnapshot, MacosError> {
-    serde_json::from_str(payload)
-        .map_err(|error| MacosError::Other(format!("invalid scroll/read payload: {error}: {payload}")))
+    serde_json::from_str(payload).map_err(|error| {
+        MacosError::Other(format!("invalid scroll/read payload: {error}: {payload}"))
+    })
 }
 
 fn poll_scroll_read_snapshot(
@@ -1803,35 +2103,37 @@ pub fn scroll_and_read(
     selector: Option<&str>,
     profile_filter: Option<&str>,
 ) -> Result<SafariScrollReadResult, MacosError> {
-    let js = scroll_read_poll_js(selector);
-    let payload = execute_js_for_profile(&js, profile_filter, "safari_scroll_read_initial")?;
-    let mut snapshot = parse_scroll_read_snapshot(&payload)?;
-    let mut seen = scroll_read_snapshot_blocks(&snapshot, &[]);
-    let mut chunks = Vec::new();
+    with_safari_session(|| {
+        let js = scroll_read_poll_js(selector);
+        let payload = execute_js_for_profile(&js, profile_filter, "safari_scroll_read_initial")?;
+        let mut snapshot = parse_scroll_read_snapshot(&payload)?;
+        let mut seen = scroll_read_snapshot_blocks(&snapshot, &[]);
+        let mut chunks = Vec::new();
 
-    for iteration in 1..=times {
-        scroll("down", amount, profile_filter)?;
-        snapshot = poll_scroll_read_snapshot(
-            selector,
-            &snapshot,
-            profile_filter,
-            Duration::from_secs(5),
-        )?;
-        let new_blocks = scroll_read_snapshot_blocks(&snapshot, &seen);
-        if new_blocks.is_empty() {
-            continue;
+        for iteration in 1..=times {
+            scroll("down", amount, profile_filter)?;
+            snapshot = poll_scroll_read_snapshot(
+                selector,
+                &snapshot,
+                profile_filter,
+                Duration::from_secs(5),
+            )?;
+            let new_blocks = scroll_read_snapshot_blocks(&snapshot, &seen);
+            if new_blocks.is_empty() {
+                continue;
+            }
+            seen.extend(new_blocks.iter().cloned());
+            chunks.push(SafariScrollReadChunk {
+                iteration,
+                content: new_blocks.join("\n\n"),
+            });
         }
-        seen.extend(new_blocks.iter().cloned());
-        chunks.push(SafariScrollReadChunk {
-            iteration,
-            content: new_blocks.join("\n\n"),
-        });
-    }
 
-    Ok(SafariScrollReadResult {
-        selector: selector.map(ToOwned::to_owned),
-        times,
-        chunks,
+        Ok(SafariScrollReadResult {
+            selector: selector.map(ToOwned::to_owned),
+            times,
+            chunks,
+        })
     })
 }
 
@@ -1876,29 +2178,32 @@ pub fn prepare_gemini_mode(
     mode: GeminiMode,
     profile_filter: Option<&str>,
 ) -> Result<SafariAiReadyResult, MacosError> {
-    let url = gemini_mode_url(mode);
-    let nav_js = format!(r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,);
-    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_mode_navigate")?;
-    thread::sleep(Duration::from_millis(2500));
+    with_safari_session(|| {
+        let url = gemini_mode_url(mode);
+        let nav_js =
+            format!(r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,);
+        let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_mode_navigate")?;
+        thread::sleep(Duration::from_millis(2500));
 
-    let placeholder = execute_js_for_profile(
-        &build_gemini_placeholder_read_js(),
-        profile_filter,
-        "safari_gemini_mode_placeholder",
-    )?;
-    if !gemini_mode_placeholders(mode)
-        .iter()
-        .any(|value| placeholder.contains(value))
-    {
-        return Err(MacosError::Other(format!(
-            "unexpected Gemini placeholder after URL navigation to {url}: {placeholder}"
-        )));
-    }
+        let placeholder = execute_js_for_profile(
+            &build_gemini_placeholder_read_js(),
+            profile_filter,
+            "safari_gemini_mode_placeholder",
+        )?;
+        if !gemini_mode_placeholders(mode)
+            .iter()
+            .any(|value| placeholder.contains(value))
+        {
+            return Err(MacosError::Other(format!(
+                "unexpected Gemini placeholder after URL navigation to {url}: {placeholder}"
+            )));
+        }
 
-    Ok(SafariAiReadyResult {
-        provider: "gemini".to_string(),
-        mode: gemini_mode_slug(mode).to_string(),
-        status: "ready".to_string(),
+        Ok(SafariAiReadyResult {
+            provider: "gemini".to_string(),
+            mode: gemini_mode_slug(mode).to_string(),
+            status: "ready".to_string(),
+        })
     })
 }
 
@@ -1907,84 +2212,86 @@ pub fn start_gemini_deep_research(
     auto_confirm: bool,
     profile_filter: Option<&str>,
 ) -> Result<SafariDeepResearchResult, MacosError> {
-    prepare_gemini_mode(GeminiMode::DeepResearch, profile_filter)?;
+    with_safari_session(|| {
+        prepare_gemini_mode(GeminiMode::DeepResearch, profile_filter)?;
 
-    let filled = execute_js_for_profile(
-        &build_gemini_fill_input_js(prompt),
-        profile_filter,
-        "safari_gemini_deep_research_fill",
-    )?;
-    if filled.trim() != "true" {
-        return Err(MacosError::Other(format!(
-            "failed to fill deep research input: {filled}"
-        )));
-    }
-
-    wait_and_click_send(profile_filter)?;
-
-    // Capture conversation URL after submission
-    thread::sleep(Duration::from_millis(1000));
-    let conv_url = get_gemini_conversation_url(profile_filter).ok();
-
-    let mut result = poll_gemini_deep_research(30, profile_filter)?;
-    result.conversation_url = conv_url.clone();
-    if result.plan.is_none() {
-        result.plan = Some(prompt.to_string());
-    }
-
-    if auto_confirm && result.status == "plan_ready" {
         let filled = execute_js_for_profile(
-            &build_gemini_fill_input_js("ok"),
+            &build_gemini_fill_input_js(prompt),
             profile_filter,
-            "safari_gemini_deep_research_confirm_fill",
+            "safari_gemini_deep_research_fill",
         )?;
         if filled.trim() != "true" {
-            return Err(MacosError::Other("failed to fill confirm text".to_string()));
+            return Err(MacosError::Other(format!(
+                "failed to fill deep research input: {filled}"
+            )));
         }
+
         wait_and_click_send(profile_filter)?;
-        // Wait for page to transition from plan_ready to running state
-        thread::sleep(Duration::from_secs(3));
-        let mut final_result = poll_gemini_deep_research(900, profile_filter)?;
-        final_result.conversation_url = conv_url;
-        Ok(final_result)
-    } else {
-        Ok(result)
-    }
+
+        thread::sleep(Duration::from_millis(1000));
+        let conv_url = get_gemini_conversation_url(profile_filter).ok();
+
+        let mut result = poll_gemini_deep_research(30, profile_filter)?;
+        result.conversation_url = conv_url.clone();
+        if result.plan.is_none() {
+            result.plan = Some(prompt.to_string());
+        }
+
+        if auto_confirm && result.status == "plan_ready" {
+            let filled = execute_js_for_profile(
+                &build_gemini_fill_input_js("ok"),
+                profile_filter,
+                "safari_gemini_deep_research_confirm_fill",
+            )?;
+            if filled.trim() != "true" {
+                return Err(MacosError::Other("failed to fill confirm text".to_string()));
+            }
+            wait_and_click_send(profile_filter)?;
+            thread::sleep(Duration::from_secs(3));
+            let mut final_result = poll_gemini_deep_research(900, profile_filter)?;
+            final_result.conversation_url = conv_url;
+            Ok(final_result)
+        } else {
+            Ok(result)
+        }
+    })
 }
 
 pub fn poll_gemini_deep_research(
     timeout_seconds: u64,
     profile_filter: Option<&str>,
 ) -> Result<SafariDeepResearchResult, MacosError> {
-    let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
-    let js = gemini_deep_research_poll_js();
+    with_safari_session(|| {
+        let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
+        let js = gemini_deep_research_poll_js();
 
-    while Instant::now() < deadline {
-        let payload =
-            execute_js_for_profile(&js, profile_filter, "safari_gemini_deep_research_poll")?;
-        let result = parse_deep_research_payload(&payload)?;
-        match result.status.as_str() {
-            "plan_ready" | "complete" => return Ok(result),
-            "running" => {}
-            _ => {
-                return Err(MacosError::Other(format!(
-                    "unknown deep research status: {}",
-                    result.status
-                )));
+        while Instant::now() < deadline {
+            let payload =
+                execute_js_for_profile(&js, profile_filter, "safari_gemini_deep_research_poll")?;
+            let result = parse_deep_research_payload(&payload)?;
+            match result.status.as_str() {
+                "plan_ready" | "complete" => return Ok(result),
+                "running" => {}
+                _ => {
+                    return Err(MacosError::Other(format!(
+                        "unknown deep research status: {}",
+                        result.status
+                    )));
+                }
             }
+
+            thread::sleep(Duration::from_secs(1));
         }
 
-        thread::sleep(Duration::from_secs(1));
-    }
-
-    Ok(SafariDeepResearchResult {
-        provider: "gemini".to_string(),
-        mode: "deep-research".to_string(),
-        status: "timeout".to_string(),
-        conversation_url: None,
-        plan: None,
-        response: None,
-        actions: Vec::new(),
+        Ok(SafariDeepResearchResult {
+            provider: "gemini".to_string(),
+            mode: "deep-research".to_string(),
+            status: "timeout".to_string(),
+            conversation_url: None,
+            plan: None,
+            response: None,
+            actions: Vec::new(),
+        })
     })
 }
 
@@ -1992,134 +2299,139 @@ pub fn send_gemini_prompt(
     prompt: &str,
     profile_filter: Option<&str>,
 ) -> Result<SafariAiResponseResult, MacosError> {
-    let filled = execute_js_for_profile(
-        &build_gemini_fill_input_js(prompt),
-        profile_filter,
-        "safari_gemini_prompt_fill",
-    )?;
-    if filled.trim() != "true" {
-        return Err(MacosError::Other(format!(
-            "failed to fill Gemini input: {filled}"
-        )));
-    }
-
-    wait_and_click_send(profile_filter)?;
-
-    let mut last_text = String::new();
-    let mut stable_count = 0;
-    let deadline = Instant::now() + Duration::from_secs(60);
-    let response_js = gemini_response_extract_js();
-
-    while Instant::now() < deadline {
-        thread::sleep(Duration::from_secs(1));
-        let text = execute_js_for_profile(&response_js, profile_filter, "safari_gemini_response")?;
-        let trimmed = text.trim();
-        if should_skip_gemini_response(trimmed, prompt) {
-            continue;
+    with_safari_session(|| {
+        let filled = execute_js_for_profile(
+            &build_gemini_fill_input_js(prompt),
+            profile_filter,
+            "safari_gemini_prompt_fill",
+        )?;
+        if filled.trim() != "true" {
+            return Err(MacosError::Other(format!(
+                "failed to fill Gemini input: {filled}"
+            )));
         }
 
-        if trimmed == last_text {
-            stable_count += 1;
-            if stable_count >= 2 {
-                return Ok(SafariAiResponseResult {
-                    provider: "gemini".to_string(),
-                    status: "complete".to_string(),
-                    response: trimmed.to_string(),
-                    conversation_url: None,
-                });
+        wait_and_click_send(profile_filter)?;
+
+        let mut last_text = String::new();
+        let mut stable_count = 0;
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let response_js = gemini_response_extract_js();
+
+        while Instant::now() < deadline {
+            thread::sleep(Duration::from_secs(1));
+            let text =
+                execute_js_for_profile(&response_js, profile_filter, "safari_gemini_response")?;
+            let trimmed = text.trim();
+            if should_skip_gemini_response(trimmed, prompt) {
+                continue;
             }
-        } else {
-            last_text = trimmed.to_string();
-            stable_count = 0;
+
+            if trimmed == last_text {
+                stable_count += 1;
+                if stable_count >= 2 {
+                    return Ok(SafariAiResponseResult {
+                        provider: "gemini".to_string(),
+                        status: "complete".to_string(),
+                        response: trimmed.to_string(),
+                        conversation_url: None,
+                    });
+                }
+            } else {
+                last_text = trimmed.to_string();
+                stable_count = 0;
+            }
         }
-    }
 
-    if !last_text.is_empty() {
-        return Ok(SafariAiResponseResult {
-            provider: "gemini".to_string(),
-            status: "timeout".to_string(),
-            response: last_text,
-            conversation_url: None,
-        });
-    }
+        if !last_text.is_empty() {
+            return Ok(SafariAiResponseResult {
+                provider: "gemini".to_string(),
+                status: "timeout".to_string(),
+                response: last_text,
+                conversation_url: None,
+            });
+        }
 
-    Err(MacosError::Other(
-        "timeout waiting for Gemini response".to_string(),
-    ))
+        Err(MacosError::Other(
+            "timeout waiting for Gemini response".to_string(),
+        ))
+    })
 }
 
 pub fn send_chatgpt_prompt(
     prompt: &str,
     profile_filter: Option<&str>,
 ) -> Result<SafariAiResponseResult, MacosError> {
-    let filled = execute_js_for_profile(
-        &build_chatgpt_fill_input_js(prompt),
-        profile_filter,
-        "safari_chatgpt_prompt_fill",
-    )?;
-    if filled.trim() != "true" {
-        return Err(MacosError::Other(format!(
-            "failed to fill ChatGPT input: {filled}"
-        )));
-    }
-
-    wait_and_click_chatgpt_send(profile_filter)?;
-
-    let deadline = Instant::now() + Duration::from_secs(120);
-    let response_js = chatgpt_response_extract_js();
-    let mut last_response = String::new();
-    let mut last_conversation_url: Option<String> = None;
-
-    while Instant::now() < deadline {
-        thread::sleep(Duration::from_millis(750));
-        let payload =
-            execute_js_for_profile(&response_js, profile_filter, "safari_chatgpt_response")?;
-        let value: Value = serde_json::from_str(&payload).map_err(|e| {
-            MacosError::Other(format!("failed to parse chatgpt response payload: {e}"))
-        })?;
-
-        let status = value
-            .get("status")
-            .and_then(Value::as_str)
-            .unwrap_or("running");
-        let response = value
-            .get("response")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim();
-
-        let conversation_url = value
-            .get("conversation_url")
-            .and_then(Value::as_str)
-            .map(ToOwned::to_owned);
-        if conversation_url.is_some() {
-            last_conversation_url = conversation_url.clone();
+    with_safari_session(|| {
+        let filled = execute_js_for_profile(
+            &build_chatgpt_fill_input_js(prompt),
+            profile_filter,
+            "safari_chatgpt_prompt_fill",
+        )?;
+        if filled.trim() != "true" {
+            return Err(MacosError::Other(format!(
+                "failed to fill ChatGPT input: {filled}"
+            )));
         }
 
-        let should_skip = should_skip_chatgpt_response(response, prompt);
-        if !should_skip {
-            last_response = response.to_string();
+        wait_and_click_chatgpt_send(profile_filter)?;
+
+        let deadline = Instant::now() + Duration::from_secs(120);
+        let response_js = chatgpt_response_extract_js();
+        let mut last_response = String::new();
+        let mut last_conversation_url: Option<String> = None;
+
+        while Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(750));
+            let payload =
+                execute_js_for_profile(&response_js, profile_filter, "safari_chatgpt_response")?;
+            let value: Value = serde_json::from_str(&payload).map_err(|e| {
+                MacosError::Other(format!("failed to parse chatgpt response payload: {e}"))
+            })?;
+
+            let status = value
+                .get("status")
+                .and_then(Value::as_str)
+                .unwrap_or("running");
+            let response = value
+                .get("response")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+
+            let conversation_url = value
+                .get("conversation_url")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned);
+            if conversation_url.is_some() {
+                last_conversation_url = conversation_url.clone();
+            }
+
+            let should_skip = should_skip_chatgpt_response(response, prompt);
+            if !should_skip {
+                last_response = response.to_string();
+            }
+
+            if status == "complete" {
+                return Ok(SafariAiResponseResult {
+                    provider: "chatgpt".to_string(),
+                    status: "complete".to_string(),
+                    response: if should_skip {
+                        last_response.clone()
+                    } else {
+                        response.to_string()
+                    },
+                    conversation_url: conversation_url.or_else(|| last_conversation_url.clone()),
+                });
+            }
         }
 
-        if status == "complete" {
-            return Ok(SafariAiResponseResult {
-                provider: "chatgpt".to_string(),
-                status: "complete".to_string(),
-                response: if should_skip {
-                    last_response.clone()
-                } else {
-                    response.to_string()
-                },
-                conversation_url: conversation_url.or_else(|| last_conversation_url.clone()),
-            });
-        }
-    }
-
-    Ok(SafariAiResponseResult {
-        provider: "chatgpt".to_string(),
-        status: "timeout".to_string(),
-        response: last_response,
-        conversation_url: last_conversation_url,
+        Ok(SafariAiResponseResult {
+            provider: "chatgpt".to_string(),
+            status: "timeout".to_string(),
+            response: last_response,
+            conversation_url: last_conversation_url,
+        })
     })
 }
 
@@ -2127,19 +2439,21 @@ pub fn send_chatgpt_image_prompt(
     prompt: &str,
     profile_filter: Option<&str>,
 ) -> Result<SafariAiImageResult, MacosError> {
-    let filled = execute_js_for_profile(
-        &build_chatgpt_fill_input_js(prompt),
-        profile_filter,
-        "safari_chatgpt_image_fill",
-    )?;
-    if filled.trim() != "true" {
-        return Err(MacosError::Other(format!(
-            "failed to fill ChatGPT image prompt: {filled}"
-        )));
-    }
+    with_safari_session(|| {
+        let filled = execute_js_for_profile(
+            &build_chatgpt_fill_input_js(prompt),
+            profile_filter,
+            "safari_chatgpt_image_fill",
+        )?;
+        if filled.trim() != "true" {
+            return Err(MacosError::Other(format!(
+                "failed to fill ChatGPT image prompt: {filled}"
+            )));
+        }
 
-    wait_and_click_chatgpt_send(profile_filter)?;
-    poll_chatgpt_images(180, 3, profile_filter)
+        wait_and_click_chatgpt_send(profile_filter)?;
+        poll_chatgpt_images(180, 3, profile_filter)
+    })
 }
 
 pub fn chatgpt_save_images(
@@ -2147,56 +2461,59 @@ pub fn chatgpt_save_images(
     output_dir: &str,
     profile_filter: Option<&str>,
 ) -> Result<Vec<String>, MacosError> {
-    let nav_js = format!(
-        r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
-        url = escape_js_string(conversation_url),
-    );
-    let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_chatgpt_save_img_navigate")?;
-    let result = poll_chatgpt_images(30, 8, profile_filter)?;
-    if result.images.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let out_path = std::path::Path::new(output_dir);
-    if !out_path.exists() {
-        std::fs::create_dir_all(out_path)
-            .map_err(|e| MacosError::Other(format!("failed to create output dir: {e}")))?;
-    }
-
-    use base64::Engine;
-    let engine = base64::engine::general_purpose::STANDARD;
-    let mut saved = Vec::new();
-    let filename_prefix = result
-        .conversation_url
-        .as_deref()
-        .and_then(|url| url.rsplit('/').next())
-        .filter(|segment| !segment.is_empty())
-        .unwrap_or("chatgpt");
-
-    for (i, image) in result.images.iter().enumerate() {
-        let b64 = execute_js_for_profile(
-            &chatgpt_image_extract_js(&image.url),
-            profile_filter,
-            "safari_chatgpt_img_extract",
-        )?;
-        let b64 = b64.trim();
-        if b64.is_empty() {
-            continue;
+    with_safari_session(|| {
+        let nav_js = format!(
+            r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
+            url = escape_js_string(conversation_url),
+        );
+        let _ =
+            execute_js_for_profile(&nav_js, profile_filter, "safari_chatgpt_save_img_navigate")?;
+        let result = poll_chatgpt_images(30, 8, profile_filter)?;
+        if result.images.is_empty() {
+            return Ok(Vec::new());
         }
 
-        let bytes = engine
-            .decode(b64)
-            .map_err(|e| MacosError::Other(format!("base64 decode failed for image {i}: {e}")))?;
+        let out_path = std::path::Path::new(output_dir);
+        if !out_path.exists() {
+            std::fs::create_dir_all(out_path)
+                .map_err(|e| MacosError::Other(format!("failed to create output dir: {e}")))?;
+        }
 
-        let filename = format!("{filename_prefix}_image_{i}.png");
-        let filepath = out_path.join(&filename);
-        std::fs::write(&filepath, &bytes).map_err(|e| {
-            MacosError::Other(format!("failed to write {}: {e}", filepath.display()))
-        })?;
-        saved.push(filepath.to_string_lossy().into_owned());
-    }
+        use base64::Engine;
+        let engine = base64::engine::general_purpose::STANDARD;
+        let mut saved = Vec::new();
+        let filename_prefix = result
+            .conversation_url
+            .as_deref()
+            .and_then(|url| url.rsplit('/').next())
+            .filter(|segment| !segment.is_empty())
+            .unwrap_or("chatgpt");
 
-    Ok(saved)
+        for (i, image) in result.images.iter().enumerate() {
+            let b64 = execute_js_for_profile(
+                &chatgpt_image_extract_js(&image.url),
+                profile_filter,
+                "safari_chatgpt_img_extract",
+            )?;
+            let b64 = b64.trim();
+            if b64.is_empty() {
+                continue;
+            }
+
+            let bytes = engine.decode(b64).map_err(|e| {
+                MacosError::Other(format!("base64 decode failed for image {i}: {e}"))
+            })?;
+
+            let filename = format!("{filename_prefix}_image_{i}.png");
+            let filepath = out_path.join(&filename);
+            std::fs::write(&filepath, &bytes).map_err(|e| {
+                MacosError::Other(format!("failed to write {}: {e}", filepath.display()))
+            })?;
+            saved.push(filepath.to_string_lossy().into_owned());
+        }
+
+        Ok(saved)
+    })
 }
 
 fn execute_js(js_code: &str, context: &str) -> Result<String, MacosError> {
@@ -2218,20 +2535,23 @@ fn execute_js_for_profile(
 #[cfg(test)]
 mod tests {
     use super::{
-        SafariAiImage, SafariAiImageResult, SafariScrollReadSnapshot, TAB_SEPARATOR, build_active_tab_script,
+        SAFARI_LOCK_TTL_SECS, SafariAiImage, SafariAiImageResult, SafariLockFile,
+        SafariScrollReadSnapshot, TAB_SEPARATOR, acquire_safari_lock, build_active_tab_script,
         build_chatgpt_click_send_js, build_chatgpt_fill_input_js, build_chatgpt_go_home_js,
         build_close_script, build_exec_script, build_gemini_fill_input_js, build_gemini_go_home_js,
         build_open_script, build_tab_return_block, build_tabs_script, chatgpt_image_extract_js,
-        chatgpt_image_list_js, chatgpt_image_result_is_ready, chatgpt_response_extract_js,
-        chatgpt_list_conversations_js,
-        chatgpt_should_return_empty_complete_result, extract_profile, gemini_deep_research_poll_js,
-        gemini_response_extract_js, parse_chatgpt_image_payload, parse_deep_research_payload,
-        parse_tab_line, parse_tabs_output, scroll_read_detects_new_content,
-        scroll_read_poll_js, scroll_read_new_content_blocks, scroll_read_snapshot_blocks,
-        selector_click_js, selector_fill_js, selector_text_js,
+        chatgpt_image_list_js, chatgpt_image_result_is_ready, chatgpt_list_conversations_js,
+        chatgpt_response_extract_js, chatgpt_should_return_empty_complete_result, extract_profile,
+        gemini_deep_research_poll_js, gemini_response_extract_js, is_safari_rate_limited,
+        parse_chatgpt_image_payload, parse_deep_research_payload, parse_tab_line,
+        parse_tabs_output, read_safari_lock, release_safari_lock, safari_rate_limit_backoff,
+        scroll_read_detects_new_content, scroll_read_new_content_blocks, scroll_read_poll_js,
+        scroll_read_snapshot_blocks, selector_click_js, selector_fill_js, selector_text_js,
         should_skip_chatgpt_response, should_skip_gemini_response,
     };
+    use std::fs;
     use std::time::Duration;
+    use tempfile::tempdir;
 
     #[test]
     fn extract_profile_from_window_name() {
@@ -2649,5 +2969,75 @@ mod tests {
     fn should_skip_chatgpt_response_trims_prompt_whitespace() {
         assert!(should_skip_chatgpt_response("hello", "  hello  "));
         assert!(!should_skip_chatgpt_response("world", "  hello  "));
+    }
+
+    #[test]
+    fn safari_rate_limit_detection_matches_expected_signals() {
+        assert!(is_safari_rate_limited("HTTP 429 Too Many Requests"));
+        assert!(is_safari_rate_limited("rate limit exceeded"));
+        assert!(!is_safari_rate_limited("all good"));
+    }
+
+    #[test]
+    fn safari_rate_limit_backoff_is_linear() {
+        assert_eq!(safari_rate_limit_backoff(0), Duration::from_secs(30));
+        assert_eq!(safari_rate_limit_backoff(1), Duration::from_secs(60));
+        assert_eq!(safari_rate_limit_backoff(2), Duration::from_secs(90));
+    }
+
+    #[test]
+    fn safari_lock_rejects_active_owner() {
+        let dir = tempdir().expect("tempdir");
+        let lock_path = dir.path().join("lock.json");
+        let now = 1_700_000_000;
+
+        let payload = SafariLockFile {
+            pid: 42,
+            acquired_at: now,
+            expires_at: now + SAFARI_LOCK_TTL_SECS,
+        };
+        fs::write(
+            &lock_path,
+            serde_json::to_vec(&payload).expect("encode lock payload"),
+        )
+        .expect("write lock");
+
+        let err = acquire_safari_lock(&lock_path, now, 77).expect_err("active lock should fail");
+        assert!(err.to_string().contains("locked by pid 42"));
+    }
+
+    #[test]
+    fn safari_lock_replaces_stale_owner() {
+        let dir = tempdir().expect("tempdir");
+        let lock_path = dir.path().join("lock.json");
+        let now = 1_700_000_000;
+
+        let stale = SafariLockFile {
+            pid: 42,
+            acquired_at: now - 600,
+            expires_at: now - 1,
+        };
+        fs::write(
+            &lock_path,
+            serde_json::to_vec(&stale).expect("encode lock payload"),
+        )
+        .expect("write stale lock");
+
+        acquire_safari_lock(&lock_path, now, 77).expect("stale lock should be replaced");
+        let lock = read_safari_lock(&lock_path).expect("replacement lock");
+        assert_eq!(lock.pid, 77);
+        assert_eq!(lock.expires_at, now + SAFARI_LOCK_TTL_SECS);
+    }
+
+    #[test]
+    fn safari_lock_release_removes_owned_lock() {
+        let dir = tempdir().expect("tempdir");
+        let lock_path = dir.path().join("lock.json");
+        let now = 1_700_000_000;
+
+        acquire_safari_lock(&lock_path, now, 77).expect("acquire lock");
+        release_safari_lock(&lock_path, 77).expect("release lock");
+
+        assert!(read_safari_lock(&lock_path).is_none());
     }
 }
