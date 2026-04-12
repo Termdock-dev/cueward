@@ -1310,9 +1310,21 @@ fn main() {
                                 }
                             }
                         }
+                        SafariAiAction::List => {
+                            match cueward_adapter_macos::safari::chatgpt_list_conversations(p) {
+                                Ok(convos) => {
+                                    print_external("safari/ai/chatgpt/list", &serde_json::to_string_pretty(&convos).unwrap());
+                                    eprintln!("{} conversation(s)", convos.len());
+                                }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
+                            }
+                        }
                         _ => {
                             eprintln!(
-                                "error: ChatGPT currently supports only prompt and save-images"
+                                "error: ChatGPT currently supports prompt, list, and save-images"
                             );
                             process::exit(1);
                         }
@@ -1914,6 +1926,26 @@ mod tests {
                     },
             } => {
                 assert_eq!(provider, SafariAiProvider::Gemini);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_chatgpt_list() {
+        let cli = Cli::try_parse_from(["cueward", "safari", "ai", "--provider", "chatgpt", "list"])
+            .expect("parse");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Ai {
+                        provider,
+                        action: SafariAiAction::List,
+                        ..
+                    },
+            } => {
+                assert_eq!(provider, SafariAiProvider::Chatgpt);
             }
             _ => panic!("unexpected command"),
         }
