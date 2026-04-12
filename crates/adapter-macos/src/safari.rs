@@ -1061,6 +1061,49 @@ pub fn gemini_list_conversations(
     Ok(items)
 }
 
+fn chatgpt_list_conversations_js() -> String {
+    r#"(() => {
+        const nav = document.querySelector('nav[aria-label="聊天歷程紀錄"]');
+        if (!nav) return JSON.stringify([]);
+        const recentButton = Array.from(nav.querySelectorAll("button"))
+          .find((button) => (button.innerText || button.textContent || "").trim() === "最近");
+        if (recentButton && recentButton.getAttribute("aria-expanded") === "false") {
+          recentButton.click();
+        }
+        const items = Array.from(nav.querySelectorAll('a[href^="/c/"]'));
+        const convos = [];
+        const seen = new Set();
+        for (const a of items) {
+          const href = a.getAttribute("href") || "";
+          const title = (a.innerText || a.textContent || a.getAttribute("aria-label") || "").trim();
+          if (!href || !title || seen.has(href)) continue;
+          seen.add(href);
+          convos.push({ title, url: "https://chatgpt.com" + href });
+        }
+        return JSON.stringify(convos);
+    })()"#
+        .to_string()
+}
+
+pub fn chatgpt_list_conversations(
+    profile_filter: Option<&str>,
+) -> Result<Vec<SafariConversation>, MacosError> {
+    let js = chatgpt_list_conversations_js();
+    let deadline = Instant::now() + Duration::from_secs(10);
+
+    while Instant::now() < deadline {
+        let raw = execute_js_for_profile(&js, profile_filter, "safari_chatgpt_list_conversations")?;
+        let items: Vec<SafariConversation> = serde_json::from_str(&raw)
+            .map_err(|e| MacosError::Other(format!("failed to parse conversations: {e}")))?;
+        if !items.is_empty() {
+            return Ok(items);
+        }
+        thread::sleep(Duration::from_millis(500));
+    }
+
+    Ok(Vec::new())
+}
+
 pub fn gemini_read_conversation(
     url: &str,
     profile_filter: Option<&str>,
@@ -2180,6 +2223,7 @@ mod tests {
         build_close_script, build_exec_script, build_gemini_fill_input_js, build_gemini_go_home_js,
         build_open_script, build_tab_return_block, build_tabs_script, chatgpt_image_extract_js,
         chatgpt_image_list_js, chatgpt_image_result_is_ready, chatgpt_response_extract_js,
+        chatgpt_list_conversations_js,
         chatgpt_should_return_empty_complete_result, extract_profile, gemini_deep_research_poll_js,
         gemini_response_extract_js, parse_chatgpt_image_payload, parse_deep_research_payload,
         parse_tab_line, parse_tabs_output, scroll_read_detects_new_content,
@@ -2384,6 +2428,16 @@ mod tests {
         assert!(script.contains("conversation_url"));
         assert!(script.contains("window.location.href"));
         assert!(script.contains("complete"));
+    }
+
+    #[test]
+    fn chatgpt_list_script_targets_history_nav_links() {
+        let script = chatgpt_list_conversations_js();
+
+        assert!(script.contains("nav[aria-label=\"聊天歷程紀錄\"]"));
+        assert!(script.contains("a[href^=\"/c/\"]"));
+        assert!(script.contains("https://chatgpt.com"));
+        assert!(script.contains("最近"));
     }
 
     #[test]
