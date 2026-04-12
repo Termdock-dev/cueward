@@ -1257,8 +1257,8 @@ pub fn close_tabs(profile_filter: Option<&str>, url_pattern: Option<&str>) -> Re
         })
         .collect();
 
-    let count = to_close.len();
     // Close from last to first to avoid index shifting
+    let mut closed = 0;
     for tab in to_close.iter().rev() {
         let script = format!(
             r#"
@@ -1277,10 +1277,12 @@ pub fn close_tabs(profile_filter: Option<&str>, url_pattern: Option<&str>) -> Re
             window_id = tab.window_id,
             tab_index = tab.index,
         );
-        let _ = run_capture(&script, "safari_close_tab");
+        if run_capture(&script, "safari_close_tab").is_ok() {
+            closed += 1;
+        }
     }
 
-    Ok(count)
+    Ok(closed)
 }
 
 pub fn source(profile_filter: Option<&str>) -> Result<SafariSourceResult, MacosError> {
@@ -1372,7 +1374,7 @@ pub fn scroll(
     amount: Option<i64>,
     profile_filter: Option<&str>,
 ) -> Result<SafariScrollResult, MacosError> {
-    let pixels = amount.unwrap_or(500);
+    let pixels = amount.unwrap_or(500).unsigned_abs();
     let js = match direction {
         "down" => format!("(function(){{ window.scrollBy(0, {pixels}); return JSON.stringify({{ x: Math.round(window.scrollX), y: Math.round(window.scrollY) }}); }})()"),
         "up" => format!("(function(){{ window.scrollBy(0, -{pixels}); return JSON.stringify({{ x: Math.round(window.scrollX), y: Math.round(window.scrollY) }}); }})()"),
