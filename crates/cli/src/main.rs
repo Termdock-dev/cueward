@@ -967,13 +967,21 @@ fn main() {
                     process::exit(1);
                 }
             },
-            SafariAction::Scroll { direction, amount, profile, tab } => {
+            SafariAction::Scroll {
+                direction,
+                amount,
+                profile,
+                tab,
+            } => {
                 if let Some(ref t) = tab {
-                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
-                        eprintln!("error: {e}"); process::exit(1);
+                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref())
+                    {
+                        eprintln!("error: {e}");
+                        process::exit(1);
                     }
                 }
-                match cueward_adapter_macos::safari::scroll(&direction, amount, profile.as_deref()) {
+                match cueward_adapter_macos::safari::scroll(&direction, amount, profile.as_deref())
+                {
                     Ok(result) => {
                         println!("{}", serde_json::to_string_pretty(&result).unwrap());
                         eprintln!("scrolled {direction}");
@@ -984,10 +992,18 @@ fn main() {
                     }
                 }
             }
-            SafariAction::ScrollAndRead { times, amount, profile, tab, selector } => {
+            SafariAction::ScrollAndRead {
+                times,
+                amount,
+                profile,
+                tab,
+                selector,
+            } => {
                 if let Some(ref t) = tab {
-                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
-                        eprintln!("error: {e}"); process::exit(1);
+                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref())
+                    {
+                        eprintln!("error: {e}");
+                        process::exit(1);
                     }
                 }
                 match cueward_adapter_macos::safari::scroll_and_read(
@@ -997,7 +1013,10 @@ fn main() {
                     profile.as_deref(),
                 ) {
                     Ok(result) => {
-                        print_external("safari/scroll-and-read", &serde_json::to_string_pretty(&result).unwrap());
+                        print_external(
+                            "safari/scroll-and-read",
+                            &serde_json::to_string_pretty(&result).unwrap(),
+                        );
                         eprintln!("scroll/read pipeline complete");
                     }
                     Err(e) => {
@@ -1007,9 +1026,14 @@ fn main() {
                 }
             }
             SafariAction::CloseTabs { profile, url } => {
-                match cueward_adapter_macos::safari::close_tabs(profile.as_deref(), url.as_deref()) {
+                match cueward_adapter_macos::safari::close_tabs(profile.as_deref(), url.as_deref())
+                {
                     Ok(count) => {
-                        println!("{}", serde_json::to_string_pretty(&serde_json::json!({ "closed": count })).unwrap());
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&serde_json::json!({ "closed": count }))
+                                .unwrap()
+                        );
                         eprintln!("{count} tab(s) closed");
                     }
                     Err(e) => {
@@ -1018,15 +1042,24 @@ fn main() {
                     }
                 }
             }
-            SafariAction::Read { selector, profile, tab } => {
+            SafariAction::Read {
+                selector,
+                profile,
+                tab,
+            } => {
                 if let Some(ref t) = tab {
-                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
-                        eprintln!("error: {e}"); process::exit(1);
+                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref())
+                    {
+                        eprintln!("error: {e}");
+                        process::exit(1);
                     }
                 }
                 match cueward_adapter_macos::safari::read(selector.as_deref(), profile.as_deref()) {
                     Ok(result) => {
-                        print_external("safari/read", &serde_json::to_string_pretty(&result).unwrap());
+                        print_external(
+                            "safari/read",
+                            &serde_json::to_string_pretty(&result).unwrap(),
+                        );
                         eprintln!("read page content");
                     }
                     Err(e) => {
@@ -1037,13 +1070,18 @@ fn main() {
             }
             SafariAction::Source { profile, tab } => {
                 if let Some(ref t) = tab {
-                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
-                        eprintln!("error: {e}"); process::exit(1);
+                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref())
+                    {
+                        eprintln!("error: {e}");
+                        process::exit(1);
                     }
                 }
                 match cueward_adapter_macos::safari::source(profile.as_deref()) {
                     Ok(result) => {
-                        print_external("safari/source", &serde_json::to_string_pretty(&result).unwrap());
+                        print_external(
+                            "safari/source",
+                            &serde_json::to_string_pretty(&result).unwrap(),
+                        );
                         eprintln!("read page source");
                     }
                     Err(e) => {
@@ -1052,15 +1090,24 @@ fn main() {
                     }
                 }
             }
-            SafariAction::Exec { js_code, profile, tab } => {
+            SafariAction::Exec {
+                js_code,
+                profile,
+                tab,
+            } => {
                 if let Some(ref t) = tab {
-                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
-                        eprintln!("error: {e}"); process::exit(1);
+                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref())
+                    {
+                        eprintln!("error: {e}");
+                        process::exit(1);
                     }
                 }
                 match cueward_adapter_macos::safari::exec(&js_code, profile.as_deref()) {
                     Ok(result) => {
-                        print_external("safari/exec", &serde_json::to_string_pretty(&result).unwrap());
+                        print_external(
+                            "safari/exec",
+                            &serde_json::to_string_pretty(&result).unwrap(),
+                        );
                         eprintln!("executed javascript");
                     }
                     Err(e) => {
@@ -1174,7 +1221,10 @@ fn main() {
                             SafariAiAction::List => {
                                 match cueward_adapter_macos::safari::gemini_list_conversations(p) {
                                     Ok(convos) => {
-                                        print_external("safari/ai/gemini/list", &serde_json::to_string_pretty(&convos).unwrap());
+                                        print_external(
+                                            "safari/ai/gemini/list",
+                                            &serde_json::to_string_pretty(&convos).unwrap(),
+                                        );
                                         eprintln!("{} conversation(s)", convos.len());
                                     }
                                     Err(e) => {
@@ -1188,7 +1238,10 @@ fn main() {
                                     &url, p,
                                 ) {
                                     Ok(r) => {
-                                        print_external("safari/ai/gemini/read", &serde_json::to_string_pretty(&r).unwrap());
+                                        print_external(
+                                            "safari/ai/gemini/read",
+                                            &serde_json::to_string_pretty(&r).unwrap(),
+                                        );
                                         eprintln!("conversation read");
                                     }
                                     Err(e) => {
@@ -1202,7 +1255,10 @@ fn main() {
                                     timeout, p,
                                 ) {
                                     Ok(r) => {
-                                        print_external("safari/ai/gemini/poll", &serde_json::to_string_pretty(&r).unwrap());
+                                        print_external(
+                                            "safari/ai/gemini/poll",
+                                            &serde_json::to_string_pretty(&r).unwrap(),
+                                        );
                                         eprintln!("polled");
                                     }
                                     Err(e) => {
@@ -1261,7 +1317,10 @@ fn main() {
                                     &prompt, p,
                                 ) {
                                     Ok(r) => {
-                                        print_external("safari/ai/chatgpt", &serde_json::to_string_pretty(&r).unwrap());
+                                        print_external(
+                                            "safari/ai/chatgpt",
+                                            &serde_json::to_string_pretty(&r).unwrap(),
+                                        );
                                         eprintln!("chatgpt response ready");
                                     }
                                     Err(e) => {
@@ -1274,7 +1333,10 @@ fn main() {
                                         &prompt, p,
                                     ) {
                                         Ok(r) => {
-                                            print_external("safari/ai/chatgpt/image", &serde_json::to_string_pretty(&r).unwrap());
+                                            print_external(
+                                                "safari/ai/chatgpt/image",
+                                                &serde_json::to_string_pretty(&r).unwrap(),
+                                            );
                                             eprintln!("chatgpt image response ready");
                                         }
                                         Err(e) => {
@@ -1313,7 +1375,10 @@ fn main() {
                         SafariAiAction::List => {
                             match cueward_adapter_macos::safari::chatgpt_list_conversations(p) {
                                 Ok(convos) => {
-                                    print_external("safari/ai/chatgpt/list", &serde_json::to_string_pretty(&convos).unwrap());
+                                    print_external(
+                                        "safari/ai/chatgpt/list",
+                                        &serde_json::to_string_pretty(&convos).unwrap(),
+                                    );
                                     eprintln!("{} conversation(s)", convos.len());
                                 }
                                 Err(e) => {
@@ -1333,10 +1398,16 @@ fn main() {
                         SafariAiAction::List => {
                             match cueward_adapter_macos::safari::threads_extract_feed(p) {
                                 Ok(posts) => {
-                                    print_external("safari/threads/feed", &serde_json::to_string_pretty(&posts).unwrap());
+                                    print_external(
+                                        "safari/threads/feed",
+                                        &serde_json::to_string_pretty(&posts).unwrap(),
+                                    );
                                     eprintln!("{} post(s)", posts.len());
                                 }
-                                Err(e) => { eprintln!("error: {e}"); process::exit(1); }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
                             }
                         }
                         _ => {
@@ -1348,10 +1419,16 @@ fn main() {
                         SafariAiAction::List => {
                             match cueward_adapter_macos::safari::x_extract_feed(p) {
                                 Ok(posts) => {
-                                    print_external("safari/x/feed", &serde_json::to_string_pretty(&posts).unwrap());
+                                    print_external(
+                                        "safari/x/feed",
+                                        &serde_json::to_string_pretty(&posts).unwrap(),
+                                    );
                                     eprintln!("{} post(s)", posts.len());
                                 }
-                                Err(e) => { eprintln!("error: {e}"); process::exit(1); }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
                             }
                         }
                         _ => {
@@ -1460,7 +1537,10 @@ fn main() {
             }
             match cueward_adapter_macos::screenshot::capture(ocr, output.as_deref(), display) {
                 Ok(result) => {
-                    print_external("screenshot", &serde_json::to_string_pretty(&result).unwrap());
+                    print_external(
+                        "screenshot",
+                        &serde_json::to_string_pretty(&result).unwrap(),
+                    );
                     eprintln!("screenshot saved to {}", result.path);
                 }
                 Err(e) => {
@@ -1480,7 +1560,10 @@ fn main() {
                 }
                 match cueward_adapter_macos::clipboard::get(save_image.as_deref()) {
                     Ok(content) => {
-                        print_external("clipboard/get", &serde_json::to_string_pretty(&content).unwrap());
+                        print_external(
+                            "clipboard/get",
+                            &serde_json::to_string_pretty(&content).unwrap(),
+                        );
                         match content.content_type.as_str() {
                             "image" => eprintln!(
                                 "clipboard image saved to {}",
@@ -1678,7 +1761,10 @@ mod tests {
 
         match cli.command {
             Command::Safari {
-                action: SafariAction::Exec { js_code, profile, .. },
+                action:
+                    SafariAction::Exec {
+                        js_code, profile, ..
+                    },
             } => {
                 assert_eq!(js_code, "1+1");
                 assert_eq!(profile.as_deref(), Some("Ryugu"));

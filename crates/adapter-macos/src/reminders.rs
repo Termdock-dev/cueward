@@ -173,8 +173,7 @@ fn build_list_script(list_filter: Option<&str>) -> String {
             end repeat
             return output
         end tell
-        "#
-        ,
+        "#,
         prelude = reminders_script_prelude(),
     )
 }
@@ -270,8 +269,8 @@ mod tests {
     use chrono::{Local, TimeZone};
 
     use super::{
-        build_list_script, build_today_script, parse_reminder_line, parse_reminders_output,
-        REMINDER_SEPARATOR,
+        REMINDER_SEPARATOR, build_list_script, build_today_script, parse_reminder_line,
+        parse_reminders_output,
     };
 
     #[test]
@@ -330,6 +329,9 @@ mod tests {
 
         let reminder = parse_reminder_line(line).expect("reminder");
 
-        assert_eq!(reminder.notes, format!("Contains{REMINDER_SEPARATOR}Marker"));
+        assert_eq!(
+            reminder.notes,
+            format!("Contains{REMINDER_SEPARATOR}Marker")
+        );
     }
 }

@@ -1,5 +1,5 @@
-use crate::applescript::{escape, escape_body, run};
 use crate::MacosError;
+use crate::applescript::{escape, escape_body, run};
 
 /// Create a note in Apple Notes with the given title and body.
 pub fn create_note(title: &str, body: &str, folder: &str) -> Result<(), MacosError> {
@@ -87,9 +87,7 @@ pub fn notify(title: &str, message: &str) -> Result<(), MacosError> {
     let escaped_title = escape(title);
     let escaped_msg = escape(message);
 
-    let script = format!(
-        r#"display notification "{escaped_msg}" with title "{escaped_title}""#
-    );
+    let script = format!(r#"display notification "{escaped_msg}" with title "{escaped_title}""#);
 
     run(&script, "notification failed")
 }
@@ -112,6 +110,9 @@ mod tests {
         let result = create_note(&title, "line1\nline2", folder);
         let _ = delete_note(&title, folder);
 
-        assert!(result.is_ok(), "expected multiline note creation to succeed: {result:?}");
+        assert!(
+            result.is_ok(),
+            "expected multiline note creation to succeed: {result:?}"
+        );
     }
 }

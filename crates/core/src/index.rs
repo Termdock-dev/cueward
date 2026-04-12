@@ -3,9 +3,9 @@ use std::path::PathBuf;
 
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
-use tantivy::schema::{Schema, STORED, TEXT};
 use tantivy::schema::Value;
-use tantivy::{doc, Index, IndexWriter, ReloadPolicy};
+use tantivy::schema::{STORED, Schema, TEXT};
+use tantivy::{Index, IndexWriter, ReloadPolicy, doc};
 
 use crate::Cue;
 
@@ -108,10 +108,7 @@ impl CueIndex {
             let doc = searcher.doc::<tantivy::TantivyDocument>(doc_address)?;
             let mut map = serde_json::Map::new();
             for (i, field) in fields.iter().enumerate() {
-                let val = doc
-                    .get_first(*field)
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let val = doc.get_first(*field).and_then(|v| v.as_str()).unwrap_or("");
                 map.insert(
                     field_names[i].to_string(),
                     serde_json::Value::String(val.to_string()),

@@ -1,16 +1,16 @@
-pub mod safari;
-mod notes;
-mod messages;
 pub mod applescript;
 pub mod calendar;
 pub mod clipboard;
-pub mod send;
-pub mod plan;
+mod error;
+mod messages;
+mod notes;
 pub mod ocr;
+pub mod plan;
 pub mod quick_notes;
 pub mod reminders;
+pub mod safari;
 pub mod screenshot;
-mod error;
+pub mod send;
 
 pub use error::MacosError;
 
@@ -22,24 +22,15 @@ pub struct MacosAdapter;
 impl PlatformAdapter for MacosAdapter {
     type Error = MacosError;
 
-    fn capture_browser_history(
-        &self,
-        since: DateTime<Utc>,
-    ) -> Result<Vec<Cue>, Self::Error> {
+    fn capture_browser_history(&self, since: DateTime<Utc>) -> Result<Vec<Cue>, Self::Error> {
         safari::capture(since)
     }
 
-    fn capture_notes(
-        &self,
-        since: DateTime<Utc>,
-    ) -> Result<Vec<Cue>, Self::Error> {
+    fn capture_notes(&self, since: DateTime<Utc>) -> Result<Vec<Cue>, Self::Error> {
         notes::capture(since)
     }
 
-    fn capture_messages(
-        &self,
-        since: DateTime<Utc>,
-    ) -> Result<Vec<Cue>, Self::Error> {
+    fn capture_messages(&self, since: DateTime<Utc>) -> Result<Vec<Cue>, Self::Error> {
         messages::capture(since)
     }
 }

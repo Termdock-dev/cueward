@@ -72,11 +72,7 @@ impl Tagger {
     }
 
     pub fn tag(&self, cue: &mut Cue) {
-        let text = format!(
-            "{} {}",
-            cue.title.as_deref().unwrap_or(""),
-            &cue.content
-        );
+        let text = format!("{} {}", cue.title.as_deref().unwrap_or(""), &cue.content);
 
         let mut seen = std::collections::HashSet::new();
         for mat in self.automaton.find_iter(&text) {

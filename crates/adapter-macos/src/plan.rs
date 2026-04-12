@@ -1,5 +1,5 @@
-use crate::applescript::{escape, escape_body, run};
 use crate::MacosError;
+use crate::applescript::{escape, escape_body, run};
 
 /// Create a reminder in Apple Reminders.
 pub fn create_reminder(title: &str, notes: &str, list: &str) -> Result<(), MacosError> {

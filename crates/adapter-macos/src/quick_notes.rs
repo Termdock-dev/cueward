@@ -3,9 +3,9 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
+use crate::MacosError;
 use crate::applescript::{escape, escape_body, run};
 use crate::send;
-use crate::MacosError;
 
 #[derive(serde::Serialize)]
 pub struct QuickNote {
@@ -44,8 +44,7 @@ fn list_by_title(title: &str) -> Result<Vec<QuickNote>, MacosError> {
 fn db_path() -> Result<PathBuf, MacosError> {
     let home = std::env::var("HOME")
         .map_err(|_| MacosError::Other("HOME environment variable not set".to_string()))?;
-    Ok(PathBuf::from(home)
-        .join("Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"))
+    Ok(PathBuf::from(home).join("Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"))
 }
 
 /// Run a read-only SQLite query via the sqlite3 CLI to get consistent WAL reads.
@@ -131,7 +130,10 @@ pub fn update(title: &str, body: &str) -> Result<(), MacosError> {
     let folder = find_folder(title)?;
     let escaped_title = escape(title);
     let escaped_folder = escape(&folder);
-    let html_title = title.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+    let html_title = title
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
     let body_expr = escape_body(&format!("<h1>{html_title}</h1><br>{body}"));
 
     let script = format!(
@@ -178,7 +180,9 @@ fn read_body_html(title: &str, folder: &str) -> Result<String, MacosError> {
         )));
     }
 
-    Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .trim_end()
+        .to_string())
 }
 
 fn escape_html_text(text: &str) -> String {
