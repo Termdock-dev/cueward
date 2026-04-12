@@ -94,6 +94,8 @@ pub struct SafariAiResponseResult {
     pub provider: String,
     pub status: String,
     pub response: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversation_url: Option<String>,
 }
 
 #[derive(Debug, Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -174,7 +176,6 @@ fn extract_profile(window_name: &str, active_tab_title: &str) -> Option<String> 
         .filter(|profile| !profile.is_empty())
         .map(ToOwned::to_owned)
 }
-
 
 fn target_window_block(profile_filter: Option<&str>) -> String {
     match profile_filter {
@@ -336,7 +337,6 @@ fn build_active_tab_script(profile_filter: Option<&str>) -> String {
         tab_return = tab_return,
     )
 }
-
 
 fn build_exec_script_for_profile(js_code: &str, profile_filter: Option<&str>) -> String {
     let js_expr = escape_body(js_code);
@@ -512,11 +512,20 @@ fn gemini_mode_placeholders(mode: GeminiMode) -> &'static [&'static str] {
         ],
         GeminiMode::DeepResearch => &["你想研究什麼？", "What do you want to research?"],
         GeminiMode::Video => &["描述影片", "Describe the video", "Describe your video"],
-        GeminiMode::Music => &["描述音樂", "描述要創作的音樂", "Describe the music", "Describe the music you"],
+        GeminiMode::Music => &[
+            "描述音樂",
+            "描述要創作的音樂",
+            "Describe the music",
+            "Describe the music you",
+        ],
     }
 }
 
 fn should_skip_gemini_response(trimmed: &str, prompt: &str) -> bool {
+    trimmed.is_empty() || trimmed == prompt.trim()
+}
+
+fn should_skip_chatgpt_response(trimmed: &str, prompt: &str) -> bool {
     trimmed.is_empty() || trimmed == prompt.trim()
 }
 
@@ -538,10 +547,17 @@ fn gemini_mode_url(mode: GeminiMode) -> &'static str {
     }
 }
 
-
 fn build_gemini_go_home_js() -> String {
     r#"(function() {
         window.location.href = "https://gemini.google.com/app";
+        return "true";
+    })()"#
+        .to_string()
+}
+
+fn build_chatgpt_go_home_js() -> String {
+    r#"(function() {
+        window.location.href = "https://chatgpt.com/";
         return "true";
     })()"#
         .to_string()
@@ -552,6 +568,16 @@ pub fn ensure_gemini_home(profile_filter: Option<&str>) -> Result<(), MacosError
         &build_gemini_go_home_js(),
         profile_filter,
         "safari_gemini_go_home",
+    )?;
+    thread::sleep(Duration::from_millis(2500));
+    Ok(())
+}
+
+pub fn ensure_chatgpt_home(profile_filter: Option<&str>) -> Result<(), MacosError> {
+    let _ = execute_js_for_profile(
+        &build_chatgpt_go_home_js(),
+        profile_filter,
+        "safari_chatgpt_go_home",
     )?;
     thread::sleep(Duration::from_millis(2500));
     Ok(())
@@ -606,6 +632,26 @@ fn build_gemini_fill_input_js(prompt: &str) -> String {
     )
 }
 
+fn build_chatgpt_fill_input_js(prompt: &str) -> String {
+    let prompt = escape_js_string(prompt);
+    format!(
+        r##"(() => {{
+            const input = document.querySelector(
+              "#prompt-textarea, textarea[data-id], div[contenteditable='true'][role='textbox'], div[contenteditable='true']"
+            );
+            if (!input) throw new Error("chatgpt input not found");
+            input.focus();
+            if ("value" in input) {{
+              input.value = "";
+            }} else {{
+              input.textContent = "";
+            }}
+            document.execCommand("insertText", false, "{prompt}");
+            return "true";
+        }})()"##
+    )
+}
+
 fn wait_and_click_send(profile_filter: Option<&str>) -> Result<(), MacosError> {
     let js = &build_gemini_click_send_js();
     let deadline = Instant::now() + Duration::from_secs(5);
@@ -616,7 +662,9 @@ fn wait_and_click_send(profile_filter: Option<&str>) -> Result<(), MacosError> {
             return Ok(());
         }
     }
-    Err(MacosError::Other("send button not found or disabled after 5s".to_string()))
+    Err(MacosError::Other(
+        "send button not found or disabled after 5s".to_string(),
+    ))
 }
 
 fn build_gemini_click_send_js() -> String {
@@ -640,6 +688,42 @@ fn build_gemini_click_send_js() -> String {
         .to_string()
 }
 
+fn build_chatgpt_click_send_js() -> String {
+    r#"(() => {
+        const sendLabels = ["Send prompt", "Send message", "傳送訊息", "傳送提示"];
+        const buttons = [...document.querySelectorAll('button,[role="button"]')];
+        for (const button of buttons) {
+          const label = [
+            button.getAttribute("aria-label"),
+            button.getAttribute("title"),
+            button.getAttribute("data-testid"),
+            button.innerText,
+            button.textContent
+          ].filter(Boolean).join(" ");
+          if (!sendLabels.some((v) => label.includes(v))) continue;
+          if (button.disabled || button.getAttribute("aria-disabled") == "true") return "disabled";
+          button.click();
+          return "true";
+        }
+        return "false";
+    })()"#
+        .to_string()
+}
+
+fn wait_and_click_chatgpt_send(profile_filter: Option<&str>) -> Result<(), MacosError> {
+    let js = &build_chatgpt_click_send_js();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(200));
+        let result = execute_js_for_profile(js, profile_filter, "safari_chatgpt_wait_send")?;
+        if result.trim() == "true" {
+            return Ok(());
+        }
+    }
+    Err(MacosError::Other(
+        "send button not found or disabled after 5s".to_string(),
+    ))
+}
 
 fn gemini_deep_research_poll_js() -> String {
     r#"(() => {
@@ -682,6 +766,51 @@ fn gemini_deep_research_poll_js() -> String {
         .to_string()
 }
 
+fn chatgpt_response_extract_js() -> String {
+    r#"(() => {
+        const getConversationUrl = () => {
+          const url = window.location.href || "";
+          return /chatgpt\.com\/c\/[a-z0-9-]+/i.test(url) ? url : null;
+        };
+        const extractText = (node) => (node?.innerText || node?.textContent || "").trim();
+        const selectors = [
+          '[data-message-author-role="assistant"]',
+          'article[data-testid^="conversation-turn-"]',
+          'main article'
+        ];
+
+        let response = "";
+        for (const selector of selectors) {
+          const nodes = [...document.querySelectorAll(selector)];
+          for (let i = nodes.length - 1; i >= 0; i--) {
+            const text = extractText(nodes[i]);
+            if (text) {
+              response = text;
+              break;
+            }
+          }
+          if (response) break;
+        }
+
+        const controls = [...document.querySelectorAll('button,[role="button"]')]
+          .map((button) => [
+            button.getAttribute("aria-label"),
+            button.getAttribute("title"),
+            button.innerText,
+            button.textContent
+          ].filter(Boolean).join(" "))
+          .join(" ");
+        const isRunning = /Stop generating|Stop streaming|停止生成|停止串流/.test(controls);
+
+        return JSON.stringify({
+          status: response ? (isRunning ? "running" : "complete") : "running",
+          response,
+          conversation_url: getConversationUrl()
+        });
+    })()"#
+        .to_string()
+}
+
 fn get_gemini_conversation_url(profile_filter: Option<&str>) -> Result<String, MacosError> {
     let js = r#"(() => {
         const url = window.location.href || "";
@@ -696,7 +825,9 @@ fn get_gemini_conversation_url(profile_filter: Option<&str>) -> Result<String, M
     Ok(url.to_string())
 }
 
-pub fn gemini_list_conversations(profile_filter: Option<&str>) -> Result<Vec<SafariConversation>, MacosError> {
+pub fn gemini_list_conversations(
+    profile_filter: Option<&str>,
+) -> Result<Vec<SafariConversation>, MacosError> {
     let js = r#"(() => {
         const items = document.querySelectorAll('a[href*="/app/"]');
         const convos = [];
@@ -740,12 +871,16 @@ pub fn gemini_read_conversation(
     let raw = execute_js_for_profile(read_js, profile_filter, "safari_gemini_read_content")?;
     let value: serde_json::Value = serde_json::from_str(&raw)
         .map_err(|e| MacosError::Other(format!("failed to parse read result: {e}")))?;
-    let status = value.get("status").and_then(|v| v.as_str()).unwrap_or("error");
+    let status = value
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("error");
     let response = value.get("response").and_then(|v| v.as_str()).unwrap_or("");
     Ok(SafariAiResponseResult {
         provider: "gemini".to_string(),
         status: status.to_string(),
         response: response.to_string(),
+        conversation_url: None,
     })
 }
 
@@ -805,14 +940,15 @@ pub fn gemini_save_images(
             continue;
         }
 
-        let bytes = engine.decode(b64).map_err(|e| {
-            MacosError::Other(format!("base64 decode failed for image {i}: {e}"))
-        })?;
+        let bytes = engine
+            .decode(b64)
+            .map_err(|e| MacosError::Other(format!("base64 decode failed for image {i}: {e}")))?;
 
         let filename = format!("gemini_image_{i}.png");
         let filepath = out_path.join(&filename);
-        std::fs::write(&filepath, &bytes)
-            .map_err(|e| MacosError::Other(format!("failed to write {}: {e}", filepath.display())))?;
+        std::fs::write(&filepath, &bytes).map_err(|e| {
+            MacosError::Other(format!("failed to write {}: {e}", filepath.display()))
+        })?;
         saved.push(filepath.to_string_lossy().into_owned());
     }
 
@@ -846,12 +982,16 @@ pub fn gemini_save_media(
     let raw = execute_js_for_profile(js, profile_filter, "safari_gemini_media_download")?;
     let value: serde_json::Value = serde_json::from_str(&raw)
         .map_err(|e| MacosError::Other(format!("failed to parse media result: {e}")))?;
-    let status = value.get("status").and_then(|v| v.as_str()).unwrap_or("error");
+    let status = value
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("error");
     let response = value.get("response").and_then(|v| v.as_str()).unwrap_or("");
     Ok(SafariAiResponseResult {
         provider: "gemini".to_string(),
         status: status.to_string(),
         response: response.to_string(),
+        conversation_url: None,
     })
 }
 
@@ -943,11 +1083,18 @@ pub fn close(index: Option<usize>) -> Result<SafariCloseResult, MacosError> {
 }
 
 pub fn source(profile_filter: Option<&str>) -> Result<SafariSourceResult, MacosError> {
-    let result = execute_js_for_profile("document.documentElement.outerHTML", profile_filter, "safari_source")?;
+    let result = execute_js_for_profile(
+        "document.documentElement.outerHTML",
+        profile_filter,
+        "safari_source",
+    )?;
     Ok(SafariSourceResult { html: result })
 }
 
-pub fn read(selector: Option<&str>, profile_filter: Option<&str>) -> Result<SafariReadResult, MacosError> {
+pub fn read(
+    selector: Option<&str>,
+    profile_filter: Option<&str>,
+) -> Result<SafariReadResult, MacosError> {
     let js = match selector {
         Some(selector) => selector_text_js(selector),
         None => "(document.body.innerText ?? \"\").trim()".to_string(),
@@ -1014,8 +1161,9 @@ pub fn wait(selector: &str, timeout_seconds: u64) -> Result<SafariWaitResult, Ma
 }
 
 fn parse_deep_research_payload(payload: &str) -> Result<SafariDeepResearchResult, MacosError> {
-    let value: Value = serde_json::from_str(payload)
-        .map_err(|error| MacosError::Other(format!("invalid deep research payload: {error}: {payload}")))?;
+    let value: Value = serde_json::from_str(payload).map_err(|error| {
+        MacosError::Other(format!("invalid deep research payload: {error}: {payload}"))
+    })?;
     let status = value
         .get("status")
         .and_then(Value::as_str)
@@ -1037,8 +1185,14 @@ fn parse_deep_research_payload(payload: &str) -> Result<SafariDeepResearchResult
         mode: "deep-research".to_string(),
         status: status.to_string(),
         conversation_url: None,
-        plan: value.get("plan").and_then(Value::as_str).map(ToOwned::to_owned),
-        response: value.get("response").and_then(Value::as_str).map(ToOwned::to_owned),
+        plan: value
+            .get("plan")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+        response: value
+            .get("response")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
         actions,
     })
 }
@@ -1048,9 +1202,7 @@ pub fn prepare_gemini_mode(
     profile_filter: Option<&str>,
 ) -> Result<SafariAiReadyResult, MacosError> {
     let url = gemini_mode_url(mode);
-    let nav_js = format!(
-        r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,
-    );
+    let nav_js = format!(r#"(function() {{ window.location.href = "{url}"; return "true"; }})()"#,);
     let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_gemini_mode_navigate")?;
     thread::sleep(Duration::from_millis(2500));
 
@@ -1075,7 +1227,6 @@ pub fn prepare_gemini_mode(
     })
 }
 
-
 pub fn start_gemini_deep_research(
     prompt: &str,
     auto_confirm: bool,
@@ -1089,7 +1240,9 @@ pub fn start_gemini_deep_research(
         "safari_gemini_deep_research_fill",
     )?;
     if filled.trim() != "true" {
-        return Err(MacosError::Other(format!("failed to fill deep research input: {filled}")));
+        return Err(MacosError::Other(format!(
+            "failed to fill deep research input: {filled}"
+        )));
     }
 
     wait_and_click_send(profile_filter)?;
@@ -1132,7 +1285,8 @@ pub fn poll_gemini_deep_research(
     let js = gemini_deep_research_poll_js();
 
     while Instant::now() < deadline {
-        let payload = execute_js_for_profile(&js, profile_filter, "safari_gemini_deep_research_poll")?;
+        let payload =
+            execute_js_for_profile(&js, profile_filter, "safari_gemini_deep_research_poll")?;
         let result = parse_deep_research_payload(&payload)?;
         match result.status.as_str() {
             "plan_ready" | "complete" => return Ok(result),
@@ -1141,7 +1295,7 @@ pub fn poll_gemini_deep_research(
                 return Err(MacosError::Other(format!(
                     "unknown deep research status: {}",
                     result.status
-                )))
+                )));
             }
         }
 
@@ -1169,7 +1323,9 @@ pub fn send_gemini_prompt(
         "safari_gemini_prompt_fill",
     )?;
     if filled.trim() != "true" {
-        return Err(MacosError::Other(format!("failed to fill Gemini input: {filled}")));
+        return Err(MacosError::Other(format!(
+            "failed to fill Gemini input: {filled}"
+        )));
     }
 
     wait_and_click_send(profile_filter)?;
@@ -1194,6 +1350,7 @@ pub fn send_gemini_prompt(
                     provider: "gemini".to_string(),
                     status: "complete".to_string(),
                     response: trimmed.to_string(),
+                    conversation_url: None,
                 });
             }
         } else {
@@ -1207,12 +1364,88 @@ pub fn send_gemini_prompt(
             provider: "gemini".to_string(),
             status: "timeout".to_string(),
             response: last_text,
+            conversation_url: None,
         });
     }
 
     Err(MacosError::Other(
         "timeout waiting for Gemini response".to_string(),
     ))
+}
+
+pub fn send_chatgpt_prompt(
+    prompt: &str,
+    profile_filter: Option<&str>,
+) -> Result<SafariAiResponseResult, MacosError> {
+    let filled = execute_js_for_profile(
+        &build_chatgpt_fill_input_js(prompt),
+        profile_filter,
+        "safari_chatgpt_prompt_fill",
+    )?;
+    if filled.trim() != "true" {
+        return Err(MacosError::Other(format!(
+            "failed to fill ChatGPT input: {filled}"
+        )));
+    }
+
+    wait_and_click_chatgpt_send(profile_filter)?;
+
+    let deadline = Instant::now() + Duration::from_secs(120);
+    let response_js = chatgpt_response_extract_js();
+    let mut last_response = String::new();
+    let mut last_conversation_url: Option<String> = None;
+
+    while Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(750));
+        let payload =
+            execute_js_for_profile(&response_js, profile_filter, "safari_chatgpt_response")?;
+        let value: Value = serde_json::from_str(&payload).map_err(|e| {
+            MacosError::Other(format!("failed to parse chatgpt response payload: {e}"))
+        })?;
+
+        let status = value
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or("running");
+        let response = value
+            .get("response")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+
+        let conversation_url = value
+            .get("conversation_url")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned);
+        if conversation_url.is_some() {
+            last_conversation_url = conversation_url.clone();
+        }
+
+        let should_skip = should_skip_chatgpt_response(response, prompt);
+        if !should_skip {
+            last_response = response.to_string();
+        }
+
+        if status == "complete" {
+            return Ok(SafariAiResponseResult {
+                provider: "chatgpt".to_string(),
+                status: "complete".to_string(),
+                response: if should_skip {
+                    last_response.clone()
+                } else {
+                    response.to_string()
+                },
+                conversation_url: conversation_url.or_else(|| last_conversation_url.clone()),
+            });
+        }
+    }
+
+    Ok(SafariAiResponseResult {
+        provider: "chatgpt".to_string(),
+        status: "timeout".to_string(),
+        response: last_response,
+        conversation_url: last_conversation_url,
+    })
 }
 
 fn execute_js(js_code: &str, context: &str) -> Result<String, MacosError> {
@@ -1224,20 +1457,23 @@ fn execute_js_for_profile(
     profile_filter: Option<&str>,
     context: &str,
 ) -> Result<String, MacosError> {
-    let stdout = run_capture(&build_exec_script_for_profile(js_code, profile_filter), context)?;
+    let stdout = run_capture(
+        &build_exec_script_for_profile(js_code, profile_filter),
+        context,
+    )?;
     Ok(decode_field(stdout.trim()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        TAB_SEPARATOR, build_active_tab_script, build_close_script,
-        build_exec_script, build_gemini_fill_input_js, build_gemini_go_home_js,
-        build_open_script,
-        build_tab_return_block, build_tabs_script, extract_profile, gemini_deep_research_poll_js,
-        gemini_response_extract_js, parse_deep_research_payload, parse_tab_line,
-        parse_tabs_output, selector_click_js, selector_fill_js, selector_text_js,
-        should_skip_gemini_response,
+        TAB_SEPARATOR, build_active_tab_script, build_chatgpt_click_send_js,
+        build_chatgpt_fill_input_js, build_chatgpt_go_home_js, build_close_script,
+        build_exec_script, build_gemini_fill_input_js, build_gemini_go_home_js, build_open_script,
+        build_tab_return_block, build_tabs_script, chatgpt_response_extract_js, extract_profile,
+        gemini_deep_research_poll_js, gemini_response_extract_js, parse_deep_research_payload,
+        parse_tab_line, parse_tabs_output, selector_click_js, selector_fill_js, selector_text_js,
+        should_skip_chatgpt_response, should_skip_gemini_response,
     };
 
     #[test]
@@ -1369,13 +1605,42 @@ mod tests {
     }
 
     #[test]
+    fn chatgpt_go_home_script_targets_new_chat() {
+        let script = build_chatgpt_go_home_js();
+
+        assert!(script.contains("chatgpt.com"));
+        assert!(script.contains("window.location.href"));
+    }
+
+    #[test]
+    fn chatgpt_fill_input_script_targets_prompt_textarea() {
+        let script = build_chatgpt_fill_input_js("hello from chatgpt");
+
+        assert!(script.contains("#prompt-textarea"));
+        assert!(script.contains("hello from chatgpt"));
+        assert!(script.contains("execCommand"));
+    }
+
+    #[test]
+    fn chatgpt_click_send_script_checks_accessible_labels() {
+        let script = build_chatgpt_click_send_js();
+
+        assert!(script.contains("Send prompt"));
+        assert!(script.contains("Send message"));
+        assert!(script.contains("button.disabled"));
+    }
+
+    #[test]
     fn parse_deep_research_payload_reads_plan_and_actions() {
         let payload = r#"{"status":"plan_ready","plan":"Outline","actions":["confirm","edit"]}"#;
         let result = parse_deep_research_payload(payload).expect("parse payload");
 
         assert_eq!(result.status, "plan_ready");
         assert_eq!(result.plan.as_deref(), Some("Outline"));
-        assert_eq!(result.actions, vec!["confirm".to_string(), "edit".to_string()]);
+        assert_eq!(
+            result.actions,
+            vec!["confirm".to_string(), "edit".to_string()]
+        );
     }
 
     #[test]
@@ -1399,8 +1664,24 @@ mod tests {
     }
 
     #[test]
+    fn chatgpt_response_extract_script_returns_response_and_conversation_url() {
+        let script = chatgpt_response_extract_js();
+
+        assert!(script.contains("article"));
+        assert!(script.contains("conversation_url"));
+        assert!(script.contains("window.location.href"));
+        assert!(script.contains("complete"));
+    }
+
+    #[test]
     fn should_skip_gemini_response_trims_prompt_whitespace() {
         assert!(should_skip_gemini_response("hello", "  hello  "));
         assert!(!should_skip_gemini_response("world", "  hello  "));
+    }
+
+    #[test]
+    fn should_skip_chatgpt_response_trims_prompt_whitespace() {
+        assert!(should_skip_chatgpt_response("hello", "  hello  "));
+        assert!(!should_skip_chatgpt_response("world", "  hello  "));
     }
 }
