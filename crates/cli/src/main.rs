@@ -297,6 +297,9 @@ enum SafariAction {
         /// Restrict operations to a Safari profile
         #[arg(long)]
         profile: Option<String>,
+        /// Target a specific tab by index or URL/title substring
+        #[arg(long)]
+        tab: Option<String>,
     },
 
     /// Close multiple tabs, optionally filtered by profile and/or URL pattern
@@ -317,6 +320,9 @@ enum SafariAction {
         /// Restrict operations to a Safari profile name parsed from the window title
         #[arg(long)]
         profile: Option<String>,
+        /// Target a specific tab by index or URL/title substring
+        #[arg(long)]
+        tab: Option<String>,
     },
 
     /// Read the full HTML source of the current active tab
@@ -324,6 +330,9 @@ enum SafariAction {
         /// Restrict operations to a Safari profile name parsed from the window title
         #[arg(long)]
         profile: Option<String>,
+        /// Target a specific tab by index or URL/title substring
+        #[arg(long)]
+        tab: Option<String>,
     },
 
     /// Execute JavaScript in the current active tab
@@ -333,6 +342,9 @@ enum SafariAction {
         /// Restrict operations to a Safari profile name parsed from the window title
         #[arg(long)]
         profile: Option<String>,
+        /// Target a specific tab by index or URL/title substring
+        #[arg(long)]
+        tab: Option<String>,
     },
 
     /// Click an element in the current active tab
@@ -924,7 +936,12 @@ fn main() {
                     process::exit(1);
                 }
             },
-            SafariAction::Scroll { direction, amount, profile } => {
+            SafariAction::Scroll { direction, amount, profile, tab } => {
+                if let Some(ref t) = tab {
+                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
+                        eprintln!("error: {e}"); process::exit(1);
+                    }
+                }
                 match cueward_adapter_macos::safari::scroll(&direction, amount, profile.as_deref()) {
                     Ok(result) => {
                         println!("{}", serde_json::to_string_pretty(&result).unwrap());
@@ -948,7 +965,12 @@ fn main() {
                     }
                 }
             }
-            SafariAction::Read { selector, profile } => {
+            SafariAction::Read { selector, profile, tab } => {
+                if let Some(ref t) = tab {
+                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
+                        eprintln!("error: {e}"); process::exit(1);
+                    }
+                }
                 match cueward_adapter_macos::safari::read(selector.as_deref(), profile.as_deref()) {
                     Ok(result) => {
                         println!("{}", serde_json::to_string_pretty(&result).unwrap());
@@ -960,7 +982,12 @@ fn main() {
                     }
                 }
             }
-            SafariAction::Source { profile } => {
+            SafariAction::Source { profile, tab } => {
+                if let Some(ref t) = tab {
+                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
+                        eprintln!("error: {e}"); process::exit(1);
+                    }
+                }
                 match cueward_adapter_macos::safari::source(profile.as_deref()) {
                     Ok(result) => {
                         println!("{}", serde_json::to_string_pretty(&result).unwrap());
@@ -972,7 +999,12 @@ fn main() {
                     }
                 }
             }
-            SafariAction::Exec { js_code, profile } => {
+            SafariAction::Exec { js_code, profile, tab } => {
+                if let Some(ref t) = tab {
+                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
+                        eprintln!("error: {e}"); process::exit(1);
+                    }
+                }
                 match cueward_adapter_macos::safari::exec(&js_code, profile.as_deref()) {
                     Ok(result) => {
                         println!("{}", serde_json::to_string_pretty(&result).unwrap());
@@ -1557,7 +1589,7 @@ mod tests {
 
         match cli.command {
             Command::Safari {
-                action: SafariAction::Exec { js_code, profile },
+                action: SafariAction::Exec { js_code, profile, .. },
             } => {
                 assert_eq!(js_code, "1+1");
                 assert_eq!(profile.as_deref(), Some("Ryugu"));
