@@ -844,7 +844,7 @@ fn chatgpt_image_list_js() -> String {
             if (!img.src) return false;
             if (!/^https:\/\/chatgpt\.com\/backend-api\/estuary\/content/.test(img.src)) return false;
             if (img.width < 256 || img.height < 256) return false;
-            return img.alt.includes("已產生圖像") || img.alt.includes("Generated image") || img.alt === "";
+            return img.alt.includes("已產生圖像") || img.alt.includes("Generated image");
           });
 
         const deduped = [];
@@ -872,6 +872,42 @@ fn chatgpt_image_list_js() -> String {
         });
     })()"#
         .to_string()
+}
+
+fn poll_chatgpt_images(
+    timeout_seconds: u64,
+    profile_filter: Option<&str>,
+) -> Result<SafariAiImageResult, MacosError> {
+    let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
+    let image_js = chatgpt_image_list_js();
+    let mut last_result = SafariAiImageResult {
+        provider: "chatgpt".to_string(),
+        mode: "image".to_string(),
+        status: "running".to_string(),
+        conversation_url: None,
+        images: Vec::new(),
+    };
+
+    while Instant::now() < deadline {
+        thread::sleep(Duration::from_secs(1));
+        let payload =
+            execute_js_for_profile(&image_js, profile_filter, "safari_chatgpt_image_poll")?;
+        let result = parse_chatgpt_image_payload(&payload)?;
+        if result.conversation_url.is_some() {
+            last_result.conversation_url = result.conversation_url.clone();
+        }
+        if !result.images.is_empty() {
+            last_result.images = result.images.clone();
+        }
+        last_result.status = result.status.clone();
+
+        if result.status == "complete" && !result.images.is_empty() {
+            return Ok(result);
+        }
+    }
+
+    last_result.status = "timeout".to_string();
+    Ok(last_result)
 }
 
 fn chatgpt_image_extract_js(index: usize) -> String {
@@ -1588,37 +1624,7 @@ pub fn send_chatgpt_image_prompt(
     }
 
     wait_and_click_chatgpt_send(profile_filter)?;
-
-    let deadline = Instant::now() + Duration::from_secs(180);
-    let image_js = chatgpt_image_list_js();
-    let mut last_result = SafariAiImageResult {
-        provider: "chatgpt".to_string(),
-        mode: "image".to_string(),
-        status: "running".to_string(),
-        conversation_url: None,
-        images: Vec::new(),
-    };
-
-    while Instant::now() < deadline {
-        thread::sleep(Duration::from_secs(1));
-        let payload =
-            execute_js_for_profile(&image_js, profile_filter, "safari_chatgpt_image_poll")?;
-        let result = parse_chatgpt_image_payload(&payload)?;
-        if result.conversation_url.is_some() {
-            last_result.conversation_url = result.conversation_url.clone();
-        }
-        if !result.images.is_empty() {
-            last_result.images = result.images.clone();
-        }
-        last_result.status = result.status.clone();
-
-        if result.status == "complete" && !result.images.is_empty() {
-            return Ok(result);
-        }
-    }
-
-    last_result.status = "timeout".to_string();
-    Ok(last_result)
+    poll_chatgpt_images(180, profile_filter)
 }
 
 pub fn chatgpt_save_images(
@@ -1631,14 +1637,7 @@ pub fn chatgpt_save_images(
         url = escape_js_string(conversation_url),
     );
     let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_chatgpt_save_img_navigate")?;
-    thread::sleep(Duration::from_millis(5000));
-
-    let payload = execute_js_for_profile(
-        &chatgpt_image_list_js(),
-        profile_filter,
-        "safari_chatgpt_img_list",
-    )?;
-    let result = parse_chatgpt_image_payload(&payload)?;
+    let result = poll_chatgpt_images(30, profile_filter)?;
     if result.images.is_empty() {
         return Ok(Vec::new());
     }
