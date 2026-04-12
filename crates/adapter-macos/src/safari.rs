@@ -1654,19 +1654,16 @@ fn poll_x_posts(
     let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
     let js = x_extract_feed_js();
 
-    while Instant::now() < deadline {
+    loop {
         let raw = execute_js_for_profile(&js, profile_filter, "safari_x_feed")?;
         let posts: Vec<SocialFeedPost> = serde_json::from_str(&raw)
             .map_err(|e| MacosError::Other(format!("failed to parse x feed: {e}")))?;
-        if !posts.is_empty() {
+
+        if !posts.is_empty() || Instant::now() >= deadline {
             return Ok(posts);
         }
         thread::sleep(Duration::from_millis(500));
     }
-
-    let raw = execute_js_for_profile(&js, profile_filter, "safari_x_feed")?;
-    serde_json::from_str(&raw)
-        .map_err(|e| MacosError::Other(format!("failed to parse x feed: {e}")))
 }
 
 fn navigate_tab_or_open(
