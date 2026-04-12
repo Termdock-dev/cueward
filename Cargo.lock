@@ -312,6 +312,7 @@ dependencies = [
 name = "cueward-adapter-macos"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "chrono",
  "cueward-core",
  "rusqlite",

@@ -304,6 +304,25 @@ enum SafariAction {
         tab: Option<String>,
     },
 
+    /// Scroll repeatedly and return only newly loaded content
+    ScrollAndRead {
+        /// Number of scroll/read iterations
+        #[arg(long, default_value = "1")]
+        times: u64,
+        /// Pixels to scroll each iteration
+        #[arg(long)]
+        amount: Option<i64>,
+        /// Restrict operations to a Safari profile
+        #[arg(long)]
+        profile: Option<String>,
+        /// Target a specific tab by index or URL/title substring
+        #[arg(long)]
+        tab: Option<String>,
+        /// Optional CSS selector to scope the read area
+        #[arg(long)]
+        selector: Option<String>,
+    },
+
     /// Close multiple tabs, optionally filtered by profile and/or URL pattern
     CloseTabs {
         /// Restrict to a Safari profile name
@@ -958,6 +977,28 @@ fn main() {
                     Ok(result) => {
                         println!("{}", serde_json::to_string_pretty(&result).unwrap());
                         eprintln!("scrolled {direction}");
+                    }
+                    Err(e) => {
+                        eprintln!("error: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            SafariAction::ScrollAndRead { times, amount, profile, tab, selector } => {
+                if let Some(ref t) = tab {
+                    if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
+                        eprintln!("error: {e}"); process::exit(1);
+                    }
+                }
+                match cueward_adapter_macos::safari::scroll_and_read(
+                    times,
+                    amount,
+                    selector.as_deref(),
+                    profile.as_deref(),
+                ) {
+                    Ok(result) => {
+                        print_external("safari/scroll-and-read", &serde_json::to_string_pretty(&result).unwrap());
+                        eprintln!("scroll/read pipeline complete");
                     }
                     Err(e) => {
                         eprintln!("error: {e}");
@@ -1643,6 +1684,42 @@ mod tests {
             Command::Safari {
                 action: SafariAction::Active { profile },
             } => assert_eq!(profile.as_deref(), Some("Ryugu")),
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_scroll_and_read() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "scroll-and-read",
+            "--tab",
+            "x.com",
+            "--profile",
+            "Ryugu",
+            "--times",
+            "3",
+        ])
+        .expect("parse scroll-and-read");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::ScrollAndRead {
+                        tab,
+                        profile,
+                        times,
+                        amount,
+                        selector,
+                    },
+            } => {
+                assert_eq!(tab.as_deref(), Some("x.com"));
+                assert_eq!(profile.as_deref(), Some("Ryugu"));
+                assert_eq!(times, 3);
+                assert_eq!(amount, None);
+                assert_eq!(selector, None);
+            }
             _ => panic!("unexpected command"),
         }
     }
