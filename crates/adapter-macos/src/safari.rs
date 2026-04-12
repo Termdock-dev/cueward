@@ -909,7 +909,7 @@ fn poll_chatgpt_images(
 
         if result.status == "complete" {
             if started_at.elapsed() >= Duration::from_secs(empty_complete_grace_seconds) {
-                return Ok(result);
+                return Ok(last_result);
             }
             continue;
         }
