@@ -19,7 +19,7 @@ use crate::applescript::{escape, escape_body, run_capture as run_applescript_cap
 /// Core Data epoch: 2001-01-01 00:00:00 UTC
 const CORE_DATA_EPOCH: i64 = 978_307_200;
 const SAFARI_OPERATION_DELAY: Duration = Duration::from_secs(1);
-const SAFARI_LOCK_TTL_SECS: i64 = 300;
+const SAFARI_LOCK_TTL_SECS: i64 = 1800;
 const SAFARI_429_MAX_RETRIES: usize = 3;
 const TAB_SEPARATOR: &str = "---TAB_SEP---";
 const FIELD_SEPARATOR: &str = "<<<FIELD_SEP>>>";
@@ -235,13 +235,18 @@ fn throttle_safari_operation() -> Result<(), MacosError> {
 }
 
 fn is_safari_rate_limited(text: &str) -> bool {
-    let normalized = text.to_ascii_lowercase();
+    let trimmed = text.trim();
+    if trimmed.is_empty() || trimmed.len() > 256 {
+        return false;
+    }
+
+    let normalized = trimmed.to_ascii_lowercase();
     normalized.contains("too many requests")
         || normalized.contains("http 429")
         || normalized.contains("429 too many requests")
-        || normalized.contains("rate limit")
-        || normalized.contains("rate-limited")
         || normalized.contains("\"status\":429")
+        || normalized == "rate limit exceeded"
+        || normalized == "rate-limited"
 }
 
 fn safari_rate_limit_backoff(attempt: usize) -> Duration {
@@ -2991,6 +2996,12 @@ mod tests {
     fn safari_rate_limit_detection_matches_expected_signals() {
         assert!(is_safari_rate_limited("HTTP 429 Too Many Requests"));
         assert!(is_safari_rate_limited("rate limit exceeded"));
+        assert!(is_safari_rate_limited(
+            r#"{"status":429,"error":"Too Many Requests"}"#
+        ));
+        assert!(!is_safari_rate_limited(
+            "this article explains how rate limits work"
+        ));
         assert!(!is_safari_rate_limited("all good"));
     }
 
@@ -3055,6 +3066,11 @@ mod tests {
         release_safari_lock(&lock_path, 77).expect("release lock");
 
         assert!(read_safari_lock(&lock_path).is_none());
+    }
+
+    #[test]
+    fn safari_lock_ttl_covers_long_running_safari_jobs() {
+        assert!(SAFARI_LOCK_TTL_SECS >= 900);
     }
 
     #[test]

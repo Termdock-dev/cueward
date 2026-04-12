@@ -18,9 +18,9 @@
 
 1. 固定節流：每次 Safari automation 底層操作之間至少等待 1 秒。
 2. 429 退避：若底層結果或錯誤文字可辨識為 rate limit，最多重試 3 次，等待 30/60/90 秒。
-3. File lock：使用 `~/.cueward/lock.json`，TTL 300 秒，避免多個 process 同時操控 Safari。
+3. File lock：使用 `~/.cueward/lock.json`，TTL 1800 秒，避免多個 process 同時操控 Safari。
 
 ## Notes
 
-- lock 採最小可行設計：以 TTL 作為 crash 後的自動恢復機制，不額外依賴 process liveness 檢查。
-- 429 偵測僅針對明確訊號，例如 `Too Many Requests`、`HTTP 429`、`rate limit` 等，避免過度誤判一般內容。
+- lock 採最小可行設計：以 TTL 作為 crash 後的自動恢復機制，不額外依賴 process liveness 檢查；TTL 需覆蓋最長 Safari 任務。
+- 429 偵測僅針對明確且短訊號，例如 `Too Many Requests`、`HTTP 429`、`"status":429` 等，避免過度誤判一般內容。
