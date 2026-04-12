@@ -76,6 +76,16 @@ cueward safari exec "document.title"
 cueward safari click "#submit"
 cueward safari fill "textarea" "hello from cueward"
 cueward safari wait ".result" --timeout 30
+
+# Scroll the page
+cueward safari scroll down
+cueward safari scroll up --amount 1000
+cueward safari scroll top
+cueward safari scroll bottom --profile Ryugu
+
+# Close multiple tabs by profile or URL pattern
+cueward safari close-tabs --profile Ryugu --url "gemini.google.com"
+cueward safari close-tabs --profile Ryugu  # close all tabs in profile
 ```
 
 ### Safari AI

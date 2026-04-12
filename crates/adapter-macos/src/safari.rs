@@ -1247,6 +1247,44 @@ pub fn close(index: Option<usize>) -> Result<SafariCloseResult, MacosError> {
     })
 }
 
+pub fn close_tabs(profile_filter: Option<&str>, url_pattern: Option<&str>) -> Result<usize, MacosError> {
+    let all_tabs = tabs(profile_filter)?;
+    let to_close: Vec<&SafariTab> = all_tabs
+        .iter()
+        .filter(|tab| match url_pattern {
+            Some(pattern) => tab.url.contains(pattern),
+            None => true,
+        })
+        .collect();
+
+    // Close from last to first to avoid index shifting
+    let mut closed = 0;
+    for tab in to_close.iter().rev() {
+        let script = format!(
+            r#"
+            tell application "Safari"
+                repeat with w in every window
+                    if (id of w) is {window_id} then
+                        set tabIdx to {tab_index} + 1
+                        if tabIdx ≤ (count of tabs of w) then
+                            close tab tabIdx of w
+                        end if
+                        exit repeat
+                    end if
+                end repeat
+            end tell
+            "#,
+            window_id = tab.window_id,
+            tab_index = tab.index,
+        );
+        if run_capture(&script, "safari_close_tab").is_ok() {
+            closed += 1;
+        }
+    }
+
+    Ok(closed)
+}
+
 pub fn source(profile_filter: Option<&str>) -> Result<SafariSourceResult, MacosError> {
     let result = execute_js_for_profile(
         "document.documentElement.outerHTML",
@@ -1323,6 +1361,34 @@ pub fn wait(selector: &str, timeout_seconds: u64) -> Result<SafariWaitResult, Ma
         }
         thread::sleep(Duration::from_millis(250));
     }
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SafariScrollResult {
+    pub scroll_x: i64,
+    pub scroll_y: i64,
+}
+
+pub fn scroll(
+    direction: &str,
+    amount: Option<i64>,
+    profile_filter: Option<&str>,
+) -> Result<SafariScrollResult, MacosError> {
+    let pixels = amount.unwrap_or(500).unsigned_abs();
+    let js = match direction {
+        "down" => format!("(function(){{ window.scrollBy(0, {pixels}); return JSON.stringify({{ x: Math.round(window.scrollX), y: Math.round(window.scrollY) }}); }})()"),
+        "up" => format!("(function(){{ window.scrollBy(0, -{pixels}); return JSON.stringify({{ x: Math.round(window.scrollX), y: Math.round(window.scrollY) }}); }})()"),
+        "top" => "(function(){ window.scrollTo(0, 0); return JSON.stringify({ x: 0, y: 0 }); })()".to_string(),
+        "bottom" => "(function(){ window.scrollTo(0, document.body.scrollHeight); return JSON.stringify({ x: Math.round(window.scrollX), y: Math.round(window.scrollY) }); })()".to_string(),
+        _ => return Err(MacosError::Other(format!("unknown scroll direction: {direction}. Use: up, down, top, bottom"))),
+    };
+    let raw = execute_js_for_profile(&js, profile_filter, "safari_scroll")?;
+    let value: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|e| MacosError::Other(format!("failed to parse scroll result: {e}")))?;
+    Ok(SafariScrollResult {
+        scroll_x: value.get("x").and_then(|v| v.as_i64()).unwrap_or(0),
+        scroll_y: value.get("y").and_then(|v| v.as_i64()).unwrap_or(0),
+    })
 }
 
 fn parse_deep_research_payload(payload: &str) -> Result<SafariDeepResearchResult, MacosError> {
