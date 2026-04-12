@@ -22,6 +22,7 @@ pub struct CalendarEvent {
 fn applescript_date_block(var_name: &str, dt: &DateTime<Local>) -> String {
     format!(
         r#"set {var_name} to current date
+            set day of {var_name} to 1
             set year of {var_name} to {y}
             set month of {var_name} to {m}
             set day of {var_name} to {d}
@@ -103,8 +104,8 @@ pub fn list_events(
     to: DateTime<Local>,
     calendar_filter: Option<&str>,
 ) -> Result<Vec<CalendarEvent>, MacosError> {
-    let from_str = format_for_applescript(&from);
-    let to_str = format_for_applescript(&to);
+    let from_block = applescript_date_block("fromDate", &from);
+    let to_block = applescript_date_block("toDate", &to);
 
     let cal_filter_block = match calendar_filter {
         Some(name) => {
@@ -142,9 +143,10 @@ pub fn list_events(
             return escaped_text
         end encode_field
 
+        {from_block}
+        {to_block}
+
         tell application "Calendar"
-            set fromDate to date "{from_str}"
-            set toDate to date "{to_str}"
             set output to ""
             {cal_filter_block}
             repeat with aCal in targetCals
