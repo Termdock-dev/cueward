@@ -3,7 +3,7 @@ use std::process;
 use chrono::Utc;
 
 use cueward_adapter_macos::MacosAdapter;
-use cueward_core::{CueIndex, PlatformAdapter, State, Tagger, inbox};
+use cueward_core::{PlatformAdapter, State, inbox};
 
 use super::Source;
 use super::helpers::{parse_duration, print_external, source_name};
@@ -58,9 +58,6 @@ pub(crate) fn dispatch(source: Source, since: String) {
         Ok(path) => eprintln!("saved to {}", path.display()),
         Err(e) => eprintln!("warning: failed to save inbox: {e}"),
     }
-
-    let _ = CueIndex::open_or_create();
-    let _ = Tagger::load();
 
     let json = serde_json::to_string_pretty(&all_cues).unwrap();
     print_external("capture", &json);
