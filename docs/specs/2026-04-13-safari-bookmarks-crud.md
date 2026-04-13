@@ -16,10 +16,10 @@
 新增 `safari bookmarks` 子命令：
 
 ```bash
-cueward safari bookmarks list [--profile "Ryugu"] [--folder "Work/AI Tools"]
-cueward safari bookmarks search "claude" [--profile "Ryugu"] [--folder "Work/AI Tools"]
-cueward safari bookmarks add --title "Claude" --url "https://claude.ai" [--profile "Ryugu"] [--folder "Work/AI Tools"]
-cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" [--profile "Ryugu"] [--folder "Work/AI Tools"]
+cueward safari bookmarks list [--profile "Work"] [--folder "Projects/AI Tools"]
+cueward safari bookmarks search "claude" [--profile "Work"] [--folder "Projects/AI Tools"]
+cueward safari bookmarks add --title "Claude" --url "https://claude.ai" [--profile "Work"] [--folder "Projects/AI Tools"]
+cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" [--profile "Work"] [--folder "Projects/AI Tools"]
 ```
 
 語意：
@@ -41,9 +41,9 @@ cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" [--pr
 
 ## Folder Path 規則
 
-- `--profile Ryugu --folder "Work/AI Tools"` 代表沿著 `Ryugu -> Work -> AI Tools` 往下走
-- 若只有 `--profile Ryugu`，等同操作 `Ryugu` root folder
-- `--folder "Work/AI Tools"` 代表沿著 `Work -> AI Tools` 往下走
+- `--profile Work --folder "Projects/AI Tools"` 代表沿著 `Work -> Projects -> AI Tools` 往下走
+- 若只有 `--profile Work`，等同操作 `Work` root folder
+- `--folder "Projects/AI Tools"` 代表沿著 `Projects -> AI Tools` 往下走
 - 路徑分隔符固定為 `/`
 - 第一期不支援 folder title 本身包含 `/`
 - 空 segment 不允許，例如 `Work//AI`

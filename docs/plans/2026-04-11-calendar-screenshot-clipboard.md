@@ -1012,11 +1012,11 @@ git commit -m "build: release build with calendar, screenshot, clipboard"
 
 ---
 
-### Task 9: Update Ryugu daemon tools/cueward.ts
+### Task 9: Update host app tools/cueward.ts
 
 **Files:**
-- Modify: `/Users/cyh/Development/Ryugu/daemon/src/tools/cueward.ts`
-- Modify: `/Users/cyh/Development/Ryugu/daemon/src/tools/tools.test.ts`
+- Modify: `/path/to/host-app/daemon/src/tools/cueward.ts`
+- Modify: `/path/to/host-app/daemon/src/tools/tools.test.ts`
 
 - [ ] **Step 1: Add new actions to VALID_ACTIONS and subcommand whitelists**
 
@@ -1127,16 +1127,16 @@ Add to `tools.test.ts`:
 
 - [ ] **Step 4: Run daemon tests**
 
-Run: `cd /Users/cyh/Development/Ryugu/daemon && npx tsx --test src/tools/tools.test.ts 2>&1 | tail -10`
+Run: `cd /path/to/host-app/daemon && npx tsx --test src/tools/tools.test.ts 2>&1 | tail -10`
 Expected: all PASS
 
-Run: `cd /Users/cyh/Development/Ryugu/daemon && npm test 2>&1 | tail -5`
+Run: `cd /path/to/host-app/daemon && npm test 2>&1 | tail -5`
 Expected: all PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/cyh/Development/Ryugu
+cd /path/to/host-app
 git add daemon/src/tools/cueward.ts daemon/src/tools/tools.test.ts
 git commit -m "feat(tools): add calendar, screenshot, clipboard to cueward wrapper"
 ```

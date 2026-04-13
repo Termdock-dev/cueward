@@ -38,7 +38,7 @@ fn cli_parses_safari_bookmarks_list_with_profile() {
         "bookmarks",
         "list",
         "--profile",
-        "Ryugu",
+        "Work",
     ])
     .expect("parse safari bookmarks list with profile");
 
@@ -49,7 +49,7 @@ fn cli_parses_safari_bookmarks_list_with_profile() {
                     action: SafariBookmarksAction::List { profile, folder },
                 },
         } => {
-            assert_eq!(profile.as_deref(), Some("Ryugu"));
+            assert_eq!(profile.as_deref(), Some("Work"));
             assert_eq!(folder, None);
         }
         _ => panic!("unexpected command"),
@@ -139,7 +139,7 @@ fn cli_parses_safari_bookmarks_add_with_profile_and_folder() {
         "--url",
         "https://claude.ai",
         "--profile",
-        "Ryugu",
+        "Work",
         "--folder",
         "Work/AI Tools",
     ])
@@ -160,7 +160,7 @@ fn cli_parses_safari_bookmarks_add_with_profile_and_folder() {
         } => {
             assert_eq!(title, "Claude");
             assert_eq!(url, "https://claude.ai");
-            assert_eq!(profile.as_deref(), Some("Ryugu"));
+            assert_eq!(profile.as_deref(), Some("Work"));
             assert_eq!(folder.as_deref(), Some("Work/AI Tools"));
         }
         _ => panic!("unexpected command"),
