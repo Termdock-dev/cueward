@@ -12,12 +12,12 @@ use cueward_core::{Cue, CueSource};
 
 use crate::MacosError;
 use crate::applescript::{escape, escape_body, run_capture as run_applescript_capture};
-use crate::safari_guard::{safari_automation_state, with_safari_session};
 #[cfg(test)]
 pub(crate) use crate::safari_guard::{
     SAFARI_LOCK_TTL_SECS, SafariAutomationSession, SafariLockFile, acquire_safari_lock,
     read_safari_lock, release_safari_lock,
 };
+use crate::safari_guard::{safari_automation_state, with_safari_session};
 
 /// Core Data epoch: 2001-01-01 00:00:00 UTC
 const CORE_DATA_EPOCH: i64 = 978_307_200;
