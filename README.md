@@ -383,14 +383,28 @@ mkdir -p ~/.claude/skills/ && cp -r skills/cueward-agent ~/.claude/skills/
 
 ```
 crates/
-├── core/            Cue struct, PlatformAdapter trait, BM25 index, auto-tagger
-├── cli/             clap CLI (capture, triage, search, send, plan, reminders, ocr, safari,
-│                    notes, quick-notes, calendar, screenshot, clipboard)
-├── adapter-macos/   Safari (SQLite), Notes (AppleScript), Messages (SQLite),
-│                    Safari current tabs (AppleScript), Reminders write/read (AppleScript),
-│                    Calendar (AppleScript), Vision OCR (Swift), Screenshot (screencapture),
-│                    Clipboard (pbpaste/pbcopy)
-└── adapter-windows/ Reserved for future cross-platform support
+├── core/               Cue struct, PlatformAdapter trait, BM25 index, auto-tagger
+├── cli/
+│   ├── main.rs         CLI entrypoint
+│   └── commands/       Command-local clap enums, dispatch, and parse tests
+├── adapter-macos/
+│   ├── safari/
+│   │   ├── mod.rs      Public Safari facade + re-exports
+│   │   ├── types.rs    Shared Safari result types
+│   │   ├── script.rs   Shared AppleScript / JavaScript builders
+│   │   ├── core.rs     Tabs, open/close, read/exec, scroll / scroll-and-read
+│   │   ├── history.rs  Safari History.db capture
+│   │   ├── social/     Threads / X feed extractors
+│   │   └── ai/         Gemini / ChatGPT / Grok provider modules
+│   ├── bookmarks.rs    Safari bookmarks CRUD
+│   ├── safari_guard.rs Shared Safari rate limit + file lock guard
+│   ├── notes.rs        Apple Notes automation
+│   ├── reminders.rs    Apple Reminders read / write
+│   ├── calendar.rs     Apple Calendar read / write
+│   ├── screenshot.rs   Screenshot capture
+│   ├── clipboard.rs    Clipboard read / write
+│   └── ocr.rs          Vision OCR
+└── adapter-windows/    Reserved for future cross-platform support
 ```
 
 - **Core Engine + Adapter Pattern**: Platform-specific code is isolated in adapters. Core logic is platform-agnostic.
