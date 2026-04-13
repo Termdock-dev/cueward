@@ -2,6 +2,8 @@
 
 所有 Agent（Codex、Claude、Gemini）在此 repo 工作時遵守以下規則。
 
+詳細技術規範見 [CLAUDE.md](CLAUDE.md)。
+
 ## 架構
 
 ```
