@@ -163,10 +163,16 @@ mod tests {
                 }),
                 BookmarkNode::Folder(BookmarkFolder {
                     title: "Personal".to_string(),
-                    children: vec![BookmarkNode::Bookmark(BookmarkEntry {
-                        title: "Blog".to_string(),
-                        url: "https://example.com/blog".to_string(),
-                    })],
+                    children: vec![
+                        BookmarkNode::Bookmark(BookmarkEntry {
+                            title: "Blog".to_string(),
+                            url: "https://example.com/blog".to_string(),
+                        }),
+                        BookmarkNode::Bookmark(BookmarkEntry {
+                            title: "CAFÉ".to_string(),
+                            url: "https://example.com/cafe".to_string(),
+                        }),
+                    ],
                 }),
             ],
         }
@@ -199,6 +205,15 @@ mod tests {
 
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].title.as_deref(), Some("Claude"));
+    }
+
+    #[test]
+    fn bookmarks_search_handles_non_ascii_case_folding() {
+        let tree = sample_bookmarks_tree();
+        let items = search_items(&tree, "café", Some("Personal")).expect("search");
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].title.as_deref(), Some("CAFÉ"));
     }
 
     #[test]

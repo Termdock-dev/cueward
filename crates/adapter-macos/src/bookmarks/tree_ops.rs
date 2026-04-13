@@ -119,7 +119,7 @@ pub(super) fn search_items(
     folder: Option<&str>,
 ) -> Result<Vec<SafariBookmarkItem>, MacosError> {
     let (children, current_path) = resolve_children(tree, folder)?;
-    let normalized_query = query.trim().to_ascii_lowercase();
+    let normalized_query = query.trim().to_lowercase();
     let mut results = Vec::new();
     collect_search_matches(children, &current_path, &normalized_query, &mut results);
     Ok(results)
@@ -143,8 +143,8 @@ fn collect_search_matches(
                 );
             }
             BookmarkNode::Bookmark(entry) => {
-                let title = entry.title.to_ascii_lowercase();
-                let url = entry.url.to_ascii_lowercase();
+                let title = entry.title.to_lowercase();
+                let url = entry.url.to_lowercase();
                 if title.contains(normalized_query) || url.contains(normalized_query) {
                     results.push(SafariBookmarkItem {
                         kind: SafariBookmarkItemKind::Bookmark,

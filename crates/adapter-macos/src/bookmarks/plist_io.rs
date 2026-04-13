@@ -198,8 +198,16 @@ fn load_root_value(path: &Path) -> Result<Value, MacosError> {
 }
 
 fn save_root_value(path: &Path, root: &Value) -> Result<(), MacosError> {
-    root.to_file_binary(path)
-        .map_err(|err| MacosError::Other(format!("plist write failed: {err}")))
+    let parent = path
+        .parent()
+        .ok_or_else(|| MacosError::Other("invalid path".to_string()))?;
+    let mut temp = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|err| MacosError::Other(format!("failed to create temp file: {err}")))?;
+    root.to_writer_binary(&mut temp)
+        .map_err(|err| MacosError::Other(format!("plist write failed: {err}")))?;
+    temp.persist(path)
+        .map_err(|err| MacosError::Other(format!("failed to persist plist: {err}")))?;
+    Ok(())
 }
 
 fn resolve_children_mut_value<'a>(
