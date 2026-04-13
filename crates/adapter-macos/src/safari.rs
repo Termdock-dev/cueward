@@ -1304,12 +1304,11 @@ fn grok_response_extract_js() -> String {
           .map((button) => [
             button.getAttribute("aria-label"),
             button.getAttribute("title"),
-            button.getAttribute("data-testid"),
             button.innerText,
             button.textContent
           ].filter(Boolean).join(" "))
           .join(" ");
-        const isRunning = /Stop|停止|Thinking|Generating/i.test(controls);
+        const isRunning = /Stop generating|Stop responding|停止生成|停止回應|Thinking\.\.\.|Generating/i.test(controls);
 
         return JSON.stringify({
           status: response ? (isRunning ? "running" : "complete") : "running",
