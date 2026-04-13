@@ -2,7 +2,7 @@ mod image;
 
 use std::collections::HashMap;
 
-use cueward_core::{AttachmentSegment, Cue, CueSource};
+use cueward_core::{AttachmentKind, AttachmentSegment, Cue, CueSource};
 
 use super::{ATTACHMENT_LABEL, AttachmentOcrBlock, MEDIA_MATCH_WINDOW_SECS, MediaAttachment, MediaNote};
 use image::{collect_attachment_ocr_blocks, materialize_attachments};
@@ -19,15 +19,18 @@ pub(crate) fn enrich_cues_with_attachments(cues: &mut [Cue], media_notes: &[Medi
         }
 
         let Some(media_note) = match_media_note(cue, media_notes) else {
+            cue.attachment_segments = build_unresolved_segments(placeholder_count);
             continue;
         };
 
         if media_note.attachments.is_empty() {
+            cue.attachment_segments = build_unresolved_segments(placeholder_count);
             continue;
         }
 
         let attachments = materialize_attachments(&media_note.attachments, placeholder_count);
         if attachments.is_empty() {
+            cue.attachment_segments = build_unresolved_segments(placeholder_count);
             continue;
         }
 
@@ -146,7 +149,7 @@ fn build_attachment_segments(
         })
         .collect();
 
-    attachments
+    let mut segments: Vec<AttachmentSegment> = attachments
         .iter()
         .take(placeholder_count)
         .enumerate()
@@ -155,12 +158,37 @@ fn build_attachment_segments(
             let ocr = ocr_by_attachment.get(&key);
             AttachmentSegment {
                 index: idx + 1,
-                filename: attachment.filename.clone(),
-                path: attachment.path.display().to_string(),
+                kind: AttachmentKind::Image,
+                filename: Some(attachment.filename.clone()),
+                path: Some(attachment.path.display().to_string()),
                 sha256: attachment.sha256.clone(),
                 ocr_text: ocr.map(|block| block.text.clone()),
                 has_ocr: ocr.is_some(),
             }
+        })
+        .collect();
+
+    if placeholder_count > segments.len() {
+        segments.extend(build_unresolved_segments_from(segments.len(), placeholder_count));
+    }
+
+    segments
+}
+
+fn build_unresolved_segments(placeholder_count: usize) -> Vec<AttachmentSegment> {
+    build_unresolved_segments_from(0, placeholder_count)
+}
+
+fn build_unresolved_segments_from(existing_count: usize, placeholder_count: usize) -> Vec<AttachmentSegment> {
+    (existing_count..placeholder_count)
+        .map(|idx| AttachmentSegment {
+            index: idx + 1,
+            kind: AttachmentKind::Unresolved,
+            filename: None,
+            path: None,
+            sha256: None,
+            ocr_text: None,
+            has_ocr: false,
         })
         .collect()
 }
@@ -175,7 +203,7 @@ mod tests {
     use std::path::PathBuf;
 
     use chrono::{TimeZone, Utc};
-    use cueward_core::{Cue, CueSource};
+    use cueward_core::{AttachmentKind, Cue, CueSource};
 
     use super::{
         AttachmentOcrBlock, MediaAttachment, MediaNote, append_attachment_ocr,
@@ -230,8 +258,18 @@ mod tests {
 
         assert_eq!(cues[0].content, "[Attachment 1: scan.jpg]");
         assert_eq!(cues[0].attachment_segments.len(), 1);
-        assert_eq!(cues[0].attachment_segments[0].filename, "scan.jpg");
-        assert_eq!(cues[0].attachment_segments[0].path, "/tmp/scan.jpg");
+        assert!(matches!(
+            cues[0].attachment_segments[0].kind,
+            AttachmentKind::Image
+        ));
+        assert_eq!(
+            cues[0].attachment_segments[0].filename.as_deref(),
+            Some("scan.jpg")
+        );
+        assert_eq!(
+            cues[0].attachment_segments[0].path.as_deref(),
+            Some("/tmp/scan.jpg")
+        );
         assert_eq!(
             cues[0].attachment_segments[0].sha256.as_deref(),
             Some("abc123")
@@ -284,8 +322,9 @@ mod tests {
 
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].index, 1);
-        assert_eq!(segments[0].filename, "image.png");
-        assert_eq!(segments[0].path, "/tmp/image.png");
+        assert!(matches!(segments[0].kind, AttachmentKind::Image));
+        assert_eq!(segments[0].filename.as_deref(), Some("image.png"));
+        assert_eq!(segments[0].path.as_deref(), Some("/tmp/image.png"));
         assert_eq!(segments[0].sha256.as_deref(), Some("hash1"));
         assert_eq!(segments[0].ocr_text.as_deref(), Some("detected text"));
         assert!(segments[0].has_ocr);
@@ -339,5 +378,63 @@ mod tests {
         let combined = append_attachment_ocr(content, &blocks);
 
         assert!(combined.contains("[Attachment 2 OCR: two.png]"));
+    }
+
+    #[test]
+    fn enrich_cues_with_attachments_emits_unresolved_when_no_media_matches() {
+        let timestamp = Utc.with_ymd_and_hms(2026, 4, 10, 8, 0, 0).unwrap();
+        let mut cues = vec![Cue {
+            source: CueSource::Notes,
+            timestamp,
+            content: "[Attachment]".into(),
+            url: None,
+            title: Some("Unresolved".into()),
+            tags: Vec::new(),
+            attachment_segments: Vec::new(),
+            metadata: HashMap::new(),
+        }];
+
+        super::enrich_cues_with_attachments(&mut cues, &[]);
+
+        assert_eq!(cues[0].attachment_segments.len(), 1);
+        assert!(matches!(
+            cues[0].attachment_segments[0].kind,
+            AttachmentKind::Unresolved
+        ));
+        assert_eq!(cues[0].attachment_segments[0].filename, None);
+        assert_eq!(cues[0].attachment_segments[0].path, None);
+        assert!(!cues[0].attachment_segments[0].has_ocr);
+    }
+
+    #[test]
+    fn enrich_cues_with_attachments_emits_unresolved_when_match_has_no_attachments() {
+        let timestamp = Utc.with_ymd_and_hms(2026, 4, 10, 8, 0, 0).unwrap();
+        let mut cues = vec![Cue {
+            source: CueSource::Notes,
+            timestamp,
+            content: "[Attachment]\n[Attachment]".into(),
+            url: None,
+            title: Some("Still unresolved".into()),
+            tags: Vec::new(),
+            attachment_segments: Vec::new(),
+            metadata: HashMap::new(),
+        }];
+        let media_notes = vec![MediaNote {
+            timestamp: timestamp.timestamp(),
+            title: Some("Still unresolved".into()),
+            attachments: Vec::new(),
+        }];
+
+        super::enrich_cues_with_attachments(&mut cues, &media_notes);
+
+        assert_eq!(cues[0].attachment_segments.len(), 2);
+        assert!(cues[0]
+            .attachment_segments
+            .iter()
+            .all(|segment| matches!(segment.kind, AttachmentKind::Unresolved)));
+        assert!(cues[0]
+            .attachment_segments
+            .iter()
+            .all(|segment| segment.path.is_none() && segment.filename.is_none()));
     }
 }

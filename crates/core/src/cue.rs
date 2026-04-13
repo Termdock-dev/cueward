@@ -12,10 +12,34 @@ pub enum CueSource {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AttachmentKind {
+    Image,
+    WebPreview,
+    Binary,
+    Pdf,
+    Scan,
+    Audio,
+    Map,
+    Drawing,
+    Unresolved,
+}
+
+impl Default for AttachmentKind {
+    fn default() -> Self {
+        Self::Unresolved
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttachmentSegment {
     pub index: usize,
-    pub filename: String,
-    pub path: String,
+    #[serde(default)]
+    pub kind: AttachmentKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -39,4 +63,46 @@ pub struct Cue {
     pub attachment_segments: Vec<AttachmentSegment>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub metadata: HashMap<String, String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AttachmentKind, AttachmentSegment};
+
+    #[test]
+    fn attachment_segment_serializes_kind_for_image() {
+        let segment = AttachmentSegment {
+            index: 1,
+            kind: AttachmentKind::Image,
+            filename: Some("scan.jpg".into()),
+            path: Some("/tmp/scan.jpg".into()),
+            sha256: Some("abc123".into()),
+            ocr_text: None,
+            has_ocr: false,
+        };
+
+        let value = serde_json::to_value(segment).expect("serialize segment");
+
+        assert_eq!(value["kind"], "image");
+        assert_eq!(value["filename"], "scan.jpg");
+        assert_eq!(value["path"], "/tmp/scan.jpg");
+    }
+
+    #[test]
+    fn attachment_segment_deserializes_legacy_json_without_kind() {
+        let segment: AttachmentSegment = serde_json::from_str(
+            r#"{
+                "index": 1,
+                "filename": "scan.jpg",
+                "path": "/tmp/scan.jpg",
+                "sha256": "abc123",
+                "has_ocr": false
+            }"#,
+        )
+        .expect("decode legacy segment");
+
+        assert!(matches!(segment.kind, AttachmentKind::Unresolved));
+        assert_eq!(segment.filename.as_deref(), Some("scan.jpg"));
+        assert_eq!(segment.path.as_deref(), Some("/tmp/scan.jpg"));
+    }
 }
