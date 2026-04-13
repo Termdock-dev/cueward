@@ -8,5 +8,5 @@ pub mod tagger;
 pub use adapter::PlatformAdapter;
 pub use cue::{AttachmentSegment, Cue, CueSource};
 pub use index::CueIndex;
-pub use state::State;
+pub use state::{ScanTargetState, State};
 pub use tagger::Tagger;

@@ -170,6 +170,8 @@ cueward reddit search "async rust"
 cueward reddit search "async rust" --subreddit r/rust --limit 25
 ```
 
+Repeated scans may return status metadata such as `fresh`, `unchanged`, `skipped`, `warning`, or `deleted`, with `data` omitted when the target is skipped or confirmed deleted.
+
 Outputs JSON to stdout:
 
 ```json

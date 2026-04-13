@@ -1,12 +1,13 @@
+use chrono::{Duration as ChronoDuration, Utc};
 use std::time::{Duration, Instant};
-
 use serde_json::json;
 
 use super::{
     build_feed_url, build_search_url, compute_next_reddit_request, normalize_post_url,
     normalize_subreddit, parse_listing_posts, parse_post_result, parse_subreddit_info,
-    reddit_backoff, should_retry_status,
+    reddit_backoff, should_retry_status, RedditComment,
 };
+use super::scan::filter_comments;
 
 #[test]
 fn normalize_subreddit_accepts_prefixed_or_plain_names() {
@@ -209,4 +210,48 @@ fn parse_post_result_returns_post_and_top_level_comments_only() {
     assert_eq!(result.post.id, "abc123");
     assert_eq!(result.comments.len(), 1);
     assert_eq!(result.comments[0].id, "c1");
+}
+
+#[test]
+fn filter_comments_drops_deleted_short_and_old_comments() {
+    let now = Utc::now();
+    let comments = vec![
+        RedditComment {
+            id: "c1".to_string(),
+            author: "[deleted]".to_string(),
+            body: "this comment is long enough but deleted".to_string(),
+            score: 1,
+            created_utc: now.timestamp(),
+            permalink: "https://reddit.com/c1".to_string(),
+        },
+        RedditComment {
+            id: "c2".to_string(),
+            author: "real_user".to_string(),
+            body: "too short".to_string(),
+            score: 1,
+            created_utc: now.timestamp(),
+            permalink: "https://reddit.com/c2".to_string(),
+        },
+        RedditComment {
+            id: "c3".to_string(),
+            author: "real_user".to_string(),
+            body: "this comment is long enough but too old to keep around".to_string(),
+            score: 1,
+            created_utc: (now - ChronoDuration::days(31)).timestamp(),
+            permalink: "https://reddit.com/c3".to_string(),
+        },
+        RedditComment {
+            id: "c4".to_string(),
+            author: "real_user".to_string(),
+            body: "this comment is long enough and recent so it should survive".to_string(),
+            score: 1,
+            created_utc: now.timestamp(),
+            permalink: "https://reddit.com/c4".to_string(),
+        },
+    ];
+
+    let filtered = filter_comments(comments, now);
+
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].id, "c4");
 }

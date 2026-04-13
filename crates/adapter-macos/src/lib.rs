@@ -8,6 +8,7 @@ mod notes;
 pub mod ocr;
 pub mod plan;
 pub mod quick_notes;
+pub mod scan_state;
 pub mod reddit;
 pub mod reminders;
 pub mod safari;
@@ -16,6 +17,7 @@ pub mod screenshot;
 pub mod send;
 
 pub use error::MacosError;
+pub use scan_state::{ScanEnvelope, ScanStatus};
 
 use chrono::{DateTime, Utc};
 use cueward_core::{Cue, PlatformAdapter};

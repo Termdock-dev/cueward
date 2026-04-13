@@ -48,7 +48,12 @@ pub(crate) fn dispatch(action: RedditAction) {
             match cueward_adapter_macos::reddit::feed(&subreddit, limit) {
                 Ok(result) => {
                     print_serialized_or_exit("reddit/feed", serde_json::to_string_pretty(&result));
-                    eprintln!("{} post(s)", result.posts.len());
+                    let count = result
+                        .data
+                        .as_ref()
+                        .map(|data| data.posts.len())
+                        .unwrap_or(0);
+                    eprintln!("{count} post(s)");
                 }
                 Err(error) => {
                     eprintln!("error: {error}");
@@ -59,7 +64,12 @@ pub(crate) fn dispatch(action: RedditAction) {
         RedditAction::Post { url } => match cueward_adapter_macos::reddit::post(&url) {
             Ok(result) => {
                 print_serialized_or_exit("reddit/post", serde_json::to_string_pretty(&result));
-                eprintln!("{} top-level comment(s)", result.comments.len());
+                let count = result
+                    .data
+                    .as_ref()
+                    .map(|data| data.comments.len())
+                    .unwrap_or(0);
+                eprintln!("{count} top-level comment(s)");
             }
             Err(error) => {
                 eprintln!("error: {error}");
@@ -73,7 +83,12 @@ pub(crate) fn dispatch(action: RedditAction) {
         } => match cueward_adapter_macos::reddit::search(&query, subreddit.as_deref(), limit) {
             Ok(result) => {
                 print_serialized_or_exit("reddit/search", serde_json::to_string_pretty(&result));
-                eprintln!("{} post(s)", result.posts.len());
+                let count = result
+                    .data
+                    .as_ref()
+                    .map(|data| data.posts.len())
+                    .unwrap_or(0);
+                eprintln!("{count} post(s)");
             }
             Err(error) => {
                 eprintln!("error: {error}");

@@ -16,6 +16,12 @@ const REDDIT_UA: &str = concat!(
     " (+https://github.com/HCYT/cueward)"
 );
 
+mod scan;
+#[cfg(test)]
+mod tests;
+
+pub use scan::{feed, post, search};
+
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct RedditSubredditInfo {
     pub name: String,
@@ -74,57 +80,14 @@ pub struct RedditSearchResult {
     pub posts: Vec<RedditPostSummary>,
 }
 
-/// Read a subreddit feed via old.reddit.com JSON endpoints.
-pub fn feed(subreddit: &str, limit: usize) -> Result<RedditFeedResult, MacosError> {
-    validate_limit(limit)?;
-    let subreddit = normalize_subreddit(subreddit)?;
-    let about = fetch_json(&build_about_url(&subreddit))?;
-    let listing = fetch_json(&build_feed_url(&subreddit, limit))?;
-    Ok(RedditFeedResult {
-        subreddit: parse_subreddit_info(&about)?,
-        posts: parse_listing_posts(&listing)?,
-    })
-}
-
-/// Read a Reddit post plus its top-level comments.
-pub fn post(url: &str) -> Result<RedditPostResult, MacosError> {
-    let url = normalize_post_url(url)?;
-    let payload = fetch_json(&url)?;
-    parse_post_result(&payload)
-}
-
-/// Search Reddit posts via the public JSON API.
-pub fn search(
-    query: &str,
-    subreddit: Option<&str>,
-    limit: usize,
-) -> Result<RedditSearchResult, MacosError> {
-    validate_limit(limit)?;
-    let query = query.trim();
-    if query.is_empty() {
-        return Err(MacosError::Other("reddit query must not be empty".to_string()));
-    }
-    let subreddit = match subreddit {
-        Some(value) => Some(normalize_subreddit(value)?),
-        None => None,
-    };
-    let posts = parse_listing_posts(&fetch_json(&build_search_url(query, subreddit.as_deref(), limit))?)?;
-    Ok(RedditSearchResult {
-        query: query.to_string(),
-        subreddit,
-        limit,
-        posts,
-    })
-}
-
-fn validate_limit(limit: usize) -> Result<(), MacosError> {
+pub(super) fn validate_limit(limit: usize) -> Result<(), MacosError> {
     if limit == 0 {
         return Err(MacosError::Other("reddit limit must be greater than 0".to_string()));
     }
     Ok(())
 }
 
-fn normalize_subreddit(input: &str) -> Result<String, MacosError> {
+pub(super) fn normalize_subreddit(input: &str) -> Result<String, MacosError> {
     let trimmed = input.trim();
     let trimmed = trimmed.strip_prefix("r/").unwrap_or(trimmed);
     let trimmed = trimmed.strip_prefix("R/").unwrap_or(trimmed);
@@ -135,7 +98,7 @@ fn normalize_subreddit(input: &str) -> Result<String, MacosError> {
     Ok(trimmed.to_ascii_lowercase())
 }
 
-fn normalize_post_url(input: &str) -> Result<String, MacosError> {
+pub(super) fn normalize_post_url(input: &str) -> Result<String, MacosError> {
     let trimmed = input.trim();
     let without_scheme = trimmed
         .strip_prefix("https://")
@@ -176,15 +139,15 @@ fn normalize_post_url(input: &str) -> Result<String, MacosError> {
     ))
 }
 
-fn build_about_url(subreddit: &str) -> String {
+pub(super) fn build_about_url(subreddit: &str) -> String {
     format!("{REDDIT_BASE}/r/{subreddit}/about.json")
 }
 
-fn build_feed_url(subreddit: &str, limit: usize) -> String {
+pub(super) fn build_feed_url(subreddit: &str, limit: usize) -> String {
     format!("{REDDIT_BASE}/r/{subreddit}.json?limit={limit}")
 }
 
-fn build_search_url(query: &str, subreddit: Option<&str>, limit: usize) -> String {
+pub(super) fn build_search_url(query: &str, subreddit: Option<&str>, limit: usize) -> String {
     let query = urlencoding::encode(query);
     match subreddit {
         Some(subreddit) => format!(
@@ -194,11 +157,27 @@ fn build_search_url(query: &str, subreddit: Option<&str>, limit: usize) -> Strin
     }
 }
 
-fn fetch_json(url: &str) -> Result<Value, MacosError> {
+pub(super) enum FetchJsonError {
+    NotFound,
+    Other(MacosError),
+}
+
+impl From<FetchJsonError> for MacosError {
+    fn from(value: FetchJsonError) -> Self {
+        match value {
+            FetchJsonError::NotFound => {
+                MacosError::Other("reddit target not found".to_string())
+            }
+            FetchJsonError::Other(error) => error,
+        }
+    }
+}
+
+pub(super) fn fetch_json(url: &str) -> Result<Value, FetchJsonError> {
     let mut last_error = None;
 
     for attempt in 0..=REDDIT_MAX_RETRIES {
-        throttle_reddit_request()?;
+        throttle_reddit_request().map_err(FetchJsonError::Other)?;
         let response = ureq::get(url)
             .set("User-Agent", REDDIT_UA)
             .set("Accept", "application/json")
@@ -206,15 +185,22 @@ fn fetch_json(url: &str) -> Result<Value, MacosError> {
         match response {
             Ok(response) => {
                 let body = response.into_string().map_err(|error| {
-                    MacosError::Other(format!("failed to read reddit response: {error}"))
+                    FetchJsonError::Other(MacosError::Other(format!(
+                        "failed to read reddit response: {error}"
+                    )))
                 })?;
                 return serde_json::from_str(&body).map_err(|error| {
-                    MacosError::Other(format!("invalid reddit json payload: {error}"))
+                    FetchJsonError::Other(MacosError::Other(format!(
+                        "invalid reddit json payload: {error}"
+                    )))
                 });
             }
             Err(ureq::Error::Status(status, response)) => {
                 let retry_after = retry_after_delay(&response);
                 let body = response.into_string().unwrap_or_default();
+                if status == 404 {
+                    return Err(FetchJsonError::NotFound);
+                }
                 if should_retry_status(status) && attempt < REDDIT_MAX_RETRIES {
                     last_error = Some(format!(
                         "reddit returned retryable status {status}: {}",
@@ -223,10 +209,10 @@ fn fetch_json(url: &str) -> Result<Value, MacosError> {
                     thread::sleep(retry_after.unwrap_or_else(|| reddit_backoff(attempt)));
                     continue;
                 }
-                return Err(MacosError::Other(format!(
+                return Err(FetchJsonError::Other(MacosError::Other(format!(
                     "reddit returned unexpected status {status}: {}",
                     body.trim()
-                )));
+                ))));
             }
             Err(ureq::Error::Transport(error)) => {
                 if attempt < REDDIT_MAX_RETRIES {
@@ -234,14 +220,16 @@ fn fetch_json(url: &str) -> Result<Value, MacosError> {
                     thread::sleep(reddit_backoff(attempt));
                     continue;
                 }
-                return Err(MacosError::Other(format!("reddit request failed: {error}")));
+                return Err(FetchJsonError::Other(MacosError::Other(format!(
+                    "reddit request failed: {error}"
+                ))));
             }
         }
     }
 
-    Err(MacosError::Other(
+    Err(FetchJsonError::Other(MacosError::Other(
         last_error.unwrap_or_else(|| "reddit request failed after retries".to_string()),
-    ))
+    )))
 }
 
 fn reddit_request_state() -> &'static Mutex<Option<Instant>> {
@@ -294,7 +282,7 @@ fn reddit_backoff(attempt: usize) -> Duration {
     Duration::from_secs(2 * (attempt as u64 + 1))
 }
 
-fn parse_subreddit_info(root: &Value) -> Result<RedditSubredditInfo, MacosError> {
+pub(super) fn parse_subreddit_info(root: &Value) -> Result<RedditSubredditInfo, MacosError> {
     let data = object(root, "reddit about payload")?
         .get("data")
         .ok_or_else(|| MacosError::Other("invalid reddit json payload: missing about data".to_string()))
@@ -308,7 +296,7 @@ fn parse_subreddit_info(root: &Value) -> Result<RedditSubredditInfo, MacosError>
     })
 }
 
-fn parse_listing_posts(root: &Value) -> Result<Vec<RedditPostSummary>, MacosError> {
+pub(super) fn parse_listing_posts(root: &Value) -> Result<Vec<RedditPostSummary>, MacosError> {
     let children = listing_children(root)?;
     Ok(children
         .iter()
@@ -317,7 +305,7 @@ fn parse_listing_posts(root: &Value) -> Result<Vec<RedditPostSummary>, MacosErro
         .collect())
 }
 
-fn parse_post_result(root: &Value) -> Result<RedditPostResult, MacosError> {
+pub(super) fn parse_post_result(root: &Value) -> Result<RedditPostResult, MacosError> {
     let items = array(root, "reddit post payload")?;
     let post_listing = items
         .first()
@@ -431,6 +419,3 @@ fn optional_i64(data: &Map<String, Value>, key: &str) -> Option<i64> {
             .or_else(|| value.as_f64().map(|n| n as i64))
     })
 }
-
-#[cfg(test)]
-mod tests;
