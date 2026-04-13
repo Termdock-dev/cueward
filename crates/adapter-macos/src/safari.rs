@@ -1133,7 +1133,7 @@ fn build_chatgpt_click_send_js() -> String {
 
 fn build_grok_click_send_js() -> String {
     r#"(() => {
-        const sendLabels = ["Send", "Ask Grok", "提交", "傳送", "送出"];
+        const sendLabels = ["send", "ask grok", "提交", "傳送", "送出"];
         const buttons = [...document.querySelectorAll('button,[role="button"]')];
         for (const button of buttons) {
           const label = [
@@ -1142,7 +1142,7 @@ fn build_grok_click_send_js() -> String {
             button.getAttribute("data-testid"),
             button.innerText,
             button.textContent
-          ].filter(Boolean).join(" ");
+          ].filter(Boolean).join(" ").toLowerCase();
           if (!sendLabels.some((v) => label.includes(v))) continue;
           if (button.disabled || button.getAttribute("aria-disabled") == "true") return "disabled";
           button.click();
@@ -1309,7 +1309,7 @@ fn grok_response_extract_js() -> String {
             button.textContent
           ].filter(Boolean).join(" "))
           .join(" ");
-        const isRunning = /Stop|停止|Thinking|Generating/.test(controls);
+        const isRunning = /Stop|停止|Thinking|Generating/i.test(controls);
 
         return JSON.stringify({
           status: response ? (isRunning ? "running" : "complete") : "running",
@@ -1666,6 +1666,7 @@ pub fn grok_read_conversation(
             url = escape_js_string(url),
         );
         let _ = execute_js_for_profile(&nav_js, profile_filter, "safari_grok_read_navigate")?;
+        thread::sleep(Duration::from_millis(3000));
 
         let deadline = Instant::now() + Duration::from_secs(30);
         let response_js = grok_response_extract_js();
@@ -3180,7 +3181,7 @@ mod tests {
     fn grok_click_send_script_checks_accessible_labels() {
         let script = build_grok_click_send_js();
 
-        assert!(script.contains("Ask Grok"));
+        assert!(script.contains("ask grok"));
         assert!(script.contains("提交"));
         assert!(script.contains("aria-label"));
         assert!(script.contains("data-testid"));
