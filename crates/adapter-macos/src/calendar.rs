@@ -39,11 +39,6 @@ fn applescript_date_block(var_name: &str, dt: &DateTime<Local>) -> String {
     )
 }
 
-/// Format a local datetime as "YYYY-MM-DD HH:MM:SS" for AppleScript date string matching.
-fn format_for_applescript(dt: &DateTime<Local>) -> String {
-    dt.format("%Y-%m-%d %H:%M:%S").to_string()
-}
-
 fn decode_field(value: &str) -> String {
     let mut decoded = String::with_capacity(value.len());
     let mut chars = value.chars();

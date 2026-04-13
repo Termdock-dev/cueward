@@ -42,7 +42,7 @@ pub(crate) enum NotesAction {
 pub(crate) fn dispatch(action: NotesAction) {
     match action {
         NotesAction::Update { title, body, folder } => {
-            match cueward_adapter_macos::send::update_note(&title, &body, &folder) {
+            match cueward_adapter_macos::notes::crud::update_note(&title, &body, &folder) {
                 Ok(()) => eprintln!("note updated: {title}"),
                 Err(e) => {
                     eprintln!("error: {e}");
@@ -51,7 +51,7 @@ pub(crate) fn dispatch(action: NotesAction) {
             }
         }
         NotesAction::Delete { title, folder } => {
-            match cueward_adapter_macos::send::delete_note(&title, &folder) {
+            match cueward_adapter_macos::notes::crud::delete_note(&title, &folder) {
                 Ok(()) => eprintln!("note deleted: {title}"),
                 Err(e) => {
                     eprintln!("error: {e}");
@@ -60,7 +60,7 @@ pub(crate) fn dispatch(action: NotesAction) {
             }
         }
         NotesAction::Move { title, from, to } => {
-            match cueward_adapter_macos::send::move_note(&title, &from, &to) {
+            match cueward_adapter_macos::notes::crud::move_note(&title, &from, &to) {
                 Ok(()) => eprintln!("note moved: {title} ({from} -> {to})"),
                 Err(e) => {
                     eprintln!("error: {e}");

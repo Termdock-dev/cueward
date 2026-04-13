@@ -4,7 +4,7 @@ pub mod calendar;
 pub mod clipboard;
 mod error;
 mod messages;
-mod notes;
+pub mod notes;
 pub mod ocr;
 pub mod plan;
 pub mod quick_notes;
@@ -14,7 +14,6 @@ pub mod reminders;
 pub mod safari;
 mod safari_guard;
 pub mod screenshot;
-pub mod send;
 
 pub use error::MacosError;
 pub use scan_state::{ScanEnvelope, ScanStatus};
