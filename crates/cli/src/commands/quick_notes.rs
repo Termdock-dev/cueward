@@ -4,26 +4,38 @@ use clap::Subcommand;
 
 #[derive(Subcommand)]
 pub(crate) enum QuickNotesAction {
+    /// List all Quick Notes
     List,
+    /// Create a new Quick Note
     Create {
+        /// Note title
         #[arg(long)]
         title: String,
+        /// Note body
         #[arg(long)]
         body: String,
     },
+    /// Update a Quick Note's body
     Update {
+        /// Note title to find
         #[arg(long)]
         title: String,
+        /// New body content
         #[arg(long)]
         body: String,
     },
+    /// Delete a Quick Note
     Delete {
+        /// Note title to find
         #[arg(long)]
         title: String,
     },
+    /// Archive a Quick Note into a regular folder and remove it from Quick Notes
     Archive {
+        /// Note title to find. Must be unique among Quick Notes.
         #[arg(long)]
         title: String,
+        /// Destination folder for the archived regular note
         #[arg(long)]
         to: String,
     },

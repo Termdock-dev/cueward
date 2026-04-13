@@ -41,67 +41,95 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
+    /// Capture knowledge fragments from local sources
     Capture {
+        /// Data source to capture from
         #[arg(long, default_value = "all")]
         source: Source,
+        /// Time window (e.g. "24h", "7d")
         #[arg(long, default_value = "24h")]
         since: String,
     },
+    /// Categorize, tag, and index captured cues
     Triage,
+    /// Search indexed cues
     Search {
+        /// Search query
         query: String,
+        /// Max results
         #[arg(long, default_value = "10")]
         limit: usize,
     },
+    /// Send a digest note or system notification
     Send {
+        /// Note title
         #[arg(long)]
         title: String,
+        /// Note body (read from stdin if not provided)
         #[arg(long)]
         body: Option<String>,
+        /// Target Notes folder
         #[arg(long, default_value = "Cueward")]
         folder: String,
+        /// Also send a macOS notification
         #[arg(long)]
         notify: bool,
     },
+    /// Create a reminder or calendar event
     Plan {
+        /// Reminder/event title
         #[arg(long)]
         title: String,
+        /// Notes or description
         #[arg(long, default_value = "")]
         notes: String,
+        /// Reminders list name
         #[arg(long, default_value = "Cueward")]
         list: String,
     },
+    /// Read Apple Reminders
     Reminders {
         #[command(subcommand)]
         action: RemindersAction,
     },
+    /// Extract text from images or PDFs via Vision OCR
     Ocr {
+        /// Path to image or PDF file
         path: String,
     },
+    /// Read current Safari tabs and active tab
     Safari {
         #[command(subcommand)]
         action: SafariAction,
     },
+    /// Manage Apple Notes (update, delete, move)
     Notes {
         #[command(subcommand)]
         action: NotesAction,
     },
+    /// Manage Quick Notes (快速備忘錄)
     QuickNotes {
         #[command(subcommand)]
         action: QuickNotesAction,
     },
+    /// Query and manage Apple Calendar events
     Calendar {
         #[command(subcommand)]
         action: CalendarAction,
     },
+    /// Capture a screenshot of the screen
     Screenshot {
+        /// Also run OCR on the captured image
         #[arg(long)]
         ocr: bool,
+        /// Output path (default: ~/.cueward/cache/screenshots/<timestamp>.png)
         #[arg(long)]
         output: Option<String>,
+        /// Display number (1 = main, 2 = secondary, 3 = third)
         #[arg(long)]
         display: Option<u32>,
     },
+    /// Read or write the system clipboard
     Clipboard {
         #[command(subcommand)]
         action: ClipboardAction,

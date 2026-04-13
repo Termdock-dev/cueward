@@ -7,37 +7,54 @@ use super::helpers::{local_day_bounds, parse_datetime_arg, parse_required_dateti
 
 #[derive(Subcommand)]
 pub(crate) enum CalendarAction {
+    /// List events in a time range (default: next 24h)
     List {
+        /// Start datetime (RFC3339 or "YYYY-MM-DD HH:MM")
         #[arg(long)]
         from: Option<String>,
+        /// End datetime (RFC3339 or "YYYY-MM-DD HH:MM")
         #[arg(long)]
         to: Option<String>,
+        /// Filter by calendar name
         #[arg(long)]
         calendar: Option<String>,
     },
+    /// List today's events (00:00 to 23:59)
     Today {
+        /// Filter by calendar name
         #[arg(long)]
         calendar: Option<String>,
     },
+    /// Create a calendar event
     Create {
+        /// Event title
         #[arg(long)]
         title: String,
+        /// Start datetime (RFC3339 or "YYYY-MM-DD HH:MM")
         #[arg(long)]
         start: String,
+        /// End datetime (RFC3339 or "YYYY-MM-DD HH:MM")
         #[arg(long)]
         end: String,
+        /// Calendar name (uses default calendar if omitted)
         #[arg(long)]
         calendar: Option<String>,
+        /// Notes/description
         #[arg(long)]
         notes: Option<String>,
+        /// Location
         #[arg(long)]
         location: Option<String>,
     },
+    /// Delete a calendar event by title and start datetime
     Delete {
+        /// Event title
         #[arg(long)]
         title: String,
+        /// Start datetime (RFC3339 or "YYYY-MM-DD HH:MM")
         #[arg(long)]
         start: String,
+        /// Calendar name
         #[arg(long)]
         calendar: String,
     },

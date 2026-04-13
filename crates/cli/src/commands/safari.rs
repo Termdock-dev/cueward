@@ -8,90 +8,136 @@ use super::helpers::print_external;
 
 #[derive(Subcommand)]
 pub(crate) enum SafariAction {
+    /// List all current Safari tabs
     Tabs {
+        /// Filter by Safari profile name parsed from window title
         #[arg(long)]
         profile: Option<String>,
     },
+    /// Show the current active tab in the front Safari window
     Active {
+        /// Restrict operations to a Safari profile name parsed from the window title
         #[arg(long)]
         profile: Option<String>,
     },
+    /// Open a URL in a new Safari tab
     Open {
+        /// URL to open
         url: String,
+        /// Restrict operations to a Safari profile name parsed from the window title
         #[arg(long)]
         profile: Option<String>,
     },
+    /// Close a tab in the front Safari window
     Close {
+        /// Zero-based tab index in the front window. Defaults to the current tab.
         #[arg(long)]
         index: Option<usize>,
     },
+    /// Scroll the current page
     Scroll {
+        /// Direction: up, down, top, bottom
         direction: String,
+        /// Pixels to scroll (default 500, ignored for top/bottom)
         #[arg(long)]
         amount: Option<i64>,
+        /// Restrict operations to a Safari profile
         #[arg(long)]
         profile: Option<String>,
+        /// Target a specific tab by index or URL/title substring
         #[arg(long)]
         tab: Option<String>,
     },
+    /// Scroll repeatedly and return only newly loaded content
     ScrollAndRead {
+        /// Number of scroll/read iterations
         #[arg(long, default_value = "1")]
         times: u64,
+        /// Pixels to scroll each iteration
         #[arg(long)]
         amount: Option<i64>,
+        /// Restrict operations to a Safari profile
         #[arg(long)]
         profile: Option<String>,
+        /// Target a specific tab by index or URL/title substring
         #[arg(long)]
         tab: Option<String>,
+        /// Optional CSS selector to scope the read area
         #[arg(long)]
         selector: Option<String>,
     },
+    /// Close multiple tabs, optionally filtered by profile and/or URL pattern
     CloseTabs {
+        /// Restrict to a Safari profile name
         #[arg(long)]
         profile: Option<String>,
+        /// Only close tabs whose URL contains this string
         #[arg(long)]
         url: Option<String>,
     },
+    /// Read page content from the current active tab
     Read {
+        /// Optional CSS selector to extract a specific element's text
         #[arg(long)]
         selector: Option<String>,
+        /// Restrict operations to a Safari profile name parsed from the window title
         #[arg(long)]
         profile: Option<String>,
+        /// Target a specific tab by index or URL/title substring
         #[arg(long)]
         tab: Option<String>,
     },
+    /// Read the full HTML source of the current active tab
     Source {
+        /// Restrict operations to a Safari profile name parsed from the window title
         #[arg(long)]
         profile: Option<String>,
+        /// Target a specific tab by index or URL/title substring
         #[arg(long)]
         tab: Option<String>,
     },
+    /// Execute JavaScript in the current active tab
     Exec {
+        /// JavaScript code to execute
         js_code: String,
+        /// Restrict operations to a Safari profile name parsed from the window title
         #[arg(long)]
         profile: Option<String>,
+        /// Target a specific tab by index or URL/title substring
         #[arg(long)]
         tab: Option<String>,
     },
+    /// Click an element in the current active tab
     Click {
+        /// CSS selector
         selector: String,
     },
+    /// Fill an element in the current active tab
     Fill {
+        /// CSS selector
         selector: String,
+        /// Text to fill
         text: String,
     },
+    /// Wait for an element to appear in the current active tab
     Wait {
+        /// CSS selector
         selector: String,
+        /// Timeout in seconds
         #[arg(long, default_value = "30")]
         timeout: u64,
     },
+    /// Safari bookmarks workflows
     Bookmarks {
         #[command(subcommand)]
         action: SafariBookmarksAction,
     },
+    /// Safari AI provider workflows
     Ai {
+        /// AI provider to target
         #[arg(long)]
         provider: SafariAiProvider,
+        /// Restrict operations to a Safari profile name parsed from the window title
         #[arg(long)]
         profile: Option<String>,
         #[command(subcommand)]

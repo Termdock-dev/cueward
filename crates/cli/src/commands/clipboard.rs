@@ -6,11 +6,15 @@ use super::helpers::{print_external, validate_optional_output_path};
 
 #[derive(Subcommand)]
 pub(crate) enum ClipboardAction {
+    /// Read clipboard content (text or image)
     Get {
+        /// Save image to this path instead of default cache dir
         #[arg(long)]
         save_image: Option<String>,
     },
+    /// Write text to clipboard
     Set {
+        /// Text to copy to clipboard
         text: String,
     },
 }

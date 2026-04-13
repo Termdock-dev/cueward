@@ -4,25 +4,36 @@ use clap::Subcommand;
 
 #[derive(Subcommand)]
 pub(crate) enum NotesAction {
+    /// Update a note's body
     Update {
+        /// Note title to find
         #[arg(long)]
         title: String,
+        /// New body content
         #[arg(long)]
         body: String,
+        /// Folder to search in
         #[arg(long, default_value = "Cueward")]
         folder: String,
     },
+    /// Delete a note
     Delete {
+        /// Note title to find
         #[arg(long)]
         title: String,
+        /// Folder to search in
         #[arg(long, default_value = "Cueward")]
         folder: String,
     },
+    /// Move a note to a different folder
     Move {
+        /// Note title to find
         #[arg(long)]
         title: String,
+        /// Source folder
         #[arg(long)]
         from: String,
+        /// Destination folder
         #[arg(long)]
         to: String,
     },

@@ -6,36 +6,53 @@ use super::helpers::{bookmarks_target_folder, print_external};
 
 #[derive(Subcommand)]
 pub(crate) enum SafariBookmarksAction {
+    /// List bookmark/folder items under the bookmark root or a specific folder path
     List {
+        /// Restrict bookmarks operations to a Safari profile folder at the root
         #[arg(long)]
         profile: Option<String>,
+        /// Optional folder path such as Work/AI Tools
         #[arg(long)]
         folder: Option<String>,
     },
+    /// Search bookmarks recursively from the root or a specific folder path
     Search {
+        /// Query string to match against bookmark title or URL
         query: String,
+        /// Restrict bookmarks operations to a Safari profile folder at the root
         #[arg(long)]
         profile: Option<String>,
+        /// Optional folder path such as Work/AI Tools
         #[arg(long)]
         folder: Option<String>,
     },
+    /// Add a bookmark under the root or a specific folder path
     Add {
+        /// Bookmark title
         #[arg(long)]
         title: String,
+        /// Bookmark URL
         #[arg(long)]
         url: String,
+        /// Restrict bookmarks operations to a Safari profile folder at the root
         #[arg(long)]
         profile: Option<String>,
+        /// Optional folder path such as Work/AI Tools
         #[arg(long)]
         folder: Option<String>,
     },
+    /// Delete a bookmark by exact title + URL under the root or a specific folder path
     Delete {
+        /// Bookmark title
         #[arg(long)]
         title: String,
+        /// Bookmark URL
         #[arg(long)]
         url: String,
+        /// Restrict bookmarks operations to a Safari profile folder at the root
         #[arg(long)]
         profile: Option<String>,
+        /// Optional folder path such as Work/AI Tools
         #[arg(long)]
         folder: Option<String>,
     },

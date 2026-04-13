@@ -4,10 +4,13 @@ use clap::Subcommand;
 
 #[derive(Subcommand)]
 pub(crate) enum RemindersAction {
+    /// List reminders, optionally filtered by list name
     List {
+        /// Filter by reminders list name
         #[arg(long)]
         list: Option<String>,
     },
+    /// List reminders due today
     Today,
 }
 
