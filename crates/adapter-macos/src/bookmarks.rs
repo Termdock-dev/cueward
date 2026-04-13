@@ -193,6 +193,15 @@ mod tests {
     }
 
     #[test]
+    fn bookmarks_folder_lookup_is_case_insensitive() {
+        let tree = sample_bookmarks_tree();
+        let items = list_items_in_folder(&tree, Some("work/ai tools")).expect("list folder");
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].title.as_deref(), Some("Claude"));
+    }
+
+    #[test]
     fn bookmarks_reject_invalid_folder_path_segments() {
         let err = parse_folder_path("Work//AI").expect_err("empty segment should fail");
 

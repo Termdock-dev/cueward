@@ -54,6 +54,10 @@ fn join_folder_path(parent: &str, title: &str) -> String {
     }
 }
 
+fn same_folder_title(left: &str, right: &str) -> bool {
+    left.to_lowercase() == right.to_lowercase()
+}
+
 fn resolve_children<'a>(
     tree: &'a BookmarkTree,
     folder: Option<&str>,
@@ -68,7 +72,7 @@ fn resolve_children<'a>(
 
     for part in parts {
         let next = children.iter().find_map(|node| match node {
-            BookmarkNode::Folder(folder) if folder.title == part => Some(folder),
+            BookmarkNode::Folder(folder) if same_folder_title(&folder.title, &part) => Some(folder),
             _ => None,
         });
         let Some(folder) = next else {
@@ -176,7 +180,7 @@ fn resolve_children_mut_nodes<'a>(
     };
 
     let Some(index) = children.iter().position(|node| match node {
-        BookmarkNode::Folder(folder) => folder.title == *segment,
+        BookmarkNode::Folder(folder) => same_folder_title(&folder.title, segment),
         BookmarkNode::Bookmark(_) => false,
     }) else {
         return Err(invalid_folder_path());

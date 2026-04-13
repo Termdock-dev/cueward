@@ -746,19 +746,16 @@ fn print_external(source: &str, json: &str) {
     println!("</external>");
 }
 
-fn bookmarks_target_folder(
-    profile: Option<&str>,
-    folder: Option<&str>,
-) -> Result<Option<String>, String> {
+fn bookmarks_target_folder(profile: Option<&str>, folder: Option<&str>) -> Option<String> {
     let profile = profile.map(str::trim).filter(|value| !value.is_empty());
     let folder = folder.map(str::trim).filter(|value| !value.is_empty());
 
-    Ok(match (profile, folder) {
+    match (profile, folder) {
         (Some(profile), Some(folder)) => Some(format!("{profile}/{folder}")),
         (Some(profile), None) => Some(profile.to_string()),
         (None, Some(folder)) => Some(folder.to_string()),
         (None, None) => None,
-    })
+    }
 }
 
 fn main() {
@@ -1234,13 +1231,7 @@ fn main() {
             SafariAction::Bookmarks { action } => match action {
                 SafariBookmarksAction::List { profile, folder } => {
                     let target_folder =
-                        match bookmarks_target_folder(profile.as_deref(), folder.as_deref()) {
-                            Ok(folder) => folder,
-                            Err(err) => {
-                                eprintln!("error: {err}");
-                                process::exit(1);
-                            }
-                        };
+                        bookmarks_target_folder(profile.as_deref(), folder.as_deref());
                     match cueward_adapter_macos::bookmarks::list_bookmarks(target_folder.as_deref())
                     {
                         Ok(result) => {
@@ -1262,13 +1253,7 @@ fn main() {
                     folder,
                 } => {
                     let target_folder =
-                        match bookmarks_target_folder(profile.as_deref(), folder.as_deref()) {
-                            Ok(folder) => folder,
-                            Err(err) => {
-                                eprintln!("error: {err}");
-                                process::exit(1);
-                            }
-                        };
+                        bookmarks_target_folder(profile.as_deref(), folder.as_deref());
                     match cueward_adapter_macos::bookmarks::search_bookmarks(
                         &query,
                         target_folder.as_deref(),
@@ -1293,13 +1278,7 @@ fn main() {
                     folder,
                 } => {
                     let target_folder =
-                        match bookmarks_target_folder(profile.as_deref(), folder.as_deref()) {
-                            Ok(folder) => folder,
-                            Err(err) => {
-                                eprintln!("error: {err}");
-                                process::exit(1);
-                            }
-                        };
+                        bookmarks_target_folder(profile.as_deref(), folder.as_deref());
                     match cueward_adapter_macos::bookmarks::add_bookmark_cli(
                         &title,
                         &url,
@@ -1325,13 +1304,7 @@ fn main() {
                     folder,
                 } => {
                     let target_folder =
-                        match bookmarks_target_folder(profile.as_deref(), folder.as_deref()) {
-                            Ok(folder) => folder,
-                            Err(err) => {
-                                eprintln!("error: {err}");
-                                process::exit(1);
-                            }
-                        };
+                        bookmarks_target_folder(profile.as_deref(), folder.as_deref());
                     match cueward_adapter_macos::bookmarks::delete_bookmark_cli(
                         &title,
                         &url,
@@ -2300,15 +2273,14 @@ mod tests {
 
     #[test]
     fn bookmarks_target_folder_prepends_profile_to_folder() {
-        let folder =
-            bookmarks_target_folder(Some("Ryugu"), Some("Work/AI Tools")).expect("target folder");
+        let folder = bookmarks_target_folder(Some("Ryugu"), Some("Work/AI Tools"));
 
         assert_eq!(folder, Some("Ryugu/Work/AI Tools".to_string()));
     }
 
     #[test]
     fn bookmarks_target_folder_uses_profile_as_root_when_folder_missing() {
-        let folder = bookmarks_target_folder(Some("Ryugu"), None).expect("target folder");
+        let folder = bookmarks_target_folder(Some("Ryugu"), None);
 
         assert_eq!(folder, Some("Ryugu".to_string()));
     }

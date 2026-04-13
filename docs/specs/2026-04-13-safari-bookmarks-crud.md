@@ -45,6 +45,7 @@ cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" [--pr
 - 若只有 `--profile Ryugu`，等同操作 `Ryugu` root folder
 - `--folder "Work/AI Tools"` 代表沿著 `Work -> AI Tools` 往下走
 - 路徑分隔符固定為 `/`
+- 第一期不支援 folder title 本身包含 `/`
 - 空 segment 不允許，例如 `Work//AI`
 - 任一路徑不存在，或對應節點不是資料夾，都回傳 `invalid folder path`
 - 第一期不自動建立缺失資料夾
