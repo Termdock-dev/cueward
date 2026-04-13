@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Use Cueward CLI to capture, triage, search, and manage the user's scattered knowledge from Safari, Apple Notes, and iMessage. Also supports OCR (images/PDFs), creating Notes and Reminders, managing notes (update/delete/move), and Quick Notes (快速備忘錄) operations including archive-to-folder cleanup. Trigger when the user asks about their browsing history, recent notes, messages, Quick Notes, wants to organize knowledge, create a digest, set reminders from captured content, extract text from images/PDFs, or manage Apple Notes. Also use when the user says things like "what did I read today", "find that article I saw", "summarize my knowledge intake", "help me organize what I've been looking at", "create a reminder for this", "write a summary note", "OCR this screenshot", "list my quick notes", or "what's in my quick notes".
+description: Use Cueward CLI to capture, triage, search, and manage the user's scattered knowledge from Safari, Apple Notes, and iMessage. Also supports Safari tabs/bookmarks/AI automation, OCR (images/PDFs), creating Notes and Reminders, reading Reminders, managing notes (update/delete/move), and Quick Notes (快速備忘錄) operations including archive-to-folder cleanup. Trigger when the user asks about their browsing history, recent notes, messages, Quick Notes, Safari tabs/bookmarks, wants to organize knowledge, create a digest, set reminders from captured content, inspect Safari AI conversations, extract text from images/PDFs, or manage Apple Notes. Also use when the user says things like "what did I read today", "find that article I saw", "summarize my knowledge intake", "help me organize what I've been looking at", "create a reminder for this", "write a summary note", "OCR this screenshot", "list my quick notes", "what's in my quick notes", "show my Safari tabs", or "search my bookmarks".
 ---
 
 # Cueward Agent Skill
@@ -85,7 +85,79 @@ cueward send --title "Daily Digest" --body "Summary content..." --folder Cueward
 - `--notify`: Also trigger a macOS notification
 - Body can be piped via stdin if `--body` is omitted
 
-### 5. Plan
+### 5. Safari
+
+Read live Safari state and automate the current page or a matched tab.
+
+```bash
+# List open tabs
+cueward safari tabs
+
+# Filter to a Safari profile
+cueward safari tabs --profile Ryugu
+
+# Read the active page or a specific selector
+cueward safari read
+cueward safari read --selector ".article-body"
+
+# Read a specific tab by URL/title match
+cueward safari read --tab "ChatGPT" --profile Ryugu
+
+# Run JavaScript in the current tab
+cueward safari exec "document.title"
+```
+
+- Use these commands when the user wants the current Safari context, not historical capture data
+- `--profile` targets a Safari profile parsed from the window title
+- `--tab` can match by index or URL/title substring depending on the subcommand
+
+### 6. Safari Bookmarks
+
+Inspect and manage Safari bookmarks, including nested folders and profile roots.
+
+```bash
+# List root bookmarks or a profile root
+cueward safari bookmarks list
+cueward safari bookmarks list --profile Ryugu
+
+# Traverse nested folders inside a profile
+cueward safari bookmarks list --profile Ryugu --folder "Work/AI Tools"
+
+# Recursive search
+cueward safari bookmarks search "claude" --profile Ryugu --folder "Work"
+
+# Add or delete by exact title + URL fingerprint inside a folder
+cueward safari bookmarks add --title "Claude" --url "https://claude.ai" --profile Ryugu --folder "Work/AI Tools"
+cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" --profile Ryugu --folder "Work/AI Tools"
+```
+
+- Folder paths use `/` as the separator
+- In the current implementation, folder titles containing `/` are not supported
+- `delete` must include both `--title` and `--url`
+
+### 7. Safari AI
+
+Drive Safari-based AI providers such as Gemini and ChatGPT through the CLI.
+
+```bash
+# Send a prompt
+cueward safari ai --provider gemini prompt --prompt "台灣 AI 產業分析"
+
+# Use a provider with a specific Safari profile
+cueward safari ai --provider gemini --profile Ryugu list
+
+# Read a saved conversation
+cueward safari ai --provider gemini read https://gemini.google.com/app/abc123
+
+# Save generated images
+cueward safari ai --provider chatgpt save-images https://chatgpt.com/c/abc123 --output ~/Downloads
+```
+
+- Use this when the user wants to inspect or continue a Safari AI workflow they already ran in the browser
+- Prefer `list` then `read` when the user asks about prior AI conversations
+- Gemini supports extra workflow commands such as `mode`, `poll`, and `save-media`
+
+### 8. Plan
 
 Create a reminder in Apple Reminders.
 
@@ -95,7 +167,19 @@ cueward plan --title "Review PR" --notes "Check bot comments" --list Cueward
 
 - `--list`: Reminders list (auto-created if missing). Default: `Cueward`
 
-### 6. OCR
+### 9. Reminders
+
+Read existing Apple Reminders.
+
+```bash
+cueward reminders list
+cueward reminders list --list Work
+cueward reminders today
+```
+
+- Use this when the user asks what they planned already, what is due today, or wants a reminder digest
+
+### 10. OCR
 
 Extract text from images or PDFs using Apple Vision Framework.
 
@@ -108,7 +192,7 @@ cueward ocr <path_to_image_or_pdf>
 - Languages: zh-Hant, zh-Hans, en-US, ja
 - Outputs standard Cue JSON (source: "ocr")
 
-### 7. Notes Management
+### 11. Notes Management
 
 Update, delete, or move Apple Notes.
 
@@ -125,7 +209,7 @@ cueward notes move --title "Note Title" --from Cueward --to Archive
 
 These commands find notes by exact title match within the specified folder.
 
-### 8. Quick Notes
+### 12. Quick Notes
 
 List, update, archive, and delete system Quick Notes (快速備忘錄). Quick Notes are notes created via the macOS Quick Note gesture and tagged with a system flag — they may reside in any folder.
 
@@ -240,7 +324,7 @@ Do not use `cueward notes move` for this cleanup workflow. Moving a Quick Note b
 ## Important Notes
 
 - **First run**: The user may need to grant Full Disk Access to their terminal app (System Settings > Privacy & Security > Full Disk Access). If you see permission errors, guide them through this.
-- **Automation permission**: Apple Notes capture requires allowing terminal automation (System Settings > Privacy & Security > Automation).
+- **Automation permission**: Apple Notes capture requires allowing terminal automation in System Settings > Privacy & Security > Automation.
 - **JSON on stdout**: Cueward outputs clean JSON to stdout and status/warnings to stderr. Always parse stdout for data.
 - **You are the LLM layer**: Cueward intentionally does not call any LLM. It captures and pre-processes locally. Summarization, insight extraction, and action item generation are your job as the Agent.
 - **Auto-tagging config**: If the user wants custom tags, help them create `~/.cueward/tags.toml`:
