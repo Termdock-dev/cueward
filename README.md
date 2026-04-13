@@ -91,6 +91,28 @@ cueward safari scroll bottom --profile Ryugu
 # Close multiple tabs by profile or URL pattern
 cueward safari close-tabs --profile Ryugu --url "gemini.google.com"
 cueward safari close-tabs --profile Ryugu  # close all tabs in profile
+
+# List bookmark/folder items from the Safari bookmarks root
+cueward safari bookmarks list
+
+# Scope bookmarks to a specific Safari profile folder
+cueward safari bookmarks list --profile Ryugu
+
+# Traverse nested bookmark folders inside a profile
+cueward safari bookmarks list --profile Ryugu --folder "Work/AI Tools"
+
+# Folder paths use "/" as the separator; folder titles containing "/" are not supported
+# in this first version
+
+# Search bookmarks recursively from the root or a profile folder
+cueward safari bookmarks search "claude"
+cueward safari bookmarks search "claude" --profile Ryugu --folder "Work"
+
+# Add a bookmark into a nested folder inside a profile
+cueward safari bookmarks add --title "Claude" --url "https://claude.ai" --profile Ryugu --folder "Work/AI Tools"
+
+# Delete by exact title + URL within a profile folder
+cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" --profile Ryugu --folder "Work/AI Tools"
 ```
 
 ### Safari AI
