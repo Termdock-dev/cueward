@@ -8,6 +8,7 @@ mod notes;
 pub mod ocr;
 pub mod plan;
 pub mod quick_notes;
+pub mod reddit;
 pub mod reminders;
 pub mod safari;
 mod safari_guard;

@@ -153,6 +153,23 @@ cueward safari ai --provider gemini --profile Work list
 
 Supported Gemini modes: `deep-research`, `image`, `video`, `music`.
 
+### Reddit
+
+Read Reddit via public `old.reddit.com/*.json` endpoints. These commands do not use Safari automation.
+
+```bash
+# Read a subreddit feed
+cueward reddit feed rust
+cueward reddit feed r/rust --limit 50
+
+# Read a post plus top-level comments
+cueward reddit post https://www.reddit.com/r/rust/comments/abc123/example_title/
+
+# Search posts globally or inside one subreddit
+cueward reddit search "async rust"
+cueward reddit search "async rust" --subreddit r/rust --limit 25
+```
+
 Outputs JSON to stdout:
 
 ```json
