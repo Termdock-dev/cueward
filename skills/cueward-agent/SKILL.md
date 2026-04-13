@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Use Cueward CLI to capture, triage, search, and manage the user's scattered knowledge from Safari, Apple Notes, and iMessage. Also supports Safari tabs/bookmarks/AI automation, OCR (images/PDFs), creating Notes and Reminders, reading Reminders, managing notes (update/delete/move), and Quick Notes (快速備忘錄) operations including archive-to-folder cleanup. Trigger when the user asks about their browsing history, recent notes, messages, Quick Notes, Safari tabs/bookmarks, wants to organize knowledge, create a digest, set reminders from captured content, inspect Safari AI conversations, extract text from images/PDFs, or manage Apple Notes. Also use when the user says things like "what did I read today", "find that article I saw", "summarize my knowledge intake", "help me organize what I've been looking at", "create a reminder for this", "write a summary note", "OCR this screenshot", "list my quick notes", "what's in my quick notes", "show my Safari tabs", or "search my bookmarks".
+description: Use Cueward CLI to capture, triage, search, and manage the user's scattered knowledge from Safari, Apple Notes, iMessage, and Reddit. Also supports Safari tabs/bookmarks/AI automation, OCR (images/PDFs), creating Notes and Reminders, reading Reminders, managing notes (update/delete/move), and Quick Notes (快速備忘錄) operations including archive-to-folder cleanup. Trigger when the user asks about their browsing history, recent notes, messages, Quick Notes, Safari tabs/bookmarks, Reddit feeds/posts, wants to organize knowledge, create a digest, set reminders from captured content, inspect Safari AI conversations, extract text from images/PDFs, or manage Apple Notes. Also use when the user says things like "what did I read today", "find that article I saw", "summarize my knowledge intake", "help me organize what I've been looking at", "create a reminder for this", "write a summary note", "OCR this screenshot", "list my quick notes", "what's in my quick notes", "show my Safari tabs", "search my bookmarks", or "check this subreddit".
 ---
 
 # Cueward Agent Skill
@@ -157,7 +157,28 @@ cueward safari ai --provider chatgpt save-images https://chatgpt.com/c/abc123 --
 - Prefer `list` then `read` when the user asks about prior AI conversations
 - Gemini supports extra workflow commands such as `mode`, `poll`, and `save-media`
 
-### 8. Plan
+### 8. Reddit
+
+Read Reddit through the public JSON API without Safari automation.
+
+```bash
+# Read a subreddit feed
+cueward reddit feed rust
+
+# Read a post plus top-level comments
+cueward reddit post https://www.reddit.com/r/rust/comments/abc123/example_title/
+
+# Search posts globally or inside a subreddit
+cueward reddit search "async rust"
+cueward reddit search "async rust" --subreddit r/rust --limit 25
+```
+
+- Use this when the user wants subreddit or Reddit thread data and browser automation is unnecessary
+- `feed` returns subreddit metadata plus post summaries
+- `post` returns the article plus top-level comments only
+- `search` returns post matches only, not comment matches
+
+### 9. Plan
 
 Create a reminder in Apple Reminders.
 
@@ -167,7 +188,7 @@ cueward plan --title "Review PR" --notes "Check bot comments" --list Cueward
 
 - `--list`: Reminders list (auto-created if missing). Default: `Cueward`
 
-### 9. Reminders
+### 10. Reminders
 
 Read existing Apple Reminders.
 
@@ -179,7 +200,7 @@ cueward reminders today
 
 - Use this when the user asks what they planned already, what is due today, or wants a reminder digest
 
-### 10. OCR
+### 11. OCR
 
 Extract text from images or PDFs using Apple Vision Framework.
 
@@ -192,7 +213,7 @@ cueward ocr <path_to_image_or_pdf>
 - Languages: zh-Hant, zh-Hans, en-US, ja
 - Outputs standard Cue JSON (source: "ocr")
 
-### 11. Notes Management
+### 12. Notes Management
 
 Update, delete, or move Apple Notes.
 
@@ -209,7 +230,7 @@ cueward notes move --title "Note Title" --from Cueward --to Archive
 
 These commands find notes by exact title match within the specified folder.
 
-### 12. Quick Notes
+### 13. Quick Notes
 
 List, update, archive, and delete system Quick Notes (快速備忘錄). Quick Notes are notes created via the macOS Quick Note gesture and tagged with a system flag — they may reside in any folder.
 

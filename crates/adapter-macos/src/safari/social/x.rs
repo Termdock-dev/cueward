@@ -1,12 +1,31 @@
 use std::thread;
 use std::time::{Duration, Instant};
 
+use chrono::{DateTime, Utc};
+use serde::Serialize;
+
 use crate::MacosError;
+use crate::scan_state::{
+    ScanEnvelope, ScanStatus, build_scan_key, entry_for, fingerprint_json, is_bot_like_author,
+    is_too_old, is_too_short, load_state, make_envelope, record_not_found, record_success,
+    save_state_warning, skip_reason, stored_entry,
+};
 use crate::safari_guard::with_safari_session;
 
 use super::super::core::{execute_js_for_profile, focus_tab, open};
 use super::super::script::escape_js_string;
 use super::SocialFeedPost;
+
+const X_HOME_URL: &str = "https://x.com/home";
+
+#[derive(Serialize)]
+struct XPostFingerprint<'a> {
+    author: &'a str,
+    handle: Option<&'a str>,
+    time: Option<&'a str>,
+    content: &'a str,
+    url: Option<&'a str>,
+}
 
 fn x_search_url(query: &str) -> String {
     let encoded = urlencoding::encode(query);
@@ -96,37 +115,201 @@ fn navigate_tab_or_open(
     Ok(())
 }
 
-pub fn x_extract_feed(profile_filter: Option<&str>) -> Result<Vec<SocialFeedPost>, MacosError> {
+fn normalize_x_post_url(input: &str) -> Result<String, MacosError> {
+    let trimmed = input.trim();
+    let without_scheme = trimmed
+        .strip_prefix("https://")
+        .or_else(|| trimmed.strip_prefix("http://"))
+        .unwrap_or(trimmed);
+    let (host, rest) = without_scheme
+        .split_once('/')
+        .ok_or_else(|| MacosError::Other(format!("invalid x post url: {input}")))?;
+    let host = host.to_ascii_lowercase();
+    if !matches!(
+        host.as_str(),
+        "x.com" | "www.x.com" | "twitter.com" | "www.twitter.com"
+    ) {
+        return Err(MacosError::Other(format!("invalid x post url: {input}")));
+    }
+    let path_only = rest
+        .split('?')
+        .next()
+        .unwrap_or(rest)
+        .split('#')
+        .next()
+        .unwrap_or(rest)
+        .trim_matches('/');
+    if !path_only.contains("/status/") {
+        return Err(MacosError::Other(format!("invalid x post url: {input}")));
+    }
+    Ok(format!("https://x.com/{path_only}"))
+}
+
+fn parse_x_time(value: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
+}
+
+fn filter_x_posts(posts: Vec<SocialFeedPost>, now: DateTime<Utc>) -> Vec<SocialFeedPost> {
+    posts.into_iter()
+        .filter(|post| !is_bot_like_author(&post.author))
+        .filter(|post| !is_too_short(&post.content))
+        .filter(|post| {
+            post.time
+                .as_deref()
+                .and_then(parse_x_time)
+                .map(|created_at| !is_too_old(created_at, now))
+                .unwrap_or(true)
+        })
+        .collect()
+}
+
+fn fingerprint_x_posts(posts: &[SocialFeedPost]) -> Result<String, MacosError> {
+    let payload: Vec<_> = posts
+        .iter()
+        .map(|post| XPostFingerprint {
+            author: &post.author,
+            handle: post.handle.as_deref(),
+            time: post.time.as_deref(),
+            content: &post.content,
+            url: post.url.as_deref(),
+        })
+        .collect();
+    fingerprint_json(&payload)
+}
+
+pub fn x_extract_feed(
+    profile_filter: Option<&str>,
+) -> Result<ScanEnvelope<Vec<SocialFeedPost>>, MacosError> {
     with_safari_session(|| {
+        let now = Utc::now();
+        let target_url = X_HOME_URL.to_string();
+        let key = build_scan_key("x", &target_url);
+        let mut state = load_state();
+        {
+            let entry = entry_for(&mut state, &key, "x", &target_url);
+            if entry.deleted {
+                return Ok(make_envelope(
+                    entry,
+                    ScanStatus::Deleted,
+                    Some("deleted_target".to_string()),
+                    None,
+                    None,
+                ));
+            }
+            if let Some(reason) = skip_reason(entry, now) {
+                return Ok(make_envelope(entry, ScanStatus::Skipped, Some(reason), None, None));
+            }
+        }
         let _ = focus_tab("x.com", profile_filter);
-        poll_x_posts(5, profile_filter)
+        let posts = filter_x_posts(poll_x_posts(5, profile_filter)?, now);
+        let fingerprint = fingerprint_x_posts(&posts)?;
+        let status = {
+            let entry = entry_for(&mut state, &key, "x", &target_url);
+            record_success(entry, fingerprint, now)
+        };
+        let warning = save_state_warning(&state);
+        let entry = stored_entry(&state, &key)?;
+        Ok(make_envelope(entry, status, None, warning, Some(posts)))
     })
 }
 
 pub fn x_search(
     query: &str,
     profile_filter: Option<&str>,
-) -> Result<Vec<SocialFeedPost>, MacosError> {
+) -> Result<ScanEnvelope<Vec<SocialFeedPost>>, MacosError> {
     with_safari_session(|| {
-        let url = x_search_url(query);
-        navigate_tab_or_open(&url, "x.com", profile_filter, "safari_x_search_navigate")?;
-        poll_x_posts(10, profile_filter)
+        let now = Utc::now();
+        let target_url = x_search_url(query);
+        let key = build_scan_key("x", &target_url);
+        let mut state = load_state();
+        {
+            let entry = entry_for(&mut state, &key, "x", &target_url);
+            if entry.deleted {
+                return Ok(make_envelope(
+                    entry,
+                    ScanStatus::Deleted,
+                    Some("deleted_target".to_string()),
+                    None,
+                    None,
+                ));
+            }
+            if let Some(reason) = skip_reason(entry, now) {
+                return Ok(make_envelope(entry, ScanStatus::Skipped, Some(reason), None, None));
+            }
+        }
+        navigate_tab_or_open(&target_url, "x.com", profile_filter, "safari_x_search_navigate")?;
+        let posts = filter_x_posts(poll_x_posts(10, profile_filter)?, now);
+        let fingerprint = fingerprint_x_posts(&posts)?;
+        let status = {
+            let entry = entry_for(&mut state, &key, "x", &target_url);
+            record_success(entry, fingerprint, now)
+        };
+        let warning = save_state_warning(&state);
+        let entry = stored_entry(&state, &key)?;
+        Ok(make_envelope(entry, status, None, warning, Some(posts)))
     })
 }
 
 pub fn x_read_post(
     url: &str,
     profile_filter: Option<&str>,
-) -> Result<Vec<SocialFeedPost>, MacosError> {
+) -> Result<ScanEnvelope<Vec<SocialFeedPost>>, MacosError> {
     with_safari_session(|| {
-        navigate_tab_or_open(url, "x.com", profile_filter, "safari_x_read_navigate")?;
-        poll_x_posts(10, profile_filter)
+        let now = Utc::now();
+        let target_url = normalize_x_post_url(url)?;
+        let key = build_scan_key("x", &target_url);
+        let mut state = load_state();
+        {
+            let entry = entry_for(&mut state, &key, "x", &target_url);
+            if entry.deleted {
+                return Ok(make_envelope(
+                    entry,
+                    ScanStatus::Deleted,
+                    Some("deleted_target".to_string()),
+                    None,
+                    None,
+                ));
+            }
+            if let Some(reason) = skip_reason(entry, now) {
+                return Ok(make_envelope(entry, ScanStatus::Skipped, Some(reason), None, None));
+            }
+        }
+        navigate_tab_or_open(&target_url, "x.com", profile_filter, "safari_x_read_navigate")?;
+        let raw_posts = poll_x_posts(10, profile_filter)?;
+        if raw_posts.is_empty() {
+            let status = {
+                let entry = entry_for(&mut state, &key, "x", &target_url);
+                record_not_found(entry, now)
+            };
+            let warning = save_state_warning(&state);
+            let entry = stored_entry(&state, &key)?;
+            let reason = match status {
+                ScanStatus::Deleted => Some("target_confirmed_deleted".to_string()),
+                ScanStatus::Warning => Some("target_missing_first_strike".to_string()),
+                _ => None,
+            };
+            return Ok(make_envelope(entry, status, reason, warning, None));
+        }
+        let posts = filter_x_posts(raw_posts, now);
+        let fingerprint = fingerprint_x_posts(&posts)?;
+        let status = {
+            let entry = entry_for(&mut state, &key, "x", &target_url);
+            record_success(entry, fingerprint, now)
+        };
+        let warning = save_state_warning(&state);
+        let entry = stored_entry(&state, &key)?;
+        Ok(make_envelope(entry, status, None, warning, Some(posts)))
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{x_extract_feed_js, x_search_url};
+    use chrono::{Duration, Utc};
+
+    use super::{filter_x_posts, normalize_x_post_url, x_extract_feed_js, x_search_url};
+    use super::SocialFeedPost;
 
     #[test]
     fn x_search_url_encodes_query() {
@@ -145,5 +328,57 @@ mod tests {
         assert!(script.contains("a[href*='/status/']"));
         assert!(script.contains("url: postUrl || null"));
         assert!(script.contains("https://x.com"));
+    }
+
+    #[test]
+    fn normalize_x_post_url_strips_query_and_legacy_host() {
+        let url = normalize_x_post_url("https://twitter.com/user/status/123?context=3#top")
+            .expect("normalized url");
+
+        assert_eq!(url, "https://x.com/user/status/123");
+    }
+
+    #[test]
+    fn filter_x_posts_drops_deleted_short_and_old_items() {
+        let now = Utc::now();
+        let posts = vec![
+            SocialFeedPost {
+                author: "AutoModerator".to_string(),
+                handle: None,
+                time: Some(now.to_rfc3339()),
+                content: "this post is long enough to pass length checks".to_string(),
+                url: Some("https://x.com/1".to_string()),
+                metrics: Vec::new(),
+            },
+            SocialFeedPost {
+                author: "real_user".to_string(),
+                handle: None,
+                time: Some((now - Duration::days(31)).to_rfc3339()),
+                content: "this post is also long enough to pass the filter".to_string(),
+                url: Some("https://x.com/2".to_string()),
+                metrics: Vec::new(),
+            },
+            SocialFeedPost {
+                author: "real_user".to_string(),
+                handle: None,
+                time: Some(now.to_rfc3339()),
+                content: "too short".to_string(),
+                url: Some("https://x.com/3".to_string()),
+                metrics: Vec::new(),
+            },
+            SocialFeedPost {
+                author: "real_user".to_string(),
+                handle: None,
+                time: Some(now.to_rfc3339()),
+                content: "this post is long enough and recent so it should survive".to_string(),
+                url: Some("https://x.com/4".to_string()),
+                metrics: Vec::new(),
+            },
+        ];
+
+        let filtered = filter_x_posts(posts, now);
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].url.as_deref(), Some("https://x.com/4"));
     }
 }

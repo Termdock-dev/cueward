@@ -7,6 +7,7 @@ pub(crate) mod helpers;
 pub(crate) mod notes;
 pub(crate) mod ocr;
 pub(crate) mod quick_notes;
+pub(crate) mod reddit;
 pub(crate) mod reminders;
 pub(crate) mod safari;
 pub(crate) mod safari_ai;
@@ -15,6 +16,8 @@ pub(crate) mod screenshot;
 pub(crate) mod search;
 pub(crate) mod send;
 pub(crate) mod triage;
+#[cfg(test)]
+mod reddit_tests;
 #[cfg(test)]
 mod safari_ai_tests;
 #[cfg(test)]
@@ -26,6 +29,7 @@ pub(crate) use calendar::CalendarAction;
 pub(crate) use clipboard::ClipboardAction;
 pub(crate) use notes::NotesAction;
 pub(crate) use quick_notes::QuickNotesAction;
+pub(crate) use reddit::RedditAction;
 pub(crate) use reminders::RemindersAction;
 pub(crate) use safari::SafariAction;
 
@@ -92,6 +96,11 @@ pub(crate) enum Command {
         #[command(subcommand)]
         action: RemindersAction,
     },
+    /// Read Reddit via public JSON endpoints
+    Reddit {
+        #[command(subcommand)]
+        action: RedditAction,
+    },
     /// Extract text from images or PDFs via Vision OCR
     Ocr {
         /// Path to image or PDF file
@@ -157,6 +166,7 @@ pub(crate) fn dispatch(command: Command) {
         } => send::dispatch(title, body, folder, notify),
         Command::Plan { title, notes, list } => reminders::dispatch_plan(title, notes, list),
         Command::Reminders { action } => reminders::dispatch(action),
+        Command::Reddit { action } => reddit::dispatch(action),
         Command::Ocr { path } => ocr::dispatch(path),
         Command::Safari { action } => safari::dispatch(action),
         Command::Notes { action } => notes::dispatch(action),

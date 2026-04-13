@@ -22,7 +22,8 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
             match cueward_adapter_macos::safari::x_search(&prompt, profile) {
                 Ok(posts) => {
                     print_external("safari/x/search", &serde_json::to_string_pretty(&posts).unwrap());
-                    eprintln!("{} post(s)", posts.len());
+                    let count = posts.data.as_ref().map(|items| items.len()).unwrap_or(0);
+                    eprintln!("{count} post(s)");
                 }
                 Err(e) => {
                     eprintln!("error: {e}");
@@ -33,7 +34,8 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
         SafariAiAction::List => match cueward_adapter_macos::safari::x_extract_feed(profile) {
             Ok(posts) => {
                 print_external("safari/x/feed", &serde_json::to_string_pretty(&posts).unwrap());
-                eprintln!("{} post(s)", posts.len());
+                let count = posts.data.as_ref().map(|items| items.len()).unwrap_or(0);
+                eprintln!("{count} post(s)");
             }
             Err(e) => {
                 eprintln!("error: {e}");
@@ -43,7 +45,8 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
         SafariAiAction::Read { url } => match cueward_adapter_macos::safari::x_read_post(&url, profile) {
             Ok(posts) => {
                 print_external("safari/x/read", &serde_json::to_string_pretty(&posts).unwrap());
-                eprintln!("{} post(s)", posts.len());
+                let count = posts.data.as_ref().map(|items| items.len()).unwrap_or(0);
+                eprintln!("{count} post(s)");
             }
             Err(e) => {
                 eprintln!("error: {e}");
