@@ -1,7 +1,9 @@
 use std::process;
 
 use super::{GeminiAiAction, SafariAiAction};
-use crate::commands::helpers::{print_external, to_adapter_gemini_mode};
+use crate::commands::helpers::{
+    print_external, to_adapter_gemini_mode, validate_optional_output_path,
+};
 
 pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
     match action {
@@ -97,19 +99,21 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
                 }
             }
         }
-        SafariAiAction::List => match cueward_adapter_macos::safari::gemini_list_conversations(profile) {
-            Ok(convos) => {
-                print_external(
-                    "safari/ai/gemini/list",
-                    &serde_json::to_string_pretty(&convos).unwrap(),
-                );
-                eprintln!("{} conversation(s)", convos.len());
+        SafariAiAction::List => {
+            match cueward_adapter_macos::safari::gemini_list_conversations(profile) {
+                Ok(convos) => {
+                    print_external(
+                        "safari/ai/gemini/list",
+                        &serde_json::to_string_pretty(&convos).unwrap(),
+                    );
+                    eprintln!("{} conversation(s)", convos.len());
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
             }
-            Err(e) => {
-                eprintln!("error: {e}");
-                process::exit(1);
-            }
-        },
+        }
         SafariAiAction::Read { url } => {
             match cueward_adapter_macos::safari::gemini_read_conversation(&url, profile) {
                 Ok(r) => {
@@ -141,6 +145,10 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
             }
         }
         SafariAiAction::SaveImages { url, output } => {
+            if let Err(err) = validate_optional_output_path("--output", Some(output.as_str())) {
+                eprintln!("{err}");
+                process::exit(1);
+            }
             match cueward_adapter_macos::safari::gemini_save_images(&url, &output, profile) {
                 Ok(paths) => {
                     println!("{}", serde_json::to_string_pretty(&paths).unwrap());

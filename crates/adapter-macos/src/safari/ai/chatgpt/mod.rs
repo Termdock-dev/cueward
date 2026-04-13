@@ -286,10 +286,18 @@ pub(super) fn parse_chatgpt_image_payload(
 
 pub(super) fn chatgpt_list_conversations_js() -> String {
     r#"(() => {
-        const nav = document.querySelector('nav[aria-label="聊天歷程紀錄"]');
+        const navLabels = [
+          "聊天歷程紀錄",
+          "Chat history",
+          "Conversation history"
+        ];
+        const nav = navLabels
+          .map((label) => document.querySelector(`nav[aria-label="${label}"]`))
+          .find(Boolean) || document.querySelector('nav[role="navigation"]');
         if (!nav) return JSON.stringify([]);
+        const recentLabels = ["最近", "Recent"];
         const recentButton = Array.from(nav.querySelectorAll("button"))
-          .find((button) => (button.innerText || button.textContent || "").trim() === "最近");
+          .find((button) => recentLabels.includes((button.innerText || button.textContent || "").trim()));
         if (recentButton && recentButton.getAttribute("aria-expanded") === "false") {
           recentButton.click();
         }
@@ -359,10 +367,11 @@ mod tests {
     fn chatgpt_list_script_targets_history_nav_links() {
         let script = chatgpt_list_conversations_js();
 
-        assert!(script.contains("nav[aria-label=\"聊天歷程紀錄\"]"));
+        assert!(script.contains("Chat history"));
+        assert!(script.contains("nav[role=\"navigation\"]"));
         assert!(script.contains("a[href^=\"/c/\"]"));
         assert!(script.contains("https://chatgpt.com"));
-        assert!(script.contains("最近"));
+        assert!(script.contains("Recent"));
     }
 
     #[test]
