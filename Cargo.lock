@@ -310,7 +310,7 @@ dependencies = [
 
 [[package]]
 name = "cueward-adapter-macos"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64",
  "chrono",
@@ -327,14 +327,14 @@ dependencies = [
 
 [[package]]
 name = "cueward-adapter-windows"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cueward-core",
 ]
 
 [[package]]
 name = "cueward-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "clap",
@@ -345,7 +345,7 @@ dependencies = [
 
 [[package]]
 name = "cueward-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aho-corasick",
  "chrono",

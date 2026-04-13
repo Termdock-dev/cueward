@@ -10,7 +10,7 @@ rust-version.workspace = true
 description = "macOS adapter for Cueward with Safari, Notes, Messages, Reminders, Calendar, Screenshot, Clipboard, and OCR integrations."
 
 [dependencies]
-cueward-core = { version = "0.1.0", path = "../core" }
+cueward-core = { version = "0.2.0", path = "../core" }
 rusqlite = { version = "0.35", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
