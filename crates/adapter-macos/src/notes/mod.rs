@@ -32,6 +32,19 @@ pub(crate) struct MediaNote {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct WebPreviewAttachment {
+    pub(crate) title: Option<String>,
+    pub(crate) url: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct WebPreviewNote {
+    pub(crate) timestamp: i64,
+    pub(crate) title: Option<String>,
+    pub(crate) attachments: Vec<WebPreviewAttachment>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AttachmentOcrBlock {
     pub(crate) index: usize,
     pub(crate) filename: String,

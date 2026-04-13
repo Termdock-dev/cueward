@@ -7,7 +7,7 @@ use cueward_core::{Cue, CueSource};
 use crate::MacosError;
 
 use super::attachments::{attachment_placeholder_count, enrich_cues_with_attachments};
-use super::db::load_media_notes;
+use super::db::{load_media_notes, load_web_preview_notes};
 use super::{ATTACHMENT_LABEL, ATTACHMENT_PLACEHOLDER};
 
 pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
@@ -99,9 +99,9 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
     });
 
     if has_attachment_placeholders {
-        if let Ok(media_notes) = load_media_notes(since) {
-            enrich_cues_with_attachments(&mut cues, &media_notes);
-        }
+        let media_notes = load_media_notes(since).unwrap_or_default();
+        let web_preview_notes = load_web_preview_notes(since).unwrap_or_default();
+        enrich_cues_with_attachments(&mut cues, &media_notes, &web_preview_notes);
     }
 
     Ok(cues)

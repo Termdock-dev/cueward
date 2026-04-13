@@ -37,6 +37,10 @@ pub struct AttachmentSegment {
     #[serde(default)]
     pub kind: AttachmentKind,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filename: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
@@ -74,6 +78,8 @@ mod tests {
         let segment = AttachmentSegment {
             index: 1,
             kind: AttachmentKind::Image,
+            title: None,
+            url: None,
             filename: Some("scan.jpg".into()),
             path: Some("/tmp/scan.jpg".into()),
             sha256: Some("abc123".into()),
@@ -102,7 +108,33 @@ mod tests {
         .expect("decode legacy segment");
 
         assert!(matches!(segment.kind, AttachmentKind::Unresolved));
+        assert_eq!(segment.title, None);
+        assert_eq!(segment.url, None);
         assert_eq!(segment.filename.as_deref(), Some("scan.jpg"));
         assert_eq!(segment.path.as_deref(), Some("/tmp/scan.jpg"));
+    }
+
+    #[test]
+    fn attachment_segment_serializes_title_and_url_for_web_preview() {
+        let segment = AttachmentSegment {
+            index: 1,
+            kind: AttachmentKind::WebPreview,
+            title: Some("Cursor Docs".into()),
+            url: Some("https://docs.cursor.com/guides/working-with-context".into()),
+            filename: None,
+            path: None,
+            sha256: None,
+            ocr_text: None,
+            has_ocr: false,
+        };
+
+        let value = serde_json::to_value(segment).expect("serialize web preview");
+
+        assert_eq!(value["kind"], "web_preview");
+        assert_eq!(value["title"], "Cursor Docs");
+        assert_eq!(
+            value["url"],
+            "https://docs.cursor.com/guides/working-with-context"
+        );
     }
 }
