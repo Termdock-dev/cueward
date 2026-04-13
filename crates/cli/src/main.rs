@@ -198,6 +198,7 @@ enum NotesAction {
 enum SafariAiProvider {
     Gemini,
     Chatgpt,
+    Grok,
     Threads,
     X,
 }
@@ -1394,6 +1395,77 @@ fn main() {
                             process::exit(1);
                         }
                     },
+                    SafariAiProvider::Grok => match action {
+                        SafariAiAction::Prompt {
+                            prompt,
+                            mode,
+                            auto_confirm,
+                        } => {
+                            if auto_confirm {
+                                eprintln!("error: Grok prompt does not support --auto-confirm");
+                                process::exit(1);
+                            }
+                            if mode.is_some() {
+                                eprintln!("error: Grok prompt does not support --mode yet");
+                                process::exit(1);
+                            }
+                            if let Err(e) = cueward_adapter_macos::safari::ensure_grok_home(p) {
+                                eprintln!("error: {e}");
+                                process::exit(1);
+                            }
+                            match cueward_adapter_macos::safari::send_grok_prompt(&prompt, p) {
+                                Ok(r) => {
+                                    print_external(
+                                        "safari/ai/grok",
+                                        &serde_json::to_string_pretty(&r).unwrap(),
+                                    );
+                                    eprintln!("grok response ready");
+                                }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
+                            }
+                        }
+                        SafariAiAction::List => {
+                            if let Err(e) = cueward_adapter_macos::safari::ensure_grok_home(p) {
+                                eprintln!("error: {e}");
+                                process::exit(1);
+                            }
+                            match cueward_adapter_macos::safari::grok_list_conversations(p) {
+                                Ok(convos) => {
+                                    print_external(
+                                        "safari/ai/grok/list",
+                                        &serde_json::to_string_pretty(&convos).unwrap(),
+                                    );
+                                    eprintln!("{} conversation(s)", convos.len());
+                                }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
+                            }
+                        }
+                        SafariAiAction::Read { url } => {
+                            match cueward_adapter_macos::safari::grok_read_conversation(&url, p) {
+                                Ok(r) => {
+                                    print_external(
+                                        "safari/ai/grok/read",
+                                        &serde_json::to_string_pretty(&r).unwrap(),
+                                    );
+                                    eprintln!("conversation read");
+                                }
+                                Err(e) => {
+                                    eprintln!("error: {e}");
+                                    process::exit(1);
+                                }
+                            }
+                        }
+                        _ => {
+                            eprintln!("error: Grok currently supports only prompt, list, and read");
+                            process::exit(1);
+                        }
+                    },
                     SafariAiProvider::Threads => match action {
                         SafariAiAction::List => {
                             match cueward_adapter_macos::safari::threads_extract_feed(p) {
@@ -2054,6 +2126,92 @@ mod tests {
                     },
             } => {
                 assert_eq!(provider, SafariAiProvider::Gemini);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_grok_prompt_only() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "ai",
+            "--provider",
+            "grok",
+            "prompt",
+            "--prompt",
+            "哈囉 Grok",
+        ])
+        .expect("parse");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Ai {
+                        provider,
+                        action:
+                            SafariAiAction::Prompt {
+                                prompt,
+                                mode,
+                                auto_confirm,
+                            },
+                        ..
+                    },
+            } => {
+                assert_eq!(provider, SafariAiProvider::Grok);
+                assert_eq!(prompt, "哈囉 Grok");
+                assert_eq!(mode, None);
+                assert!(!auto_confirm);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_grok_list() {
+        let cli = Cli::try_parse_from(["cueward", "safari", "ai", "--provider", "grok", "list"])
+            .expect("parse");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Ai {
+                        provider,
+                        action: SafariAiAction::List,
+                        ..
+                    },
+            } => {
+                assert_eq!(provider, SafariAiProvider::Grok);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_grok_read() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "ai",
+            "--provider",
+            "grok",
+            "read",
+            "https://grok.com/c/abc",
+        ])
+        .expect("parse");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Ai {
+                        provider,
+                        action: SafariAiAction::Read { url },
+                        ..
+                    },
+            } => {
+                assert_eq!(provider, SafariAiProvider::Grok);
+                assert_eq!(url, "https://grok.com/c/abc");
             }
             _ => panic!("unexpected command"),
         }
