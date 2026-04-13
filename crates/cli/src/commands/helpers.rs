@@ -177,15 +177,15 @@ mod tests {
 
     #[test]
     fn bookmarks_target_folder_prepends_profile_to_folder() {
-        let folder = bookmarks_target_folder(Some("Ryugu"), Some("Work/AI Tools"));
+        let folder = bookmarks_target_folder(Some("Work"), Some("Projects/AI Tools"));
 
-        assert_eq!(folder, Some("Ryugu/Work/AI Tools".to_string()));
+        assert_eq!(folder, Some("Work/Projects/AI Tools".to_string()));
     }
 
     #[test]
     fn bookmarks_target_folder_uses_profile_as_root_when_folder_missing() {
-        let folder = bookmarks_target_folder(Some("Ryugu"), None);
+        let folder = bookmarks_target_folder(Some("Work"), None);
 
-        assert_eq!(folder, Some("Ryugu".to_string()));
+        assert_eq!(folder, Some("Work".to_string()));
     }
 }

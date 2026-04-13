@@ -7,12 +7,12 @@ use super::script::{
 
 #[test]
 fn parse_tab_line_decodes_fields() {
-    let line = "61998<<<FIELD_SEP>>>Ryugu — Google\\tGemini<<<FIELD_SEP>>>0<<<FIELD_SEP>>>Google\\tGemini<<<FIELD_SEP>>>https://gemini.google.com/app<<<FIELD_SEP>>>true";
+    let line = "61998<<<FIELD_SEP>>>Work — Google\\tGemini<<<FIELD_SEP>>>0<<<FIELD_SEP>>>Google\\tGemini<<<FIELD_SEP>>>https://gemini.google.com/app<<<FIELD_SEP>>>true";
 
     let tab = parse_tab_line(line).expect("tab");
 
     assert_eq!(tab.window_id, 61998);
-    assert_eq!(tab.window_name, "Ryugu — Google\tGemini");
+    assert_eq!(tab.window_name, "Work — Google\tGemini");
     assert_eq!(tab.profile, None);
     assert_eq!(tab.index, 0);
     assert_eq!(tab.title, "Google\tGemini");

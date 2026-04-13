@@ -230,7 +230,7 @@ fn cli_parses_gemini_with_profile() {
         "--provider",
         "gemini",
         "--profile",
-        "Ryugu",
+        "Work",
         "prompt",
         "--prompt",
         "hello",
@@ -246,7 +246,7 @@ fn cli_parses_gemini_with_profile() {
                     ..
                 },
         } => {
-            assert_eq!(profile.as_deref(), Some("Ryugu"));
+            assert_eq!(profile.as_deref(), Some("Work"));
             assert_eq!(prompt, "hello");
         }
         _ => panic!("unexpected command"),

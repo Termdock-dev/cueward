@@ -19,7 +19,7 @@
 - [ ] **Step 1: Write the failing test**
 
 Add a CLI parse test for:
-`cueward safari scroll-and-read --tab x.com --profile Ryugu --times 3`
+`cueward safari scroll-and-read --tab x.com --profile Work --times 3`
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -132,4 +132,3 @@ Run:
 
 Run:
 `git diff -- crates/cli/src/main.rs crates/adapter-macos/src/safari.rs docs/plans/2026-04-12-scroll-read-pipeline.md`
-

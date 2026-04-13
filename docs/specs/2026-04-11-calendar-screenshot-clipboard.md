@@ -2,7 +2,7 @@
 
 **Goal:** 為 cueward 新增三個 macOS 整合功能：日曆讀寫、螢幕截圖（含可選 OCR）、剪貼簿讀寫。
 
-**動機:** Ryugu（AI 助手）需要這三個能力來更好地輔助老闆 — 知道行程判斷何時打擾、主動看螢幕狀態、存取剪貼簿省去手動貼上。
+**動機:** 上層 AI 助手需要這三個能力來更好地輔助使用者 — 知道行程判斷何時打擾、主動看螢幕狀態、存取剪貼簿省去手動貼上。
 
 ---
 
@@ -171,4 +171,4 @@ Calendar 和 Screenshot 加了以備未來需要（calendar events 可能進 cap
 
 ### daemon 側更新
 
-完成後需要在 Ryugu daemon 的 `tools/cueward.ts` 加對應的 action handler（calendar、screenshot、clipboard），以及更新 `buildCuewardCmd` 的 switch/case。
+完成後需要在 host app 的 `tools/cueward.ts` 加對應的 action handler（calendar、screenshot、clipboard），以及更新 `buildCuewardCmd` 的 switch/case。

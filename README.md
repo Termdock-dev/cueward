@@ -52,7 +52,7 @@ Read current Safari tabs, not just browsing history:
 cueward safari tabs
 
 # Filter by Safari profile name parsed from window title
-cueward safari tabs --profile Ryugu
+cueward safari tabs --profile Work
 
 # Current active tab in the front window
 cueward safari active
@@ -78,7 +78,7 @@ cueward safari fill "textarea" "hello from cueward"
 cueward safari wait ".result" --timeout 30
 
 # Target a specific tab by index or URL/title match
-cueward safari read --tab "gemini.google.com" --profile Ryugu
+cueward safari read --tab "gemini.google.com" --profile Work
 cueward safari exec "document.title" --tab 2
 cueward safari source --tab "ChatGPT"
 
@@ -86,33 +86,33 @@ cueward safari source --tab "ChatGPT"
 cueward safari scroll down
 cueward safari scroll up --amount 1000
 cueward safari scroll top
-cueward safari scroll bottom --profile Ryugu
+cueward safari scroll bottom --profile Work
 
 # Close multiple tabs by profile or URL pattern
-cueward safari close-tabs --profile Ryugu --url "gemini.google.com"
-cueward safari close-tabs --profile Ryugu  # close all tabs in profile
+cueward safari close-tabs --profile Work --url "gemini.google.com"
+cueward safari close-tabs --profile Work  # close all tabs in profile
 
 # List bookmark/folder items from the Safari bookmarks root
 cueward safari bookmarks list
 
 # Scope bookmarks to a specific Safari profile folder
-cueward safari bookmarks list --profile Ryugu
+cueward safari bookmarks list --profile Work
 
 # Traverse nested bookmark folders inside a profile
-cueward safari bookmarks list --profile Ryugu --folder "Work/AI Tools"
+cueward safari bookmarks list --profile Work --folder "Projects/AI Tools"
 
 # Folder paths use "/" as the separator; folder titles containing "/" are not supported
 # in this first version
 
 # Search bookmarks recursively from the root or a profile folder
 cueward safari bookmarks search "claude"
-cueward safari bookmarks search "claude" --profile Ryugu --folder "Work"
+cueward safari bookmarks search "claude" --profile Work --folder "Projects"
 
 # Add a bookmark into a nested folder inside a profile
-cueward safari bookmarks add --title "Claude" --url "https://claude.ai" --profile Ryugu --folder "Work/AI Tools"
+cueward safari bookmarks add --title "Claude" --url "https://claude.ai" --profile Work --folder "Projects/AI Tools"
 
 # Delete by exact title + URL within a profile folder
-cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" --profile Ryugu --folder "Work/AI Tools"
+cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" --profile Work --folder "Projects/AI Tools"
 ```
 
 ### Safari AI
@@ -148,7 +148,7 @@ cueward safari ai --provider gemini save-images https://gemini.google.com/app/ab
 cueward safari ai --provider gemini save-media https://gemini.google.com/app/abc123
 
 # Use a specific Safari profile
-cueward safari ai --provider gemini --profile Ryugu list
+cueward safari ai --provider gemini --profile Work list
 ```
 
 Supported Gemini modes: `deep-research`, `image`, `video`, `music`.

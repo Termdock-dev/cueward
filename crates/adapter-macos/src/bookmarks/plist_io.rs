@@ -331,7 +331,7 @@ mod tests {
 
     fn empty_folder_root() -> Value {
         let mut folder = Dictionary::new();
-        folder.insert("Title".to_string(), Value::String("Ryugu".to_string()));
+        folder.insert("Title".to_string(), Value::String("Work".to_string()));
         folder.insert(
             "WebBookmarkType".to_string(),
             Value::String("WebBookmarkTypeList".to_string()),
@@ -368,7 +368,7 @@ mod tests {
 
         let result = add_bookmark_to_path(
             &path,
-            Some("Ryugu"),
+            Some("Work"),
             "Smoke Test",
             "https://example.com/smoke",
         )
@@ -376,7 +376,7 @@ mod tests {
 
         assert_eq!(result.title.as_deref(), Some("Smoke Test"));
         assert_eq!(result.url.as_deref(), Some("https://example.com/smoke"));
-        assert_eq!(result.folder_path, "Ryugu");
+        assert_eq!(result.folder_path, "Work");
     }
 
     #[test]
@@ -387,7 +387,7 @@ mod tests {
             .to_file_binary(&path)
             .expect("write plist root");
 
-        let err = delete_bookmark_from_path(&path, Some("Ryugu"), "Missing", "https://example.com")
+        let err = delete_bookmark_from_path(&path, Some("Work"), "Missing", "https://example.com")
             .expect_err("delete should fail");
 
         assert!(err.to_string().contains("bookmark not found"));

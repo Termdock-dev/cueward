@@ -177,7 +177,7 @@ In `crates/adapter-macos/src/bookmarks.rs`:
 - recursively walk `Children`
 - implement folder lookup from root and `list` / `search` helpers
 - keep URL values opaque strings; do not add canonicalization logic
-- support `--profile` as a root-folder prefix, so `--profile Ryugu --folder "Work/AI Tools"` resolves to `Ryugu/Work/AI Tools`
+- support `--profile` as a root-folder prefix, so `--profile Work --folder "Projects/AI Tools"` resolves to `Work/Projects/AI Tools`
 
 Prefer a small read model:
 

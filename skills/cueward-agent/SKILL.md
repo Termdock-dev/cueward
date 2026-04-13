@@ -94,14 +94,14 @@ Read live Safari state and automate the current page or a matched tab.
 cueward safari tabs
 
 # Filter to a Safari profile
-cueward safari tabs --profile Ryugu
+cueward safari tabs --profile Work
 
 # Read the active page or a specific selector
 cueward safari read
 cueward safari read --selector ".article-body"
 
 # Read a specific tab by URL/title match
-cueward safari read --tab "ChatGPT" --profile Ryugu
+cueward safari read --tab "ChatGPT" --profile Work
 
 # Run JavaScript in the current tab
 cueward safari exec "document.title"
@@ -118,17 +118,17 @@ Inspect and manage Safari bookmarks, including nested folders and profile roots.
 ```bash
 # List root bookmarks or a profile root
 cueward safari bookmarks list
-cueward safari bookmarks list --profile Ryugu
+cueward safari bookmarks list --profile Work
 
 # Traverse nested folders inside a profile
-cueward safari bookmarks list --profile Ryugu --folder "Work/AI Tools"
+cueward safari bookmarks list --profile Work --folder "Projects/AI Tools"
 
 # Recursive search
-cueward safari bookmarks search "claude" --profile Ryugu --folder "Work"
+cueward safari bookmarks search "claude" --profile Work --folder "Projects"
 
 # Add or delete by exact title + URL fingerprint inside a folder
-cueward safari bookmarks add --title "Claude" --url "https://claude.ai" --profile Ryugu --folder "Work/AI Tools"
-cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" --profile Ryugu --folder "Work/AI Tools"
+cueward safari bookmarks add --title "Claude" --url "https://claude.ai" --profile Work --folder "Projects/AI Tools"
+cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" --profile Work --folder "Projects/AI Tools"
 ```
 
 - Folder paths use `/` as the separator
@@ -144,7 +144,7 @@ Drive Safari-based AI providers such as Gemini and ChatGPT through the CLI.
 cueward safari ai --provider gemini prompt --prompt "台灣 AI 產業分析"
 
 # Use a provider with a specific Safari profile
-cueward safari ai --provider gemini --profile Ryugu list
+cueward safari ai --provider gemini --profile Work list
 
 # Read a saved conversation
 cueward safari ai --provider gemini read https://gemini.google.com/app/abc123
