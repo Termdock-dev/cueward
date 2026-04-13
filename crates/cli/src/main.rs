@@ -259,6 +259,63 @@ enum SafariAiAction {
 }
 
 #[derive(Subcommand)]
+enum SafariBookmarksAction {
+    /// List bookmark/folder items under the bookmark root or a specific folder path
+    List {
+        /// Restrict bookmarks operations to a Safari profile folder at the root
+        #[arg(long)]
+        profile: Option<String>,
+        /// Optional folder path such as Work/AI Tools
+        #[arg(long)]
+        folder: Option<String>,
+    },
+
+    /// Search bookmarks recursively from the root or a specific folder path
+    Search {
+        /// Query string to match against bookmark title or URL
+        query: String,
+        /// Restrict bookmarks operations to a Safari profile folder at the root
+        #[arg(long)]
+        profile: Option<String>,
+        /// Optional folder path such as Work/AI Tools
+        #[arg(long)]
+        folder: Option<String>,
+    },
+
+    /// Add a bookmark under the root or a specific folder path
+    Add {
+        /// Bookmark title
+        #[arg(long)]
+        title: String,
+        /// Bookmark URL
+        #[arg(long)]
+        url: String,
+        /// Restrict bookmarks operations to a Safari profile folder at the root
+        #[arg(long)]
+        profile: Option<String>,
+        /// Optional folder path such as Work/AI Tools
+        #[arg(long)]
+        folder: Option<String>,
+    },
+
+    /// Delete a bookmark by exact title + URL under the root or a specific folder path
+    Delete {
+        /// Bookmark title
+        #[arg(long)]
+        title: String,
+        /// Bookmark URL
+        #[arg(long)]
+        url: String,
+        /// Restrict bookmarks operations to a Safari profile folder at the root
+        #[arg(long)]
+        profile: Option<String>,
+        /// Optional folder path such as Work/AI Tools
+        #[arg(long)]
+        folder: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
 enum SafariAction {
     /// List all current Safari tabs
     Tabs {
@@ -390,6 +447,12 @@ enum SafariAction {
         /// Timeout in seconds
         #[arg(long, default_value = "30")]
         timeout: u64,
+    },
+
+    /// Safari bookmarks workflows
+    Bookmarks {
+        #[command(subcommand)]
+        action: SafariBookmarksAction,
     },
 
     /// Safari AI provider workflows
@@ -681,6 +744,21 @@ fn print_external(source: &str, json: &str) {
     println!("<external source=\"cueward/{source}\">");
     println!("{safe}");
     println!("</external>");
+}
+
+fn bookmarks_target_folder(
+    profile: Option<&str>,
+    folder: Option<&str>,
+) -> Result<Option<String>, String> {
+    let profile = profile.map(str::trim).filter(|value| !value.is_empty());
+    let folder = folder.map(str::trim).filter(|value| !value.is_empty());
+
+    Ok(match (profile, folder) {
+        (Some(profile), Some(folder)) => Some(format!("{profile}/{folder}")),
+        (Some(profile), None) => Some(profile.to_string()),
+        (None, Some(folder)) => Some(folder.to_string()),
+        (None, None) => None,
+    })
 }
 
 fn main() {
@@ -1153,6 +1231,126 @@ fn main() {
                     }
                 }
             }
+            SafariAction::Bookmarks { action } => match action {
+                SafariBookmarksAction::List { profile, folder } => {
+                    let target_folder =
+                        match bookmarks_target_folder(profile.as_deref(), folder.as_deref()) {
+                            Ok(folder) => folder,
+                            Err(err) => {
+                                eprintln!("error: {err}");
+                                process::exit(1);
+                            }
+                        };
+                    match cueward_adapter_macos::bookmarks::list_bookmarks(target_folder.as_deref())
+                    {
+                        Ok(result) => {
+                            print_external(
+                                "safari/bookmarks/list",
+                                &serde_json::to_string_pretty(&result).unwrap(),
+                            );
+                            eprintln!("listed bookmarks");
+                        }
+                        Err(e) => {
+                            eprintln!("error: {e}");
+                            process::exit(1);
+                        }
+                    }
+                }
+                SafariBookmarksAction::Search {
+                    query,
+                    profile,
+                    folder,
+                } => {
+                    let target_folder =
+                        match bookmarks_target_folder(profile.as_deref(), folder.as_deref()) {
+                            Ok(folder) => folder,
+                            Err(err) => {
+                                eprintln!("error: {err}");
+                                process::exit(1);
+                            }
+                        };
+                    match cueward_adapter_macos::bookmarks::search_bookmarks(
+                        &query,
+                        target_folder.as_deref(),
+                    ) {
+                        Ok(result) => {
+                            print_external(
+                                "safari/bookmarks/search",
+                                &serde_json::to_string_pretty(&result).unwrap(),
+                            );
+                            eprintln!("searched bookmarks");
+                        }
+                        Err(e) => {
+                            eprintln!("error: {e}");
+                            process::exit(1);
+                        }
+                    }
+                }
+                SafariBookmarksAction::Add {
+                    title,
+                    url,
+                    profile,
+                    folder,
+                } => {
+                    let target_folder =
+                        match bookmarks_target_folder(profile.as_deref(), folder.as_deref()) {
+                            Ok(folder) => folder,
+                            Err(err) => {
+                                eprintln!("error: {err}");
+                                process::exit(1);
+                            }
+                        };
+                    match cueward_adapter_macos::bookmarks::add_bookmark_cli(
+                        &title,
+                        &url,
+                        target_folder.as_deref(),
+                    ) {
+                        Ok(result) => {
+                            print_external(
+                                "safari/bookmarks/add",
+                                &serde_json::to_string_pretty(&result).unwrap(),
+                            );
+                            eprintln!("bookmark added");
+                        }
+                        Err(e) => {
+                            eprintln!("error: {e}");
+                            process::exit(1);
+                        }
+                    }
+                }
+                SafariBookmarksAction::Delete {
+                    title,
+                    url,
+                    profile,
+                    folder,
+                } => {
+                    let target_folder =
+                        match bookmarks_target_folder(profile.as_deref(), folder.as_deref()) {
+                            Ok(folder) => folder,
+                            Err(err) => {
+                                eprintln!("error: {err}");
+                                process::exit(1);
+                            }
+                        };
+                    match cueward_adapter_macos::bookmarks::delete_bookmark_cli(
+                        &title,
+                        &url,
+                        target_folder.as_deref(),
+                    ) {
+                        Ok(result) => {
+                            print_external(
+                                "safari/bookmarks/delete",
+                                &serde_json::to_string_pretty(&result).unwrap(),
+                            );
+                            eprintln!("bookmark deleted");
+                        }
+                        Err(e) => {
+                            eprintln!("error: {e}");
+                            process::exit(1);
+                        }
+                    }
+                }
+            },
             SafariAction::Ai {
                 provider,
                 profile,
@@ -1831,7 +2029,8 @@ mod tests {
 
     use super::{
         Cli, Command, GeminiAiAction, GeminiMode, SafariAction, SafariAiAction, SafariAiProvider,
-        build_gemini_ai_action, local_day_bounds, validate_optional_output_path,
+        SafariBookmarksAction, bookmarks_target_folder, build_gemini_ai_action, local_day_bounds,
+        validate_optional_output_path,
     };
 
     #[test]
@@ -1931,6 +2130,222 @@ mod tests {
                 assert_eq!(times, 3);
                 assert_eq!(amount, None);
                 assert_eq!(selector, None);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_safari_bookmarks_list_with_folder() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "bookmarks",
+            "list",
+            "--folder",
+            "Work/AI Tools",
+        ])
+        .expect("parse safari bookmarks list");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Bookmarks {
+                        action: SafariBookmarksAction::List { profile, folder },
+                    },
+            } => {
+                assert_eq!(profile, None);
+                assert_eq!(folder.as_deref(), Some("Work/AI Tools"));
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_safari_bookmarks_list_with_profile() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "bookmarks",
+            "list",
+            "--profile",
+            "Ryugu",
+        ])
+        .expect("parse safari bookmarks list with profile");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Bookmarks {
+                        action: SafariBookmarksAction::List { profile, folder },
+                    },
+            } => {
+                assert_eq!(profile.as_deref(), Some("Ryugu"));
+                assert_eq!(folder, None);
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_safari_bookmarks_search_with_folder() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "bookmarks",
+            "search",
+            "claude",
+            "--folder",
+            "Work/AI Tools",
+        ])
+        .expect("parse safari bookmarks search");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Bookmarks {
+                        action:
+                            SafariBookmarksAction::Search {
+                                query,
+                                profile,
+                                folder,
+                            },
+                    },
+            } => {
+                assert_eq!(query, "claude");
+                assert_eq!(profile, None);
+                assert_eq!(folder.as_deref(), Some("Work/AI Tools"));
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_safari_bookmarks_add_with_title_url_and_folder() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "bookmarks",
+            "add",
+            "--title",
+            "Claude",
+            "--url",
+            "https://claude.ai",
+            "--folder",
+            "Work/AI Tools",
+        ])
+        .expect("parse safari bookmarks add");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Bookmarks {
+                        action:
+                            SafariBookmarksAction::Add {
+                                title,
+                                url,
+                                profile,
+                                folder,
+                            },
+                    },
+            } => {
+                assert_eq!(title, "Claude");
+                assert_eq!(url, "https://claude.ai");
+                assert_eq!(profile, None);
+                assert_eq!(folder.as_deref(), Some("Work/AI Tools"));
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_safari_bookmarks_add_with_profile_and_folder() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "bookmarks",
+            "add",
+            "--title",
+            "Claude",
+            "--url",
+            "https://claude.ai",
+            "--profile",
+            "Ryugu",
+            "--folder",
+            "Work/AI Tools",
+        ])
+        .expect("parse safari bookmarks add with profile");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Bookmarks {
+                        action:
+                            SafariBookmarksAction::Add {
+                                title,
+                                url,
+                                profile,
+                                folder,
+                            },
+                    },
+            } => {
+                assert_eq!(title, "Claude");
+                assert_eq!(url, "https://claude.ai");
+                assert_eq!(profile.as_deref(), Some("Ryugu"));
+                assert_eq!(folder.as_deref(), Some("Work/AI Tools"));
+            }
+            _ => panic!("unexpected command"),
+        }
+    }
+
+    #[test]
+    fn bookmarks_target_folder_prepends_profile_to_folder() {
+        let folder =
+            bookmarks_target_folder(Some("Ryugu"), Some("Work/AI Tools")).expect("target folder");
+
+        assert_eq!(folder, Some("Ryugu/Work/AI Tools".to_string()));
+    }
+
+    #[test]
+    fn bookmarks_target_folder_uses_profile_as_root_when_folder_missing() {
+        let folder = bookmarks_target_folder(Some("Ryugu"), None).expect("target folder");
+
+        assert_eq!(folder, Some("Ryugu".to_string()));
+    }
+
+    #[test]
+    fn cli_parses_safari_bookmarks_delete_with_title_url_and_folder() {
+        let cli = Cli::try_parse_from([
+            "cueward",
+            "safari",
+            "bookmarks",
+            "delete",
+            "--title",
+            "Claude",
+            "--url",
+            "https://claude.ai",
+            "--folder",
+            "Work/AI Tools",
+        ])
+        .expect("parse safari bookmarks delete");
+
+        match cli.command {
+            Command::Safari {
+                action:
+                    SafariAction::Bookmarks {
+                        action:
+                            SafariBookmarksAction::Delete {
+                                title,
+                                url,
+                                profile,
+                                folder,
+                            },
+                    },
+            } => {
+                assert_eq!(title, "Claude");
+                assert_eq!(url, "https://claude.ai");
+                assert_eq!(profile, None);
+                assert_eq!(folder.as_deref(), Some("Work/AI Tools"));
             }
             _ => panic!("unexpected command"),
         }

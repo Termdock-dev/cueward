@@ -1,4 +1,5 @@
 pub mod applescript;
+pub mod bookmarks;
 pub mod calendar;
 pub mod clipboard;
 mod error;
@@ -9,6 +10,7 @@ pub mod plan;
 pub mod quick_notes;
 pub mod reminders;
 pub mod safari;
+mod safari_guard;
 pub mod screenshot;
 pub mod send;
 
