@@ -13,6 +13,7 @@ use super::db::{
 };
 use super::{ATTACHMENT_LABEL, ATTACHMENT_PLACEHOLDER};
 
+/// Capture Apple Notes modified since the given timestamp and enrich attachment placeholders.
 pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
     let seconds_ago = (Utc::now() - since).num_seconds().max(0);
 
