@@ -58,6 +58,30 @@ pub(crate) enum CalendarAction {
         #[arg(long)]
         calendar: String,
     },
+    /// Update a calendar event matched by title
+    Update {
+        /// Event title
+        #[arg(long)]
+        title: String,
+        /// Calendar name (searches all calendars if omitted)
+        #[arg(long)]
+        calendar: Option<String>,
+        /// New title
+        #[arg(long)]
+        new_title: Option<String>,
+        /// New start datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        new_start: Option<String>,
+        /// New end datetime (RFC3339 or "YYYY-MM-DD HH:MM")
+        #[arg(long)]
+        new_end: Option<String>,
+        /// Replace notes/description
+        #[arg(long)]
+        notes: Option<String>,
+        /// Replace location
+        #[arg(long)]
+        location: Option<String>,
+    },
 }
 
 pub(crate) fn dispatch(action: CalendarAction) {
@@ -166,6 +190,51 @@ pub(crate) fn dispatch(action: CalendarAction) {
             };
             match cueward_adapter_macos::calendar::delete_event(&title, start_dt, &calendar) {
                 Ok(()) => eprintln!("event deleted: {title}"),
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            }
+        }
+        CalendarAction::Update {
+            title,
+            calendar,
+            new_title,
+            new_start,
+            new_end,
+            notes,
+            location,
+        } => {
+            let new_start_dt = match new_start.as_deref() {
+                Some(value) => match parse_datetime_arg("new-start", value) {
+                    Ok(dt) => Some(dt),
+                    Err(err) => {
+                        eprintln!("{err}");
+                        process::exit(1);
+                    }
+                },
+                None => None,
+            };
+            let new_end_dt = match new_end.as_deref() {
+                Some(value) => match parse_datetime_arg("new-end", value) {
+                    Ok(dt) => Some(dt),
+                    Err(err) => {
+                        eprintln!("{err}");
+                        process::exit(1);
+                    }
+                },
+                None => None,
+            };
+            match cueward_adapter_macos::calendar::update_event(
+                &title,
+                calendar.as_deref(),
+                new_title.as_deref(),
+                new_start_dt,
+                new_end_dt,
+                notes.as_deref(),
+                location.as_deref(),
+            ) {
+                Ok(()) => eprintln!("event updated: {title}"),
                 Err(e) => {
                     eprintln!("error: {e}");
                     process::exit(1);

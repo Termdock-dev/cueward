@@ -4,10 +4,17 @@ use serde::Serialize;
 use crate::MacosError;
 use crate::applescript::{escape, run_capture};
 
+mod crud;
+
+pub use crud::{
+    ReminderSelector, complete_reminder, create_reminder, delete_reminder, update_reminder,
+};
+
 const REMINDER_SEPARATOR: &str = "---REMINDER_SEP---";
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct ReminderItem {
+    pub id: String,
     pub title: String,
     pub notes: String,
     pub due_date: Option<String>,
@@ -51,9 +58,11 @@ fn decode_field(value: &str) -> String {
 
 fn parse_reminder_line(line: &str) -> Option<ReminderItem> {
     let parts: Vec<&str> = line.split('\t').collect();
-    if parts.len() != 5 {
-        return None;
-    }
+    let (id, parts) = match parts.len() {
+        6 => (decode_field(parts[0]), &parts[1..]),
+        5 => (String::new(), &parts[..]),
+        _ => return None,
+    };
 
     let title = decode_field(parts[0]);
     if title.is_empty() {
@@ -66,6 +75,7 @@ fn parse_reminder_line(line: &str) -> Option<ReminderItem> {
     };
 
     Some(ReminderItem {
+        id,
         title,
         notes: decode_field(parts[1]),
         due_date,
@@ -152,6 +162,7 @@ fn build_list_script(list_filter: Option<&str>) -> String {
             repeat with aList in targetLists
                 set listName to my encode_field(name of aList)
                 repeat with aReminder in reminders of aList
+                    set reminderId to my encode_field(id of aReminder)
                     set reminderTitle to my encode_field(name of aReminder)
                     if body of aReminder is missing value then
                         set reminderNotes to ""
@@ -168,7 +179,7 @@ fn build_list_script(list_filter: Option<&str>) -> String {
                     else
                         set reminderCompleted to "false"
                     end if
-                    set output to output & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
+                    set output to output & reminderId & tab & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
                 end repeat
             end repeat
             return output
@@ -214,6 +225,7 @@ fn build_today_script(from: &str, to: &str) -> String {
                 set listName to my encode_field(name of aList)
                 set matchingReminders to (reminders of aList whose due date is not missing value and due date is greater than or equal to fromDate and due date is less than or equal to toDate)
                 repeat with aReminder in matchingReminders
+                    set reminderId to my encode_field(id of aReminder)
                     set reminderTitle to my encode_field(name of aReminder)
                     if body of aReminder is missing value then
                         set reminderNotes to ""
@@ -226,7 +238,7 @@ fn build_today_script(from: &str, to: &str) -> String {
                     else
                         set reminderCompleted to "false"
                     end if
-                    set output to output & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
+                    set output to output & reminderId & tab & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
                 end repeat
             end repeat
             return output
@@ -268,17 +280,15 @@ pub fn today() -> Result<Vec<ReminderItem>, MacosError> {
 mod tests {
     use chrono::{Local, TimeZone};
 
-    use super::{
-        REMINDER_SEPARATOR, build_list_script, build_today_script, parse_reminder_line,
-        parse_reminders_output,
-    };
+    use super::{REMINDER_SEPARATOR, build_list_script, build_today_script, parse_reminder_line, parse_reminders_output};
 
     #[test]
     fn parse_reminder_line_unescapes_fields() {
-        let line = "Buy\\tmilk\tLine 1\\nLine 2\t2026-04-11T08:00:00Z\tfalse\tWork";
+        let line = "reminder-id\tBuy\\tmilk\tLine 1\\nLine 2\t2026-04-11T08:00:00Z\tfalse\tWork";
 
         let reminder = parse_reminder_line(line).expect("reminder");
 
+        assert_eq!(reminder.id, "reminder-id");
         assert_eq!(reminder.title, "Buy\tmilk");
         assert_eq!(reminder.notes, "Line 1\nLine 2");
         assert_eq!(reminder.due_date.as_deref(), Some("2026-04-11T08:00:00Z"));
@@ -289,15 +299,17 @@ mod tests {
     #[test]
     fn parse_reminders_output_keeps_multiple_items() {
         let raw = concat!(
-            "One\t\t\tfalse\tInbox---REMINDER_SEP---",
-            "Two\tNotes\t2026-04-11T08:00:00Z\ttrue\tWork---REMINDER_SEP---"
+            "id-1\tOne\t\t\tfalse\tInbox---REMINDER_SEP---",
+            "id-2\tTwo\tNotes\t2026-04-11T08:00:00Z\ttrue\tWork---REMINDER_SEP---"
         );
 
         let reminders = parse_reminders_output(raw);
 
         assert_eq!(reminders.len(), 2);
+        assert_eq!(reminders[0].id, "id-1");
         assert_eq!(reminders[0].title, "One");
         assert_eq!(reminders[0].due_date, None);
+        assert_eq!(reminders[1].id, "id-2");
         assert_eq!(reminders[1].title, "Two");
         assert_eq!(reminders[1].list_name, "Work");
     }
@@ -319,13 +331,14 @@ mod tests {
         assert!(!today_script.contains("class isot"));
         assert!(list_script.contains("format_reminder_date"));
         assert!(today_script.contains("format_reminder_date"));
+        assert!(list_script.contains("set reminderId to my encode_field(id of aReminder)"));
         assert!(list_script.contains("set reminderCompleted to \"true\""));
         assert!(today_script.contains("set matchingReminders to"));
     }
 
     #[test]
     fn parse_reminder_line_unescapes_separator_escape() {
-        let line = "One\tContains\\sMarker\t\ttrue\tInbox";
+        let line = "id-1\tOne\tContains\\sMarker\t\ttrue\tInbox";
 
         let reminder = parse_reminder_line(line).expect("reminder");
 

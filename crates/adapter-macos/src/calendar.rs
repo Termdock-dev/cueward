@@ -2,7 +2,7 @@ use chrono::{DateTime, Local};
 use serde::Serialize;
 
 use crate::MacosError;
-use crate::applescript::{escape, escape_body, run, run_capture};
+use crate::applescript::{applescript_date_block, escape, escape_body, run, run_capture};
 
 const EVENT_SEPARATOR: &str = "---EVENT_SEP---";
 
@@ -15,28 +15,6 @@ pub struct CalendarEvent {
     pub location: String,
     pub notes: String,
     pub all_day: bool,
-}
-
-/// Build an AppleScript snippet that constructs a date object locale-independently.
-/// Returns a variable assignment like: `set varName to current date \n set year of varName to ...`
-fn applescript_date_block(var_name: &str, dt: &DateTime<Local>) -> String {
-    format!(
-        r#"set {var_name} to current date
-            set day of {var_name} to 1
-            set year of {var_name} to {y}
-            set month of {var_name} to {m}
-            set day of {var_name} to {d}
-            set hours of {var_name} to {h}
-            set minutes of {var_name} to {min}
-            set seconds of {var_name} to {s}"#,
-        var_name = var_name,
-        y = dt.format("%Y"),
-        m = dt.format("%-m"),
-        d = dt.format("%-d"),
-        h = dt.format("%-H"),
-        min = dt.format("%-M"),
-        s = dt.format("%-S"),
-    )
 }
 
 fn decode_field(value: &str) -> String {
@@ -247,9 +225,124 @@ pub fn delete_event(
     run(&script, "failed to delete calendar event")
 }
 
+fn build_update_script(
+    title: &str,
+    calendar_name: Option<&str>,
+    new_title: Option<&str>,
+    new_start: Option<&DateTime<Local>>,
+    new_end: Option<&DateTime<Local>>,
+    notes: Option<&str>,
+    location: Option<&str>,
+) -> String {
+    let escaped_title = escape(title);
+    let target_cal_block = match calendar_name {
+        Some(name) => {
+            let escaped = escape(name);
+            format!(
+                r#"set targetCals to (calendars whose name is "{escaped}")
+            if targetCals is {{}} then
+                error "calendar not found: {escaped}"
+            end if"#
+            )
+        }
+        None => "set targetCals to calendars".to_string(),
+    };
+    let start_block = new_start
+        .map(|dt| applescript_date_block("newStartDate", dt))
+        .unwrap_or_default();
+    let end_block = new_end
+        .map(|dt| applescript_date_block("newEndDate", dt))
+        .unwrap_or_default();
+
+    let mut actions = Vec::new();
+    if let Some(new_title) = new_title {
+        actions.push(format!(r#"set summary of targetEvt to "{}""#, escape(new_title)));
+    }
+    match (new_start.is_some(), new_end.is_some()) {
+        (true, true) => {
+            actions.push("set start date of targetEvt to newStartDate".to_string());
+            actions.push("set end date of targetEvt to newEndDate".to_string());
+        }
+        (true, false) => {
+            actions.push("set originalDuration to (end date of targetEvt) - (start date of targetEvt)".to_string());
+            actions.push("set start date of targetEvt to newStartDate".to_string());
+            actions.push("set end date of targetEvt to newStartDate + originalDuration".to_string());
+        }
+        (false, true) => {
+            actions.push("set end date of targetEvt to newEndDate".to_string());
+        }
+        (false, false) => {}
+    }
+    if let Some(notes) = notes {
+        actions.push(format!("set description of targetEvt to {}", escape_body(notes)));
+    }
+    if let Some(location) = location {
+        actions.push(format!("set location of targetEvt to {}", escape_body(location)));
+    }
+
+    format!(
+        r#"
+        {start_block}
+        {end_block}
+        tell application "Calendar"
+            {target_cal_block}
+            set matchingEvts to {{}}
+            repeat with aCal in targetCals
+                repeat with evt in (events of aCal whose summary is "{escaped_title}")
+                    copy evt to end of matchingEvts
+                end repeat
+            end repeat
+            if matchingEvts is {{}} then
+                error "event not found: {escaped_title}"
+            end if
+            if (count of matchingEvts) > 1 then
+                error "event title is ambiguous: {escaped_title}"
+            end if
+            set targetEvt to item 1 of matchingEvts
+            {actions}
+        end tell
+        "#,
+        actions = actions.join("\n            "),
+    )
+}
+
+/// Update a calendar event matched by title and optional calendar.
+pub fn update_event(
+    title: &str,
+    calendar_name: Option<&str>,
+    new_title: Option<&str>,
+    new_start: Option<DateTime<Local>>,
+    new_end: Option<DateTime<Local>>,
+    notes: Option<&str>,
+    location: Option<&str>,
+) -> Result<(), MacosError> {
+    if new_title.is_none()
+        && new_start.is_none()
+        && new_end.is_none()
+        && notes.is_none()
+        && location.is_none()
+    {
+        return Err(MacosError::Other("no calendar updates specified".into()));
+    }
+
+    let script = build_update_script(
+        title,
+        calendar_name,
+        new_title,
+        new_start.as_ref(),
+        new_end.as_ref(),
+        notes,
+        location,
+    );
+
+    run(&script, "failed to update calendar event")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_event_line, parse_events_output};
+    use chrono::{Local, TimeZone};
+
+    use super::{build_update_script, parse_event_line, parse_events_output};
 
     #[test]
     fn parse_event_line_unescapes_sanitized_fields() {
@@ -282,5 +375,30 @@ mod tests {
         let escaped = crate::applescript::escape_body("Line 1\nLine 2");
 
         assert_eq!(escaped, "\"Line 1\" & linefeed & \"Line 2\"");
+    }
+
+    #[test]
+    fn update_event_script_preserves_duration_when_only_start_changes() {
+        let new_start = Local
+            .with_ymd_and_hms(2026, 4, 16, 14, 0, 0)
+            .single()
+            .expect("new start");
+
+        let script = build_update_script(
+            "顧問會議",
+            Some("Work"),
+            Some("顧問會議（改期）"),
+            Some(&new_start),
+            None,
+            None,
+            None,
+        );
+
+        assert!(script.contains(r#"set targetCals to (calendars whose name is "Work")"#));
+        assert!(script.contains(r#"repeat with evt in (events of aCal whose summary is "顧問會議")"#));
+        assert!(script.contains("set originalDuration to (end date of targetEvt) - (start date of targetEvt)"));
+        assert!(script.contains("set start date of targetEvt to newStartDate"));
+        assert!(script.contains("set end date of targetEvt to newStartDate + originalDuration"));
+        assert!(script.contains(r#"set summary of targetEvt to "顧問會議（改期）""#));
     }
 }

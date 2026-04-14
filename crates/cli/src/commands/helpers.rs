@@ -29,6 +29,22 @@ pub(crate) fn parse_datetime(s: &str) -> Option<DateTime<Local>> {
             return Some(dt);
         }
     }
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        if let Some(dt) = date
+            .and_hms_opt(0, 0, 0)
+            .and_then(|ndt| Local.from_local_datetime(&ndt).single())
+            .or_else(|| {
+                date.and_hms_opt(0, 0, 0)
+                    .and_then(|ndt| Local.from_local_datetime(&ndt).earliest())
+            })
+            .or_else(|| {
+                date.and_hms_opt(0, 0, 0)
+                    .and_then(|ndt| Local.from_local_datetime(&ndt).latest())
+            })
+        {
+            return Some(dt);
+        }
+    }
     None
 }
 
@@ -173,6 +189,15 @@ mod tests {
         let parsed = parse_datetime("2026-11-01 01:30");
 
         assert!(parsed.is_some());
+    }
+
+    #[test]
+    fn parse_datetime_accepts_date_only() {
+        let parsed = parse_datetime("2026-04-15").expect("date only");
+
+        assert_eq!(parsed.hour(), 0);
+        assert_eq!(parsed.minute(), 0);
+        assert_eq!(parsed.second(), 0);
     }
 
     #[test]

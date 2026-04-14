@@ -68,6 +68,38 @@ fn cli_parses_notes_update() {
 }
 
 #[test]
+fn cli_parses_notes_create() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "notes",
+        "create",
+        "--title",
+        "會議筆記",
+        "--body",
+        "內容...",
+        "--folder",
+        "工作",
+    ])
+    .expect("parse notes create");
+
+    match cli.command {
+        Command::Notes {
+            action:
+                NotesAction::Create {
+                    title,
+                    body,
+                    folder,
+                },
+        } => {
+            assert_eq!(title, "會議筆記");
+            assert_eq!(body, "內容...");
+            assert_eq!(folder, "工作");
+        }
+        _ => panic!("unexpected command"),
+    }
+}
+
+#[test]
 fn cli_parses_notes_delete() {
     let cli = Cli::try_parse_from([
         "cueward",

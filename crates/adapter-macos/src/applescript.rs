@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use std::process::Command;
 
 use crate::MacosError;
@@ -14,6 +15,27 @@ pub fn escape_body(s: &str) -> String {
         .map(|line| format!("\"{}\"", escape(line)))
         .collect();
     parts.join(" & linefeed & ")
+}
+
+/// Build an AppleScript snippet that constructs a date object locale-independently.
+pub fn applescript_date_block(var_name: &str, dt: &DateTime<Local>) -> String {
+    format!(
+        r#"set {var_name} to current date
+            set day of {var_name} to 1
+            set year of {var_name} to {y}
+            set month of {var_name} to {m}
+            set day of {var_name} to {d}
+            set hours of {var_name} to {h}
+            set minutes of {var_name} to {min}
+            set seconds of {var_name} to {s}"#,
+        var_name = var_name,
+        y = dt.format("%Y"),
+        m = dt.format("%-m"),
+        d = dt.format("%-d"),
+        h = dt.format("%-H"),
+        min = dt.format("%-M"),
+        s = dt.format("%-S"),
+    )
 }
 
 /// Run an AppleScript and return its stdout on success.
