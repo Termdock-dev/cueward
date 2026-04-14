@@ -42,7 +42,7 @@ fn load_media_notes_from_conn(
     let mut stmt = conn
         .prepare(
             r#"
-        SELECT
+        SELECT DISTINCT
             note.ZMODIFICATIONDATE,
             note.ZTITLE,
             media.ZFILENAME,
@@ -305,5 +305,50 @@ mod tests {
         let notes = load_media_notes_from_conn(&conn, &media_root, since).expect("load media notes");
 
         assert!(notes.is_empty());
+    }
+
+    #[test]
+    fn load_media_notes_deduplicates_rows_multiplied_by_attachment_join() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db_path = temp.path().join("NoteStore.sqlite");
+        let conn = Connection::open(&db_path).expect("open sqlite");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE ZICCLOUDSYNCINGOBJECT (
+                Z_PK INTEGER PRIMARY KEY,
+                ZMODIFICATIONDATE REAL,
+                ZTITLE TEXT,
+                ZMEDIA INTEGER,
+                ZFILENAME TEXT,
+                ZIDENTIFIER TEXT,
+                ZNOTE INTEGER,
+                ZTYPEUTI TEXT
+            );
+
+            INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, ZMODIFICATIONDATE, ZTITLE, ZMEDIA, ZNOTE)
+            VALUES (1, 1000.0, 'photo note', 3, NULL);
+
+            INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, ZMODIFICATIONDATE, ZTITLE, ZMEDIA, ZNOTE, ZTYPEUTI)
+            VALUES
+                (2, 1000.0, NULL, 3, 1, 'public.jpeg'),
+                (4, 1000.0, NULL, 3, 1, 'public.png');
+
+            INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, ZMODIFICATIONDATE, ZTITLE, ZMEDIA, ZFILENAME, ZIDENTIFIER)
+            VALUES (3, NULL, NULL, NULL, 'photo.jpg', 'attachment-id');
+            "#,
+        )
+        .expect("seed sqlite");
+
+        let media_root = temp.path().join("Accounts");
+        let media_dir = media_root.join("test-account/Media/attachment-id/child");
+        fs::create_dir_all(&media_dir).expect("create media dir");
+        fs::write(media_dir.join("photo.jpg"), b"jpg").expect("write jpg");
+
+        let since = Utc.timestamp_opt(978_307_200 + 900, 0).single().expect("since");
+        let notes = load_media_notes_from_conn(&conn, &media_root, since).expect("load media notes");
+
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].attachments.len(), 1);
+        assert_eq!(notes[0].attachments[0].filename, "photo.jpg");
     }
 }
