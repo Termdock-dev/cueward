@@ -51,9 +51,9 @@ fn query_notes(title_filter: Option<&str>) -> Result<Vec<QuickNote>, MacosError>
 
     let rows = stmt
         .query_map(params![title_filter], |row| {
-            let title: String = row.get(0)?;
+            let title: Option<String> = row.get(0)?;
             let folder: Option<String> = row.get(1)?;
-            Ok((title, folder.unwrap_or_default()))
+            Ok((title.unwrap_or_default(), folder.unwrap_or_default()))
         })
         .map_err(|err| MacosError::Other(format!("failed to query quick notes: {err}")))?;
 
@@ -227,7 +227,42 @@ pub fn archive(title: &str, to_folder: &str) -> Result<(), MacosError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ensure_archive_destination, html_body_for_update, strip_title_block};
+    use rusqlite::Connection;
+
+    use crate::notes::test_support::with_temp_home;
+
+    use super::{ensure_archive_destination, html_body_for_update, query_notes, strip_title_block};
+
+    fn seed_quick_notes_db(home: &std::path::Path) {
+        let notes_dir = home.join("Library/Group Containers/group.com.apple.notes");
+        std::fs::create_dir_all(&notes_dir).expect("create notes dir");
+        let db_path = notes_dir.join("NoteStore.sqlite");
+        let conn = Connection::open(db_path).expect("open sqlite");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE ZICCLOUDSYNCINGOBJECT (
+                Z_PK INTEGER PRIMARY KEY,
+                ZTITLE1 TEXT,
+                ZTITLE2 TEXT,
+                ZFOLDER INTEGER,
+                Z_ENT INTEGER,
+                ZISSYSTEMPAPER INTEGER,
+                ZMARKEDFORDELETION INTEGER
+            );
+
+            INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, ZTITLE2)
+            VALUES (10, 'Quick Notes');
+
+            INSERT INTO ZICCLOUDSYNCINGOBJECT (
+                Z_PK, ZTITLE1, ZFOLDER, Z_ENT, ZISSYSTEMPAPER, ZMARKEDFORDELETION
+            )
+            VALUES
+                (1, NULL, 10, 11, 1, 0),
+                (2, 'kept', 10, 11, 1, 0);
+            "#,
+        )
+        .expect("seed sqlite");
+    }
 
     #[test]
     fn strip_title_block_removes_leading_title_div() {
@@ -263,5 +298,17 @@ mod tests {
             html,
             "<h1>A &lt; B</h1><div>x &lt; y &amp; z</div><div><br></div><div>q &gt; r</div>"
         );
+    }
+
+    #[test]
+    fn query_notes_ignores_null_titles_when_listing() {
+        with_temp_home(|home| {
+            seed_quick_notes_db(home);
+
+            let notes = query_notes(None).expect("query quick notes");
+
+            assert_eq!(notes.len(), 1);
+            assert_eq!(notes[0].title, "kept");
+        });
     }
 }

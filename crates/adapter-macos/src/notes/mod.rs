@@ -11,6 +11,8 @@ mod capture;
 mod db;
 
 pub use capture::capture;
+#[cfg(test)]
+pub(crate) use db::test_support;
 
 const ATTACHMENT_PLACEHOLDER: char = '\u{fffc}';
 const ATTACHMENT_LABEL: &str = "[Attachment]";

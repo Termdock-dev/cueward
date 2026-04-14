@@ -1,5 +1,7 @@
 mod audio;
 mod file_backed;
+#[cfg(test)]
+pub(crate) mod test_support;
 mod web_preview;
 
 use std::collections::HashMap;

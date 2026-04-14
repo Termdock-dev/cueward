@@ -269,39 +269,15 @@ fn map_attachment_from_row(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-
     use chrono::{TimeZone, Utc};
     use rusqlite::Connection;
+
+    use crate::notes::db::test_support::with_temp_home;
 
     use super::{
         load_map_notes, load_web_preview_notes, map_attachment_from_row, preferred_map_title,
         preferred_web_preview_title, web_preview_attachment_from_row,
     };
-
-    static HOME_LOCK: Mutex<()> = Mutex::new(());
-
-    fn with_temp_notes_home<T>(test: impl FnOnce(&std::path::Path) -> T) -> T {
-        let _guard = HOME_LOCK.lock().expect("home lock");
-        let temp = tempfile::tempdir().expect("tempdir");
-        let previous_home = std::env::var_os("HOME");
-        unsafe {
-            std::env::set_var("HOME", temp.path());
-        }
-
-        let result = test(temp.path());
-
-        match previous_home {
-            Some(previous_home) => unsafe {
-                std::env::set_var("HOME", previous_home);
-            },
-            None => unsafe {
-                std::env::remove_var("HOME");
-            },
-        }
-
-        result
-    }
 
     fn seed_note_store(
         home: &std::path::Path,
@@ -473,7 +449,7 @@ mod tests {
 
     #[test]
     fn load_web_preview_notes_uses_note_ztitle_when_ztitle1_missing() {
-        with_temp_notes_home(|home| {
+        with_temp_home(|home| {
             seed_note_store(
                 home,
                 "note title from ztitle",
@@ -494,7 +470,7 @@ mod tests {
 
     #[test]
     fn load_map_notes_uses_note_ztitle_when_ztitle1_missing() {
-        with_temp_notes_home(|home| {
+        with_temp_home(|home| {
             seed_note_store(
                 home,
                 "map note title from ztitle",
