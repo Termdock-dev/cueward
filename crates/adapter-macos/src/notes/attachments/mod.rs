@@ -2,6 +2,7 @@ mod audio;
 mod file_backed;
 mod image;
 mod map;
+mod ocr_support;
 mod web_preview;
 #[cfg(test)]
 mod tests;
@@ -18,7 +19,10 @@ use audio::{
     append_audio_transcripts, build_audio_segments, collect_audio_transcript_blocks,
     labels_for_audio, match_audio_note, materialize_audio_attachments,
 };
-use file_backed::{build_file_backed_segments, labels_for_file_backed, match_file_backed_note};
+use file_backed::{
+    build_file_backed_segments, collect_file_backed_ocr_blocks, labels_for_file_backed,
+    match_file_backed_note, materialize_file_backed_attachments,
+};
 use image::{collect_attachment_ocr_blocks, materialize_attachments};
 use map::{build_map_segments, labels_for_maps, match_map_note};
 use web_preview::{
@@ -102,14 +106,19 @@ pub(crate) fn enrich_cues_with_attachments(
             if let Some(file_backed_note) = match_file_backed_note(cue, file_backed_notes) {
                 if !file_backed_note.attachments.is_empty() {
                     let remaining = placeholder_count.saturating_sub(labels.len());
-                    labels.extend(labels_for_file_backed(
-                        &file_backed_note.attachments,
-                        remaining,
-                    ));
+                    let attachments =
+                        materialize_file_backed_attachments(&file_backed_note.attachments, remaining);
+                    labels.extend(labels_for_file_backed(&attachments, remaining));
+                    let ocr_blocks =
+                        collect_file_backed_ocr_blocks(&attachments, segments.len(), remaining);
+                    if !ocr_blocks.is_empty() {
+                        cue.content = append_attachment_ocr(&cue.content, &ocr_blocks);
+                    }
                     segments.extend(build_file_backed_segments(
-                        &file_backed_note.attachments,
+                        &attachments,
                         segments.len(),
                         remaining,
+                        Some(&ocr_blocks),
                     ));
                 }
             }
@@ -279,6 +288,7 @@ fn build_image_segments(
                 filename: Some(attachment.filename.clone()),
                 path: Some(attachment.path.display().to_string()),
                 sha256: attachment.sha256.clone(),
+                page_count: None,
                 duration_seconds: None,
                 transcript_text: None,
                 ocr_text: ocr.map(|block| block.text.clone()),
@@ -303,6 +313,7 @@ fn build_unresolved_segments_from(
             filename: None,
             path: None,
             sha256: None,
+            page_count: None,
             duration_seconds: None,
             transcript_text: None,
             ocr_text: None,

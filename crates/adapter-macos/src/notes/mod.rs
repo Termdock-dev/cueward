@@ -68,8 +68,9 @@ pub(crate) struct FileBackedAttachment {
     pub(crate) kind: AttachmentKind,
     pub(crate) title: Option<String>,
     pub(crate) filename: String,
-    pub(crate) path: PathBuf,
+    pub(crate) path: Option<PathBuf>,
     pub(crate) sha256: Option<String>,
+    pub(crate) page_count: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -416,8 +416,9 @@ fn enrich_cues_with_pdf_emits_file_backed_pdf_segment() {
             kind: AttachmentKind::Pdf,
             title: Some("SK-INFLUX [V MB]_DS_C0919.pdf".into()),
             filename: "SK-INFLUX [V MB]_DS_C0919.pdf".into(),
-            path: PathBuf::from("/tmp/SK-INFLUX [V MB]_DS_C0919.pdf"),
+            path: Some(PathBuf::from("/tmp/SK-INFLUX [V MB]_DS_C0919.pdf")),
             sha256: Some("abc123".into()),
+            page_count: Some(4),
         }],
     }];
 
@@ -437,6 +438,7 @@ fn enrich_cues_with_pdf_emits_file_backed_pdf_segment() {
         cues[0].attachment_segments[0].sha256.as_deref(),
         Some("abc123")
     );
+    assert_eq!(cues[0].attachment_segments[0].page_count, Some(4));
     assert!(!cues[0].attachment_segments[0].has_ocr);
 }
 
@@ -460,8 +462,9 @@ fn enrich_cues_with_binary_emits_file_backed_binary_segment() {
             kind: AttachmentKind::Binary,
             title: None,
             filename: "34BF703C-DD8C-4607-AA9C-2A71623C2884".into(),
-            path: PathBuf::from("/tmp/34BF703C-DD8C-4607-AA9C-2A71623C2884"),
+            path: Some(PathBuf::from("/tmp/34BF703C-DD8C-4607-AA9C-2A71623C2884")),
             sha256: Some("def456".into()),
+            page_count: None,
         }],
     }];
 
@@ -485,4 +488,44 @@ fn enrich_cues_with_binary_emits_file_backed_binary_segment() {
         Some("def456")
     );
     assert!(!cues[0].attachment_segments[0].has_ocr);
+}
+
+#[test]
+fn enrich_cues_with_binary_without_materialized_path_keeps_typed_segment() {
+    let timestamp = Utc.with_ymd_and_hms(2026, 4, 9, 23, 42, 53).unwrap();
+    let mut cues = vec![Cue {
+        source: CueSource::Notes,
+        timestamp,
+        content: "[Attachment]".into(),
+        url: None,
+        title: Some("新增備忘錄".into()),
+        tags: Vec::new(),
+        attachment_segments: Vec::new(),
+        metadata: HashMap::new(),
+    }];
+    let file_backed_notes = vec![crate::notes::FileBackedNote {
+        timestamp: timestamp.timestamp(),
+        title: Some("新增備忘錄".into()),
+        attachments: vec![crate::notes::FileBackedAttachment {
+            kind: AttachmentKind::Binary,
+            title: None,
+            filename: "missing.bin".into(),
+            path: None,
+            sha256: None,
+            page_count: None,
+        }],
+    }];
+
+    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &file_backed_notes, &[]);
+
+    assert_eq!(cues[0].attachment_segments.len(), 1);
+    assert!(matches!(
+        cues[0].attachment_segments[0].kind,
+        AttachmentKind::Binary
+    ));
+    assert_eq!(cues[0].attachment_segments[0].path, None);
+    assert_eq!(
+        cues[0].attachment_segments[0].filename.as_deref(),
+        Some("missing.bin")
+    );
 }

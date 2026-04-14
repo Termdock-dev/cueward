@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::process::Command;
 
 use chrono::{DateTime, Utc};
 use cueward_core::AttachmentKind;
@@ -8,8 +9,8 @@ use crate::MacosError;
 use crate::notes::{FileBackedAttachment, FileBackedNote};
 
 use super::{
-    apple_to_unix_timestamp, normalize_media_title, notes_group_container_path, open_notes_db,
-    resolve_media_path, since_apple_epoch,
+    apple_to_unix_timestamp, compute_sha256, normalize_media_title, notes_group_container_path,
+    open_notes_db, resolve_media_path, since_apple_epoch,
 };
 
 pub(crate) fn load_file_backed_notes(since: DateTime<Utc>) -> Result<Vec<FileBackedNote>, MacosError> {
@@ -86,12 +87,10 @@ fn load_file_backed_notes_from_conn(
             .get(5)
             .map_err(|err| MacosError::Other(format!("failed to decode file-backed identifier: {err}")))?;
 
-        let Some(path) = resolve_media_path(&media_root, &identifier, &filename) else {
-            continue;
-        };
         let Some(kind) = attachment_kind_from_uti(&type_uti) else {
             continue;
         };
+        let path = resolve_media_path(&media_root, &identifier, &filename);
         let Some(attachment) = file_backed_attachment_from_row(kind, attachment_title, filename, path) else {
             continue;
         };
@@ -126,19 +125,55 @@ fn file_backed_attachment_from_row(
     kind: AttachmentKind,
     title: Option<String>,
     filename: String,
-    path: PathBuf,
+    path: Option<PathBuf>,
 ) -> Option<FileBackedAttachment> {
     if filename.trim().is_empty() {
         return None;
     }
+
+    let sha256 = path.as_deref().and_then(compute_sha256);
+    let page_count = page_count_for_attachment(&kind, path.as_deref());
 
     Some(FileBackedAttachment {
         kind,
         title: normalize_media_title(title),
         filename,
         path,
-        sha256: None,
+        sha256,
+        page_count,
     })
+}
+
+fn page_count_for_attachment(kind: &AttachmentKind, path: Option<&std::path::Path>) -> Option<u32> {
+    match kind {
+        AttachmentKind::Scan => Some(1),
+        AttachmentKind::Pdf => path.and_then(pdf_page_count),
+        _ => None,
+    }
+}
+
+fn pdf_page_count(path: &std::path::Path) -> Option<u32> {
+    let output = Command::new("mdls")
+        .arg("-name")
+        .arg("kMDItemNumberOfPages")
+        .arg("-raw")
+        .arg(path)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    parse_mdls_page_count(&String::from_utf8_lossy(&output.stdout))
+}
+
+fn parse_mdls_page_count(output: &str) -> Option<u32> {
+    let trimmed = output.trim();
+    if trimmed.is_empty() || trimmed == "(null)" {
+        return None;
+    }
+    trimmed.parse().ok()
 }
 
 #[cfg(test)]
@@ -152,6 +187,7 @@ mod tests {
 
     use super::{
         attachment_kind_from_uti, file_backed_attachment_from_row, load_file_backed_notes_from_conn,
+        parse_mdls_page_count,
     };
 
     #[test]
@@ -160,7 +196,7 @@ mod tests {
             AttachmentKind::Pdf,
             Some("SK-INFLUX [V MB]_DS_C0919.pdf".into()),
             "SK-INFLUX [V MB]_DS_C0919.pdf".into(),
-            PathBuf::from("/tmp/SK-INFLUX [V MB]_DS_C0919.pdf"),
+            Some(PathBuf::from("/tmp/SK-INFLUX [V MB]_DS_C0919.pdf")),
         )
         .expect("pdf attachment");
 
@@ -170,10 +206,7 @@ mod tests {
             Some("SK-INFLUX [V MB]_DS_C0919.pdf")
         );
         assert_eq!(attachment.filename, "SK-INFLUX [V MB]_DS_C0919.pdf");
-        assert_eq!(
-            attachment.path,
-            PathBuf::from("/tmp/SK-INFLUX [V MB]_DS_C0919.pdf")
-        );
+        assert_eq!(attachment.path, Some(PathBuf::from("/tmp/SK-INFLUX [V MB]_DS_C0919.pdf")));
     }
 
     #[test]
@@ -182,7 +215,7 @@ mod tests {
             AttachmentKind::Binary,
             None,
             "blob.bin".into(),
-            PathBuf::from("/tmp/blob.bin"),
+            Some(PathBuf::from("/tmp/blob.bin")),
         )
         .expect("binary attachment");
 
@@ -192,12 +225,34 @@ mod tests {
     }
 
     #[test]
+    fn file_backed_attachment_from_row_keeps_missing_path_visible() {
+        let attachment = file_backed_attachment_from_row(
+            AttachmentKind::Binary,
+            Some("blob.bin".into()),
+            "blob.bin".into(),
+            None,
+        )
+        .expect("binary attachment");
+
+        assert_eq!(attachment.path, None);
+        assert_eq!(attachment.sha256, None);
+        assert_eq!(attachment.page_count, None);
+    }
+
+    #[test]
     fn attachment_kind_from_uti_maps_pdf_binary_and_scan() {
         assert_eq!(attachment_kind_from_uti("com.adobe.pdf"), Some(AttachmentKind::Pdf));
         assert_eq!(attachment_kind_from_uti("public.pdf"), Some(AttachmentKind::Pdf));
         assert_eq!(attachment_kind_from_uti("public.data"), Some(AttachmentKind::Binary));
         assert_eq!(attachment_kind_from_uti("com.adobe.scan"), Some(AttachmentKind::Scan));
         assert_eq!(attachment_kind_from_uti("public.url"), None);
+    }
+
+    #[test]
+    fn parse_mdls_page_count_handles_numeric_and_null_output() {
+        assert_eq!(parse_mdls_page_count("5\n"), Some(5));
+        assert_eq!(parse_mdls_page_count("(null)\n"), None);
+        assert_eq!(parse_mdls_page_count(""), None);
     }
 
     #[test]
@@ -248,6 +303,7 @@ mod tests {
         assert_eq!(notes[0].title.as_deref(), Some("pdf note"));
         assert_eq!(notes[0].attachments.len(), 1);
         assert_eq!(notes[0].attachments[0].kind, AttachmentKind::Pdf);
+        assert!(notes[0].attachments[0].sha256.is_some());
     }
 
     #[test]
@@ -298,5 +354,7 @@ mod tests {
         assert_eq!(notes[0].title.as_deref(), Some("scan note"));
         assert_eq!(notes[0].attachments.len(), 1);
         assert_eq!(notes[0].attachments[0].kind, AttachmentKind::Scan);
+        assert_eq!(notes[0].attachments[0].page_count, Some(1));
+        assert!(notes[0].attachments[0].sha256.is_some());
     }
 }

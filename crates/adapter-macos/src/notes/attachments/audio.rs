@@ -94,6 +94,7 @@ pub(super) fn build_audio_segments(
             filename: Some(attachment.filename.clone()),
             path: Some(attachment.path.display().to_string()),
             sha256: attachment.sha256.clone(),
+            page_count: None,
             duration_seconds: attachment.duration_seconds,
             transcript_text: attachment.transcript_text.clone(),
             ocr_text: None,

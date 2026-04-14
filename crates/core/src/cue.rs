@@ -51,6 +51,8 @@ pub struct AttachmentSegment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub page_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub duration_seconds: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript_text: Option<String>,
@@ -93,6 +95,7 @@ mod tests {
             filename: Some("scan.jpg".into()),
             path: Some("/tmp/scan.jpg".into()),
             sha256: Some("abc123".into()),
+            page_count: None,
             duration_seconds: None,
             transcript_text: None,
             ocr_text: None,
@@ -114,6 +117,7 @@ mod tests {
                 "filename": "scan.jpg",
                 "path": "/tmp/scan.jpg",
                 "sha256": "abc123",
+                "page_count": null,
                 "duration_seconds": null,
                 "transcript_text": null,
                 "has_ocr": false
@@ -128,6 +132,7 @@ mod tests {
         assert_eq!(segment.longitude, None);
         assert_eq!(segment.filename.as_deref(), Some("scan.jpg"));
         assert_eq!(segment.path.as_deref(), Some("/tmp/scan.jpg"));
+        assert_eq!(segment.page_count, None);
     }
 
     #[test]
@@ -142,6 +147,7 @@ mod tests {
             filename: None,
             path: None,
             sha256: None,
+            page_count: None,
             duration_seconds: None,
             transcript_text: None,
             ocr_text: None,
@@ -170,6 +176,7 @@ mod tests {
             filename: None,
             path: None,
             sha256: None,
+            page_count: None,
             duration_seconds: None,
             transcript_text: None,
             ocr_text: None,
@@ -195,6 +202,7 @@ mod tests {
             filename: Some("voai-test.wav".into()),
             path: Some("/tmp/voai-test.wav".into()),
             sha256: Some("abc123".into()),
+            page_count: None,
             duration_seconds: Some(3.769),
             transcript_text: Some("老闆你好我是龍工這是語音測試。".into()),
             ocr_text: None,
@@ -206,5 +214,31 @@ mod tests {
         assert_eq!(value["kind"], "audio");
         assert_eq!(value["duration_seconds"], 3.769);
         assert_eq!(value["transcript_text"], "老闆你好我是龍工這是語音測試。");
+    }
+
+    #[test]
+    fn attachment_segment_serializes_page_count_for_pdf() {
+        let segment = AttachmentSegment {
+            index: 1,
+            kind: AttachmentKind::Pdf,
+            title: Some("doc.pdf".into()),
+            url: None,
+            latitude: None,
+            longitude: None,
+            filename: Some("doc.pdf".into()),
+            path: Some("/tmp/doc.pdf".into()),
+            sha256: Some("abc123".into()),
+            page_count: Some(4),
+            duration_seconds: None,
+            transcript_text: None,
+            ocr_text: Some("page one\npage two".into()),
+            has_ocr: true,
+        };
+
+        let value = serde_json::to_value(segment).expect("serialize pdf");
+
+        assert_eq!(value["kind"], "pdf");
+        assert_eq!(value["page_count"], 4);
+        assert_eq!(value["has_ocr"], true);
     }
 }
