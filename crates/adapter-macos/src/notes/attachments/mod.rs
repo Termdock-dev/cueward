@@ -1,4 +1,5 @@
 mod image;
+mod map;
 mod web_preview;
 #[cfg(test)]
 mod tests;
@@ -9,9 +10,10 @@ use cueward_core::{AttachmentKind, AttachmentSegment, Cue, CueSource};
 
 use super::{
     ATTACHMENT_LABEL, AttachmentOcrBlock, MEDIA_MATCH_WINDOW_SECS, MediaAttachment, MediaNote,
-    WebPreviewNote,
+    MapNote, WebPreviewNote,
 };
 use image::{collect_attachment_ocr_blocks, materialize_attachments};
+use map::{build_map_segments, labels_for_maps, match_map_note};
 use web_preview::{
     build_web_preview_segments, labels_for_web_previews, match_web_preview_note,
 };
@@ -20,6 +22,7 @@ pub(crate) fn enrich_cues_with_attachments(
     cues: &mut [Cue],
     media_notes: &[MediaNote],
     web_preview_notes: &[WebPreviewNote],
+    map_notes: &[MapNote],
 ) {
     for cue in cues.iter_mut() {
         if !matches!(cue.source, CueSource::Notes) {
@@ -51,6 +54,20 @@ pub(crate) fn enrich_cues_with_attachments(
                     }
 
                     segments.extend(build_image_segments(&attachments, Some(&ocr_blocks)));
+                }
+            }
+        }
+
+        if labels.len() < placeholder_count {
+            if let Some(map_note) = match_map_note(cue, map_notes) {
+                if !map_note.attachments.is_empty() {
+                    let remaining = placeholder_count.saturating_sub(labels.len());
+                    labels.extend(labels_for_maps(&map_note.attachments, remaining));
+                    segments.extend(build_map_segments(
+                        &map_note.attachments,
+                        segments.len(),
+                        remaining,
+                    ));
                 }
             }
         }
@@ -206,6 +223,8 @@ fn build_image_segments(
                 kind: AttachmentKind::Image,
                 title: None,
                 url: None,
+                latitude: None,
+                longitude: None,
                 filename: Some(attachment.filename.clone()),
                 path: Some(attachment.path.display().to_string()),
                 sha256: attachment.sha256.clone(),
@@ -226,6 +245,8 @@ fn build_unresolved_segments_from(
             kind: AttachmentKind::Unresolved,
             title: None,
             url: None,
+            latitude: None,
+            longitude: None,
             filename: None,
             path: None,
             sha256: None,

@@ -198,7 +198,7 @@ fn enrich_cues_with_attachments_emits_unresolved_when_no_media_matches() {
         metadata: HashMap::new(),
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &[], &[]);
+    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[]);
 
     assert_eq!(cues[0].attachment_segments.len(), 1);
     assert!(matches!(
@@ -229,7 +229,7 @@ fn enrich_cues_with_attachments_emits_unresolved_when_match_has_no_attachments()
         attachments: Vec::new(),
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &media_notes, &[]);
+    super::enrich_cues_with_attachments(&mut cues, &media_notes, &[], &[]);
 
     assert_eq!(cues[0].attachment_segments.len(), 2);
     assert!(cues[0]
@@ -273,7 +273,7 @@ fn enrich_cues_with_attachments_combines_media_and_web_preview_segments() {
         }],
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &media_notes, &web_preview_notes);
+    super::enrich_cues_with_attachments(&mut cues, &media_notes, &web_preview_notes, &[]);
 
     assert_eq!(
         cues[0].content,
@@ -289,5 +289,102 @@ fn enrich_cues_with_attachments_combines_media_and_web_preview_segments() {
     assert!(matches!(
         cues[0].attachment_segments[1].kind,
         AttachmentKind::WebPreview
+    ));
+}
+
+#[test]
+fn enrich_cues_with_map_emits_structured_map_segment() {
+    let timestamp = Utc.with_ymd_and_hms(2026, 4, 13, 16, 24, 54).unwrap();
+    let mut cues = vec![Cue {
+        source: CueSource::Notes,
+        timestamp,
+        content: "[Attachment]".into(),
+        url: None,
+        title: Some("新增備忘錄".into()),
+        tags: Vec::new(),
+        attachment_segments: Vec::new(),
+        metadata: HashMap::new(),
+    }];
+    let map_notes = vec![crate::notes::MapNote {
+        timestamp: timestamp.timestamp(),
+        title: Some("新增備忘錄".into()),
+        attachments: vec![crate::notes::MapAttachment {
+            title: Some("屏東縣立棒球場".into()),
+            url: Some("https://maps.apple.com/place?...".into()),
+            latitude: 22.657349,
+            longitude: 120.485956,
+        }],
+    }];
+
+    super::enrich_cues_with_attachments(&mut cues, &[], &[], &map_notes);
+
+    assert_eq!(cues[0].content, "[Attachment 1: 屏東縣立棒球場]");
+    assert_eq!(cues[0].attachment_segments.len(), 1);
+    assert!(matches!(
+        cues[0].attachment_segments[0].kind,
+        AttachmentKind::Map
+    ));
+    assert_eq!(
+        cues[0].attachment_segments[0].title.as_deref(),
+        Some("屏東縣立棒球場")
+    );
+    assert_eq!(
+        cues[0].attachment_segments[0].url.as_deref(),
+        Some("https://maps.apple.com/place?...")
+    );
+    assert_eq!(cues[0].attachment_segments[0].latitude, Some(22.657349));
+    assert_eq!(cues[0].attachment_segments[0].longitude, Some(120.485956));
+    assert!(!cues[0].attachment_segments[0].has_ocr);
+}
+
+#[test]
+fn enrich_cues_with_attachments_combines_media_and_map_segments() {
+    let timestamp = Utc.with_ymd_and_hms(2026, 4, 13, 16, 24, 54).unwrap();
+    let mut cues = vec![Cue {
+        source: CueSource::Notes,
+        timestamp,
+        content: "[Attachment]\n[Attachment]".into(),
+        url: None,
+        title: Some("新增備忘錄".into()),
+        tags: Vec::new(),
+        attachment_segments: Vec::new(),
+        metadata: HashMap::new(),
+    }];
+    let media_notes = vec![MediaNote {
+        timestamp: timestamp.timestamp(),
+        title: Some("新增備忘錄".into()),
+        attachments: vec![MediaAttachment {
+            filename: "scan.jpg".into(),
+            path: PathBuf::from("/tmp/scan.jpg"),
+            sha256: Some("abc123".into()),
+        }],
+    }];
+    let map_notes = vec![crate::notes::MapNote {
+        timestamp: timestamp.timestamp(),
+        title: Some("新增備忘錄".into()),
+        attachments: vec![crate::notes::MapAttachment {
+            title: Some("屏東縣立棒球場".into()),
+            url: Some("https://maps.apple.com/place?...".into()),
+            latitude: 22.657349,
+            longitude: 120.485956,
+        }],
+    }];
+
+    super::enrich_cues_with_attachments(&mut cues, &media_notes, &[], &map_notes);
+
+    assert_eq!(
+        cues[0].content,
+        "[Attachment 1: scan.jpg]\n[Attachment 2: 屏東縣立棒球場]"
+    );
+    assert_eq!(cues[0].attachment_segments.len(), 2);
+    assert_eq!(cues[0].attachment_segments[0].index, 1);
+    assert_eq!(cues[0].attachment_segments[1].index, 2);
+    assert!(matches!(
+        cues[0].attachment_segments[0].kind,
+        AttachmentKind::Image
+    ));
+    assert!(matches!(
+        cues[0].attachment_segments[1].kind,
+        AttachmentKind::Map
     ));
 }

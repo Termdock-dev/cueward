@@ -41,6 +41,10 @@ pub struct AttachmentSegment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub latitude: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub longitude: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub filename: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
@@ -80,6 +84,8 @@ mod tests {
             kind: AttachmentKind::Image,
             title: None,
             url: None,
+            latitude: None,
+            longitude: None,
             filename: Some("scan.jpg".into()),
             path: Some("/tmp/scan.jpg".into()),
             sha256: Some("abc123".into()),
@@ -110,6 +116,8 @@ mod tests {
         assert!(matches!(segment.kind, AttachmentKind::Unresolved));
         assert_eq!(segment.title, None);
         assert_eq!(segment.url, None);
+        assert_eq!(segment.latitude, None);
+        assert_eq!(segment.longitude, None);
         assert_eq!(segment.filename.as_deref(), Some("scan.jpg"));
         assert_eq!(segment.path.as_deref(), Some("/tmp/scan.jpg"));
     }
@@ -121,6 +129,8 @@ mod tests {
             kind: AttachmentKind::WebPreview,
             title: Some("Cursor Docs".into()),
             url: Some("https://docs.cursor.com/guides/working-with-context".into()),
+            latitude: None,
+            longitude: None,
             filename: None,
             path: None,
             sha256: None,
@@ -136,5 +146,28 @@ mod tests {
             value["url"],
             "https://docs.cursor.com/guides/working-with-context"
         );
+    }
+
+    #[test]
+    fn attachment_segment_serializes_coordinates_for_map() {
+        let segment = AttachmentSegment {
+            index: 1,
+            kind: AttachmentKind::Map,
+            title: Some("屏東縣立棒球場".into()),
+            url: Some("https://maps.apple.com/place?...".into()),
+            latitude: Some(22.657349),
+            longitude: Some(120.485956),
+            filename: None,
+            path: None,
+            sha256: None,
+            ocr_text: None,
+            has_ocr: false,
+        };
+
+        let value = serde_json::to_value(segment).expect("serialize map");
+
+        assert_eq!(value["kind"], "map");
+        assert_eq!(value["latitude"], 22.657349);
+        assert_eq!(value["longitude"], 120.485956);
     }
 }

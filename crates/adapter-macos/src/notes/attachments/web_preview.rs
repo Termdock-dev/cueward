@@ -37,6 +37,8 @@ pub(super) fn build_web_preview_segments(
                 .clone()
                 .or_else(|| Some(attachment.url.clone())),
             url: Some(attachment.url.clone()),
+            latitude: None,
+            longitude: None,
             filename: None,
             path: None,
             sha256: None,
@@ -90,7 +92,7 @@ mod tests {
             }],
         }];
 
-        super::super::enrich_cues_with_attachments(&mut cues, &[], &web_preview_notes);
+        super::super::enrich_cues_with_attachments(&mut cues, &[], &web_preview_notes, &[]);
 
         assert_eq!(cues[0].content, "[Attachment 1: Cursor Docs]");
         assert_eq!(cues[0].attachment_segments.len(), 1);
@@ -133,7 +135,7 @@ mod tests {
             }],
         }];
 
-        super::super::enrich_cues_with_attachments(&mut cues, &[], &web_preview_notes);
+        super::super::enrich_cues_with_attachments(&mut cues, &[], &web_preview_notes, &[]);
 
         assert_eq!(
             cues[0].content,

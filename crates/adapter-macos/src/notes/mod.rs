@@ -44,6 +44,21 @@ pub(crate) struct WebPreviewNote {
     pub(crate) attachments: Vec<WebPreviewAttachment>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct MapAttachment {
+    pub(crate) title: Option<String>,
+    pub(crate) url: Option<String>,
+    pub(crate) latitude: f64,
+    pub(crate) longitude: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct MapNote {
+    pub(crate) timestamp: i64,
+    pub(crate) title: Option<String>,
+    pub(crate) attachments: Vec<MapAttachment>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AttachmentOcrBlock {
     pub(crate) index: usize,
