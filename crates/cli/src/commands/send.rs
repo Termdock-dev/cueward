@@ -8,7 +8,7 @@ pub(crate) fn dispatch(title: String, body: Option<String>, folder: String, noti
         buf
     });
 
-    match cueward_adapter_macos::send::create_note(&title, &body, &folder) {
+    match cueward_adapter_macos::notes::crud::create_note(&title, &body, &folder) {
         Ok(()) => eprintln!("note created in {folder}"),
         Err(e) => {
             eprintln!("error: {e}");
@@ -24,7 +24,7 @@ pub(crate) fn dispatch(title: String, body: Option<String>, folder: String, noti
         } else {
             flat
         };
-        if let Err(e) = cueward_adapter_macos::send::notify(&title, &preview) {
+        if let Err(e) = cueward_adapter_macos::notes::notify::notify(&title, &preview) {
             eprintln!("warning: notification failed: {e}");
         }
     }

@@ -35,6 +35,7 @@ pub fn update_note(title: &str, body: &str, folder: &str) -> Result<(), MacosErr
         tell application "Notes"
             set theNote to (first note of folder "{escaped_folder}" whose name is "{escaped_title}")
             set body of theNote to {body_expr}
+            set name of theNote to "{escaped_title}"
         end tell
         "#
     );
@@ -80,16 +81,6 @@ pub fn move_note(title: &str, from_folder: &str, to_folder: &str) -> Result<(), 
     );
 
     run(&script, "failed to move note")
-}
-
-/// Send a macOS notification via osascript.
-pub fn notify(title: &str, message: &str) -> Result<(), MacosError> {
-    let escaped_title = escape(title);
-    let escaped_msg = escape(message);
-
-    let script = format!(r#"display notification "{escaped_msg}" with title "{escaped_title}""#);
-
-    run(&script, "notification failed")
 }
 
 #[cfg(test)]
