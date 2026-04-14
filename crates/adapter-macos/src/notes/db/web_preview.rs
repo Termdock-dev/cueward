@@ -21,7 +21,7 @@ pub(crate) fn load_web_preview_notes(since: DateTime<Utc>) -> Result<Vec<WebPrev
                 attachment.ZMODIFICATIONDATE,
                 attachment.ZMODIFICATIONDATE1
             ),
-            note.ZTITLE1,
+            COALESCE(note.ZTITLE, note.ZTITLE1),
             attachment.ZTITLE,
             attachment.ZURLSTRING
         FROM ZICCLOUDSYNCINGOBJECT AS attachment
@@ -106,7 +106,7 @@ pub(crate) fn load_map_notes(since: DateTime<Utc>) -> Result<Vec<MapNote>, Macos
                 attachment.ZMODIFICATIONDATE,
                 attachment.ZMODIFICATIONDATE1
             ),
-            note.ZTITLE1,
+            COALESCE(note.ZTITLE, note.ZTITLE1),
             attachment.ZTITLE,
             attachment.ZURLSTRING
         FROM ZICCLOUDSYNCINGOBJECT AS attachment
@@ -269,10 +269,78 @@ fn map_attachment_from_row(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
+    use chrono::{TimeZone, Utc};
+    use rusqlite::Connection;
+
     use super::{
-        map_attachment_from_row, preferred_map_title, preferred_web_preview_title,
-        web_preview_attachment_from_row,
+        load_map_notes, load_web_preview_notes, map_attachment_from_row, preferred_map_title,
+        preferred_web_preview_title, web_preview_attachment_from_row,
     };
+
+    static HOME_LOCK: Mutex<()> = Mutex::new(());
+
+    fn with_temp_notes_home<T>(test: impl FnOnce(&std::path::Path) -> T) -> T {
+        let _guard = HOME_LOCK.lock().expect("home lock");
+        let temp = tempfile::tempdir().expect("tempdir");
+        let previous_home = std::env::var_os("HOME");
+        unsafe {
+            std::env::set_var("HOME", temp.path());
+        }
+
+        let result = test(temp.path());
+
+        match previous_home {
+            Some(previous_home) => unsafe {
+                std::env::set_var("HOME", previous_home);
+            },
+            None => unsafe {
+                std::env::remove_var("HOME");
+            },
+        }
+
+        result
+    }
+
+    fn seed_note_store(
+        home: &std::path::Path,
+        note_title: &str,
+        attachment_title: &str,
+        url: &str,
+    ) {
+        let notes_dir = home.join("Library/Group Containers/group.com.apple.notes");
+        std::fs::create_dir_all(&notes_dir).expect("create notes dir");
+        let db_path = notes_dir.join("NoteStore.sqlite");
+        let conn = Connection::open(db_path).expect("open sqlite");
+        conn.execute_batch(
+            &format!(
+                r#"
+                CREATE TABLE ZICCLOUDSYNCINGOBJECT (
+                    Z_PK INTEGER PRIMARY KEY,
+                    ZMODIFICATIONDATE REAL,
+                    ZMODIFICATIONDATE1 REAL,
+                    ZTITLE TEXT,
+                    ZTITLE1 TEXT,
+                    ZNOTE INTEGER,
+                    ZTYPEUTI TEXT,
+                    ZURLSTRING TEXT
+                );
+
+                INSERT INTO ZICCLOUDSYNCINGOBJECT (Z_PK, ZTITLE, ZMODIFICATIONDATE1)
+                VALUES (1, '{note_title}', 1000.0);
+
+                INSERT INTO ZICCLOUDSYNCINGOBJECT (
+                    Z_PK, ZNOTE, ZTYPEUTI, ZTITLE, ZURLSTRING, ZMODIFICATIONDATE
+                )
+                VALUES (
+                    2, 1, 'public.url', '{attachment_title}', '{url}', 999.0
+                );
+                "#
+            ),
+        )
+        .expect("seed sqlite");
+    }
 
     #[test]
     fn preferred_web_preview_title_prefers_attachment_then_note_then_url() {
@@ -401,5 +469,47 @@ mod tests {
         assert_eq!(attachment.latitude, 22.657349);
         assert_eq!(attachment.longitude, 120.485956);
         assert_eq!(attachment.title.as_deref(), Some("屏東縣立棒球場"));
+    }
+
+    #[test]
+    fn load_web_preview_notes_uses_note_ztitle_when_ztitle1_missing() {
+        with_temp_notes_home(|home| {
+            seed_note_store(
+                home,
+                "note title from ztitle",
+                "Cursor Docs",
+                "https://docs.cursor.com/guides/working-with-context",
+            );
+            let since = Utc
+                .timestamp_opt(978_307_200 + 900, 0)
+                .single()
+                .expect("since");
+
+            let notes = load_web_preview_notes(since).expect("load web previews");
+
+            assert_eq!(notes.len(), 1);
+            assert_eq!(notes[0].title.as_deref(), Some("note title from ztitle"));
+        });
+    }
+
+    #[test]
+    fn load_map_notes_uses_note_ztitle_when_ztitle1_missing() {
+        with_temp_notes_home(|home| {
+            seed_note_store(
+                home,
+                "map note title from ztitle",
+                "屏東縣立棒球場",
+                "https://maps.apple.com/place?coordinate=22.657349,120.485956&name=%E5%B1%8F%E6%9D%B1%E7%B8%A3%E7%AB%8B%E6%A3%92%E7%90%83%E5%A0%B4",
+            );
+            let since = Utc
+                .timestamp_opt(978_307_200 + 900, 0)
+                .single()
+                .expect("since");
+
+            let notes = load_map_notes(since).expect("load maps");
+
+            assert_eq!(notes.len(), 1);
+            assert_eq!(notes[0].title.as_deref(), Some("map note title from ztitle"));
+        });
     }
 }
