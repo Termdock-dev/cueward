@@ -1,3 +1,4 @@
+mod file_backed;
 mod image;
 mod map;
 mod web_preview;
@@ -9,9 +10,10 @@ use std::collections::HashMap;
 use cueward_core::{AttachmentKind, AttachmentSegment, Cue, CueSource};
 
 use super::{
-    ATTACHMENT_LABEL, AttachmentOcrBlock, MEDIA_MATCH_WINDOW_SECS, MediaAttachment, MediaNote,
-    MapNote, WebPreviewNote,
+    ATTACHMENT_LABEL, AttachmentOcrBlock, FileBackedNote, MEDIA_MATCH_WINDOW_SECS,
+    MediaAttachment, MediaNote, MapNote, WebPreviewNote,
 };
+use file_backed::{build_file_backed_segments, labels_for_file_backed, match_file_backed_note};
 use image::{collect_attachment_ocr_blocks, materialize_attachments};
 use map::{build_map_segments, labels_for_maps, match_map_note};
 use web_preview::{
@@ -23,6 +25,7 @@ pub(crate) fn enrich_cues_with_attachments(
     media_notes: &[MediaNote],
     web_preview_notes: &[WebPreviewNote],
     map_notes: &[MapNote],
+    file_backed_notes: &[FileBackedNote],
 ) {
     for cue in cues.iter_mut() {
         if !matches!(cue.source, CueSource::Notes) {
@@ -82,6 +85,23 @@ pub(crate) fn enrich_cues_with_attachments(
                     ));
                     segments.extend(build_web_preview_segments(
                         &web_preview_note.attachments,
+                        segments.len(),
+                        remaining,
+                    ));
+                }
+            }
+        }
+
+        if labels.len() < placeholder_count {
+            if let Some(file_backed_note) = match_file_backed_note(cue, file_backed_notes) {
+                if !file_backed_note.attachments.is_empty() {
+                    let remaining = placeholder_count.saturating_sub(labels.len());
+                    labels.extend(labels_for_file_backed(
+                        &file_backed_note.attachments,
+                        remaining,
+                    ));
+                    segments.extend(build_file_backed_segments(
+                        &file_backed_note.attachments,
                         segments.len(),
                         remaining,
                     ));

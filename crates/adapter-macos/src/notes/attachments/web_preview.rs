@@ -92,7 +92,7 @@ mod tests {
             }],
         }];
 
-        super::super::enrich_cues_with_attachments(&mut cues, &[], &web_preview_notes, &[]);
+        super::super::enrich_cues_with_attachments(&mut cues, &[], &web_preview_notes, &[], &[]);
 
         assert_eq!(cues[0].content, "[Attachment 1: Cursor Docs]");
         assert_eq!(cues[0].attachment_segments.len(), 1);
@@ -135,7 +135,7 @@ mod tests {
             }],
         }];
 
-        super::super::enrich_cues_with_attachments(&mut cues, &[], &web_preview_notes, &[]);
+        super::super::enrich_cues_with_attachments(&mut cues, &[], &web_preview_notes, &[], &[]);
 
         assert_eq!(
             cues[0].content,

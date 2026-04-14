@@ -86,7 +86,7 @@ mod tests {
             }],
         }];
 
-        super::super::enrich_cues_with_attachments(&mut cues, &[], &[], &map_notes);
+        super::super::enrich_cues_with_attachments(&mut cues, &[], &[], &map_notes, &[]);
 
         assert_eq!(cues[0].content, "[Attachment 1: 屏東縣立棒球場]");
         assert_eq!(cues[0].attachment_segments.len(), 1);

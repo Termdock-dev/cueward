@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use cueward_core::AttachmentKind;
+
 use crate::MacosError;
 
 pub mod crud;
@@ -57,6 +59,22 @@ pub(crate) struct MapNote {
     pub(crate) timestamp: i64,
     pub(crate) title: Option<String>,
     pub(crate) attachments: Vec<MapAttachment>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FileBackedAttachment {
+    pub(crate) kind: AttachmentKind,
+    pub(crate) title: Option<String>,
+    pub(crate) filename: String,
+    pub(crate) path: PathBuf,
+    pub(crate) sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FileBackedNote {
+    pub(crate) timestamp: i64,
+    pub(crate) title: Option<String>,
+    pub(crate) attachments: Vec<FileBackedAttachment>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

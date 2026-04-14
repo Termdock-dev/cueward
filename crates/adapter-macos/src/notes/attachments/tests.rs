@@ -198,7 +198,7 @@ fn enrich_cues_with_attachments_emits_unresolved_when_no_media_matches() {
         metadata: HashMap::new(),
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[]);
+    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &[]);
 
     assert_eq!(cues[0].attachment_segments.len(), 1);
     assert!(matches!(
@@ -229,7 +229,7 @@ fn enrich_cues_with_attachments_emits_unresolved_when_match_has_no_attachments()
         attachments: Vec::new(),
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &media_notes, &[], &[]);
+    super::enrich_cues_with_attachments(&mut cues, &media_notes, &[], &[], &[]);
 
     assert_eq!(cues[0].attachment_segments.len(), 2);
     assert!(cues[0]
@@ -273,7 +273,7 @@ fn enrich_cues_with_attachments_combines_media_and_web_preview_segments() {
         }],
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &media_notes, &web_preview_notes, &[]);
+    super::enrich_cues_with_attachments(&mut cues, &media_notes, &web_preview_notes, &[], &[]);
 
     assert_eq!(
         cues[0].content,
@@ -316,7 +316,7 @@ fn enrich_cues_with_map_emits_structured_map_segment() {
         }],
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &[], &[], &map_notes);
+    super::enrich_cues_with_attachments(&mut cues, &[], &[], &map_notes, &[]);
 
     assert_eq!(cues[0].content, "[Attachment 1: 屏東縣立棒球場]");
     assert_eq!(cues[0].attachment_segments.len(), 1);
@@ -370,7 +370,7 @@ fn enrich_cues_with_attachments_combines_media_and_map_segments() {
         }],
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &media_notes, &[], &map_notes);
+    super::enrich_cues_with_attachments(&mut cues, &media_notes, &[], &map_notes, &[]);
 
     assert_eq!(
         cues[0].content,
@@ -387,4 +387,95 @@ fn enrich_cues_with_attachments_combines_media_and_map_segments() {
         cues[0].attachment_segments[1].kind,
         AttachmentKind::Map
     ));
+}
+
+#[test]
+fn enrich_cues_with_pdf_emits_file_backed_pdf_segment() {
+    let timestamp = Utc.with_ymd_and_hms(2026, 4, 14, 0, 10, 15).unwrap();
+    let mut cues = vec![Cue {
+        source: CueSource::Notes,
+        timestamp,
+        content: "[Attachment]".into(),
+        url: None,
+        title: Some("test".into()),
+        tags: Vec::new(),
+        attachment_segments: Vec::new(),
+        metadata: HashMap::new(),
+    }];
+    let file_backed_notes = vec![crate::notes::FileBackedNote {
+        timestamp: timestamp.timestamp(),
+        title: Some("test".into()),
+        attachments: vec![crate::notes::FileBackedAttachment {
+            kind: AttachmentKind::Pdf,
+            title: Some("SK-INFLUX [V MB]_DS_C0919.pdf".into()),
+            filename: "SK-INFLUX [V MB]_DS_C0919.pdf".into(),
+            path: PathBuf::from("/tmp/SK-INFLUX [V MB]_DS_C0919.pdf"),
+            sha256: Some("abc123".into()),
+        }],
+    }];
+
+    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &file_backed_notes);
+
+    assert_eq!(cues[0].content, "[Attachment 1: SK-INFLUX [V MB]_DS_C0919.pdf]");
+    assert_eq!(cues[0].attachment_segments.len(), 1);
+    assert!(matches!(
+        cues[0].attachment_segments[0].kind,
+        AttachmentKind::Pdf
+    ));
+    assert_eq!(
+        cues[0].attachment_segments[0].path.as_deref(),
+        Some("/tmp/SK-INFLUX [V MB]_DS_C0919.pdf")
+    );
+    assert_eq!(
+        cues[0].attachment_segments[0].sha256.as_deref(),
+        Some("abc123")
+    );
+    assert!(!cues[0].attachment_segments[0].has_ocr);
+}
+
+#[test]
+fn enrich_cues_with_binary_emits_file_backed_binary_segment() {
+    let timestamp = Utc.with_ymd_and_hms(2026, 4, 9, 23, 42, 53).unwrap();
+    let mut cues = vec![Cue {
+        source: CueSource::Notes,
+        timestamp,
+        content: "[Attachment]".into(),
+        url: None,
+        title: Some("新增備忘錄".into()),
+        tags: Vec::new(),
+        attachment_segments: Vec::new(),
+        metadata: HashMap::new(),
+    }];
+    let file_backed_notes = vec![crate::notes::FileBackedNote {
+        timestamp: timestamp.timestamp(),
+        title: Some("新增備忘錄".into()),
+        attachments: vec![crate::notes::FileBackedAttachment {
+            kind: AttachmentKind::Binary,
+            title: None,
+            filename: "34BF703C-DD8C-4607-AA9C-2A71623C2884".into(),
+            path: PathBuf::from("/tmp/34BF703C-DD8C-4607-AA9C-2A71623C2884"),
+            sha256: Some("def456".into()),
+        }],
+    }];
+
+    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &file_backed_notes);
+
+    assert_eq!(
+        cues[0].content,
+        "[Attachment 1: 34BF703C-DD8C-4607-AA9C-2A71623C2884]"
+    );
+    assert_eq!(cues[0].attachment_segments.len(), 1);
+    assert!(matches!(
+        cues[0].attachment_segments[0].kind,
+        AttachmentKind::Binary
+    ));
+    assert_eq!(
+        cues[0].attachment_segments[0].path.as_deref(),
+        Some("/tmp/34BF703C-DD8C-4607-AA9C-2A71623C2884")
+    );
+    assert_eq!(
+        cues[0].attachment_segments[0].sha256.as_deref(),
+        Some("def456")
+    );
+    assert!(!cues[0].attachment_segments[0].has_ocr);
 }
