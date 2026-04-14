@@ -38,6 +38,8 @@ pub(super) fn build_file_backed_segments(
             filename: Some(attachment.filename.clone()),
             path: Some(attachment.path.display().to_string()),
             sha256: attachment.sha256.clone(),
+            duration_seconds: None,
+            transcript_text: None,
             ocr_text: None,
             has_ocr: false,
         })

@@ -198,7 +198,7 @@ fn enrich_cues_with_attachments_emits_unresolved_when_no_media_matches() {
         metadata: HashMap::new(),
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &[]);
+    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &[], &[]);
 
     assert_eq!(cues[0].attachment_segments.len(), 1);
     assert!(matches!(
@@ -229,7 +229,7 @@ fn enrich_cues_with_attachments_emits_unresolved_when_match_has_no_attachments()
         attachments: Vec::new(),
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &media_notes, &[], &[], &[]);
+    super::enrich_cues_with_attachments(&mut cues, &media_notes, &[], &[], &[], &[]);
 
     assert_eq!(cues[0].attachment_segments.len(), 2);
     assert!(cues[0]
@@ -273,7 +273,14 @@ fn enrich_cues_with_attachments_combines_media_and_web_preview_segments() {
         }],
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &media_notes, &web_preview_notes, &[], &[]);
+    super::enrich_cues_with_attachments(
+        &mut cues,
+        &media_notes,
+        &web_preview_notes,
+        &[],
+        &[],
+        &[],
+    );
 
     assert_eq!(
         cues[0].content,
@@ -316,7 +323,7 @@ fn enrich_cues_with_map_emits_structured_map_segment() {
         }],
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &[], &[], &map_notes, &[]);
+    super::enrich_cues_with_attachments(&mut cues, &[], &[], &map_notes, &[], &[]);
 
     assert_eq!(cues[0].content, "[Attachment 1: 屏東縣立棒球場]");
     assert_eq!(cues[0].attachment_segments.len(), 1);
@@ -370,7 +377,7 @@ fn enrich_cues_with_attachments_combines_media_and_map_segments() {
         }],
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &media_notes, &[], &map_notes, &[]);
+    super::enrich_cues_with_attachments(&mut cues, &media_notes, &[], &map_notes, &[], &[]);
 
     assert_eq!(
         cues[0].content,
@@ -414,7 +421,7 @@ fn enrich_cues_with_pdf_emits_file_backed_pdf_segment() {
         }],
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &file_backed_notes);
+    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &file_backed_notes, &[]);
 
     assert_eq!(cues[0].content, "[Attachment 1: SK-INFLUX [V MB]_DS_C0919.pdf]");
     assert_eq!(cues[0].attachment_segments.len(), 1);
@@ -458,7 +465,7 @@ fn enrich_cues_with_binary_emits_file_backed_binary_segment() {
         }],
     }];
 
-    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &file_backed_notes);
+    super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &file_backed_notes, &[]);
 
     assert_eq!(
         cues[0].content,

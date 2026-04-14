@@ -51,6 +51,10 @@ pub struct AttachmentSegment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_seconds: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transcript_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ocr_text: Option<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub has_ocr: bool,
@@ -89,6 +93,8 @@ mod tests {
             filename: Some("scan.jpg".into()),
             path: Some("/tmp/scan.jpg".into()),
             sha256: Some("abc123".into()),
+            duration_seconds: None,
+            transcript_text: None,
             ocr_text: None,
             has_ocr: false,
         };
@@ -108,6 +114,8 @@ mod tests {
                 "filename": "scan.jpg",
                 "path": "/tmp/scan.jpg",
                 "sha256": "abc123",
+                "duration_seconds": null,
+                "transcript_text": null,
                 "has_ocr": false
             }"#,
         )
@@ -134,6 +142,8 @@ mod tests {
             filename: None,
             path: None,
             sha256: None,
+            duration_seconds: None,
+            transcript_text: None,
             ocr_text: None,
             has_ocr: false,
         };
@@ -160,6 +170,8 @@ mod tests {
             filename: None,
             path: None,
             sha256: None,
+            duration_seconds: None,
+            transcript_text: None,
             ocr_text: None,
             has_ocr: false,
         };
@@ -169,5 +181,30 @@ mod tests {
         assert_eq!(value["kind"], "map");
         assert_eq!(value["latitude"], 22.657349);
         assert_eq!(value["longitude"], 120.485956);
+    }
+
+    #[test]
+    fn attachment_segment_serializes_duration_and_transcript_for_audio() {
+        let segment = AttachmentSegment {
+            index: 1,
+            kind: AttachmentKind::Audio,
+            title: Some("voai-test.wav".into()),
+            url: None,
+            latitude: None,
+            longitude: None,
+            filename: Some("voai-test.wav".into()),
+            path: Some("/tmp/voai-test.wav".into()),
+            sha256: Some("abc123".into()),
+            duration_seconds: Some(3.769),
+            transcript_text: Some("老闆你好我是龍工這是語音測試。".into()),
+            ocr_text: None,
+            has_ocr: false,
+        };
+
+        let value = serde_json::to_value(segment).expect("serialize audio");
+
+        assert_eq!(value["kind"], "audio");
+        assert_eq!(value["duration_seconds"], 3.769);
+        assert_eq!(value["transcript_text"], "老闆你好我是龍工這是語音測試。");
     }
 }

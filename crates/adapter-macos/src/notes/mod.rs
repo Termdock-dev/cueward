@@ -77,6 +77,23 @@ pub(crate) struct FileBackedNote {
     pub(crate) attachments: Vec<FileBackedAttachment>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct AudioAttachment {
+    pub(crate) title: Option<String>,
+    pub(crate) filename: String,
+    pub(crate) path: PathBuf,
+    pub(crate) sha256: Option<String>,
+    pub(crate) duration_seconds: Option<f64>,
+    pub(crate) transcript_text: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct AudioNote {
+    pub(crate) timestamp: i64,
+    pub(crate) title: Option<String>,
+    pub(crate) attachments: Vec<AudioAttachment>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AttachmentOcrBlock {
     pub(crate) index: usize,

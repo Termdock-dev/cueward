@@ -1,3 +1,4 @@
+mod audio;
 mod file_backed;
 mod image;
 mod map;
@@ -10,8 +11,12 @@ use std::collections::HashMap;
 use cueward_core::{AttachmentKind, AttachmentSegment, Cue, CueSource};
 
 use super::{
-    ATTACHMENT_LABEL, AttachmentOcrBlock, FileBackedNote, MEDIA_MATCH_WINDOW_SECS,
-    MediaAttachment, MediaNote, MapNote, WebPreviewNote,
+    ATTACHMENT_LABEL, AttachmentOcrBlock, AudioNote, FileBackedNote,
+    MEDIA_MATCH_WINDOW_SECS, MediaAttachment, MediaNote, MapNote, WebPreviewNote,
+};
+use audio::{
+    append_audio_transcripts, build_audio_segments, collect_audio_transcript_blocks,
+    labels_for_audio, match_audio_note, materialize_audio_attachments,
 };
 use file_backed::{build_file_backed_segments, labels_for_file_backed, match_file_backed_note};
 use image::{collect_attachment_ocr_blocks, materialize_attachments};
@@ -26,6 +31,7 @@ pub(crate) fn enrich_cues_with_attachments(
     web_preview_notes: &[WebPreviewNote],
     map_notes: &[MapNote],
     file_backed_notes: &[FileBackedNote],
+    audio_notes: &[AudioNote],
 ) {
     for cue in cues.iter_mut() {
         if !matches!(cue.source, CueSource::Notes) {
@@ -105,6 +111,31 @@ pub(crate) fn enrich_cues_with_attachments(
                         segments.len(),
                         remaining,
                     ));
+                }
+            }
+        }
+
+        if labels.len() < placeholder_count {
+            if let Some(audio_note) = match_audio_note(cue, audio_notes) {
+                if !audio_note.attachments.is_empty() {
+                    let remaining = placeholder_count.saturating_sub(labels.len());
+                    let attachments =
+                        materialize_audio_attachments(&audio_note.attachments, remaining);
+                    if !attachments.is_empty() {
+                        labels.extend(labels_for_audio(&attachments, remaining));
+
+                        let transcript_blocks =
+                            collect_audio_transcript_blocks(&attachments, segments.len(), remaining);
+                        if !transcript_blocks.is_empty() {
+                            cue.content = append_audio_transcripts(&cue.content, &transcript_blocks);
+                        }
+
+                        segments.extend(build_audio_segments(
+                            &attachments,
+                            segments.len(),
+                            remaining,
+                        ));
+                    }
                 }
             }
         }
@@ -248,6 +279,8 @@ fn build_image_segments(
                 filename: Some(attachment.filename.clone()),
                 path: Some(attachment.path.display().to_string()),
                 sha256: attachment.sha256.clone(),
+                duration_seconds: None,
+                transcript_text: None,
                 ocr_text: ocr.map(|block| block.text.clone()),
                 has_ocr: ocr.is_some(),
             }
@@ -270,6 +303,8 @@ fn build_unresolved_segments_from(
             filename: None,
             path: None,
             sha256: None,
+            duration_seconds: None,
+            transcript_text: None,
             ocr_text: None,
             has_ocr: false,
         })

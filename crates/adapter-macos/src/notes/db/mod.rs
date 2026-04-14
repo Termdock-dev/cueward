@@ -1,18 +1,22 @@
+mod audio;
 mod file_backed;
 mod web_preview;
 
 use std::collections::HashMap;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OpenFlags};
+use sha2::{Digest, Sha256};
 
 use crate::MacosError;
 
 use super::{APPLE_EPOCH_OFFSET, MAX_MEDIA_SEARCH_DEPTH, MediaAttachment, MediaNote, home_dir};
 
 pub(super) use file_backed::load_file_backed_notes;
+pub(super) use audio::load_audio_notes;
 pub(super) use web_preview::{load_map_notes, load_web_preview_notes};
 
 pub(super) fn load_media_notes(since: DateTime<Utc>) -> Result<Vec<MediaNote>, MacosError> {
@@ -157,6 +161,22 @@ pub(super) fn resolve_media_path(media_root: &Path, identifier: &str, filename: 
     None
 }
 
+pub(super) fn compute_sha256(path: &Path) -> Option<String> {
+    let mut file = fs::File::open(path).ok()?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 8192];
+
+    loop {
+        let read = file.read(&mut buffer).ok()?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+
+    Some(format!("{:x}", hasher.finalize()))
+}
+
 fn find_named_file(root: &Path, filename: &str) -> Option<PathBuf> {
     find_named_file_impl(root, filename, 0)
 }
@@ -193,7 +213,7 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use rusqlite::Connection;
 
-    use super::{apple_to_unix_timestamp, find_named_file, load_media_notes_from_conn};
+    use super::{apple_to_unix_timestamp, compute_sha256, find_named_file, load_media_notes_from_conn};
 
     #[test]
     fn find_named_file_walks_nested_media_directory() {
@@ -228,6 +248,20 @@ mod tests {
     fn apple_to_unix_timestamp_uses_shared_epoch_offset() {
         assert_eq!(apple_to_unix_timestamp(0.0), 978_307_200);
         assert_eq!(apple_to_unix_timestamp(1.4), 978_307_201);
+    }
+
+    #[test]
+    fn compute_sha256_returns_stable_digest() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let target = temp.path().join("image.png");
+        fs::write(&target, b"hello world").expect("write media file");
+
+        let digest = compute_sha256(&target);
+
+        assert_eq!(
+            digest.as_deref(),
+            Some("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9")
+        );
     }
 
     #[test]

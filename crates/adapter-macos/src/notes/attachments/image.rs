@@ -1,13 +1,11 @@
 use std::fs;
-use std::io::Read;
-use std::path::{Path, PathBuf};
-
-use sha2::{Digest, Sha256};
+use std::path::PathBuf;
 
 use crate::MacosError;
 use crate::ocr;
 
 use super::super::{AttachmentOcrBlock, MediaAttachment, OCR_EMPTY_SENTINEL, home_dir};
+use super::super::db::compute_sha256;
 
 pub(super) fn collect_attachment_ocr_blocks(
     attachments: &[MediaAttachment],
@@ -113,27 +111,12 @@ fn ocr_cache_file_path(hash: &str) -> Result<PathBuf, MacosError> {
     Ok(ocr_cache_dir()?.join(format!("{hash}.txt")))
 }
 
-pub(super) fn compute_sha256(path: &Path) -> Option<String> {
-    let mut file = fs::File::open(path).ok()?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 8192];
-
-    loop {
-        let read = file.read(&mut buffer).ok()?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-
-    Some(format!("{:x}", hasher.finalize()))
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
 
-    use super::{cached_ocr_text, compute_sha256, ocr_cache_file_path};
+    use super::{cached_ocr_text, ocr_cache_file_path};
+    use crate::notes::db::compute_sha256;
     use crate::notes::OCR_EMPTY_SENTINEL;
 
     #[test]
