@@ -6,6 +6,8 @@ Cueward reads Safari history, Apple Notes, and iMessage locally — no cloud API
 
 Designed as a Unix-style tool: it outputs structured JSON for AI Agents to consume.
 
+Most first-time macOS integrations will require system permissions before they work. If a command fails immediately on first use, check Privacy & Security settings first, grant the needed access, then run it again.
+
 ## Install
 
 ```bash
@@ -25,6 +27,10 @@ Cueward reads local databases that require Full Disk Access:
 
 For Apple Notes, Reminders, and Calendar operations, also allow automation:
 - **System Settings > Privacy & Security > Automation** > allow your terminal to control Notes, Reminders, and Calendar
+
+Some integrations may additionally require:
+- **Accessibility / 輔助使用** for UI scripting style automations
+- app-specific data access via **Full Disk Access** when reading container files
 
 ## Usage
 

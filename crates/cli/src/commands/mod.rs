@@ -15,6 +15,7 @@ pub(crate) mod safari_bookmarks;
 pub(crate) mod screenshot;
 pub(crate) mod search;
 pub(crate) mod send;
+pub(crate) mod stickies;
 pub(crate) mod triage;
 #[cfg(test)]
 mod calendar_tests;
@@ -30,6 +31,8 @@ mod safari_ai_tests;
 mod safari_bookmarks_tests;
 #[cfg(test)]
 mod safari_tests;
+#[cfg(test)]
+mod stickies_tests;
 
 pub(crate) use calendar::CalendarAction;
 pub(crate) use clipboard::ClipboardAction;
@@ -38,6 +41,7 @@ pub(crate) use quick_notes::QuickNotesAction;
 pub(crate) use reddit::RedditAction;
 pub(crate) use reminders::RemindersAction;
 pub(crate) use safari::SafariAction;
+pub(crate) use stickies::StickiesAction;
 
 #[derive(Parser)]
 #[command(
@@ -149,6 +153,11 @@ pub(crate) enum Command {
         #[command(subcommand)]
         action: ClipboardAction,
     },
+    /// Manage Stickies notes
+    Stickies {
+        #[command(subcommand)]
+        action: StickiesAction,
+    },
 }
 
 #[derive(Clone, ValueEnum)]
@@ -184,5 +193,6 @@ pub(crate) fn dispatch(command: Command) {
             display,
         } => screenshot::dispatch(ocr, output, display),
         Command::Clipboard { action } => clipboard::dispatch(action),
+        Command::Stickies { action } => stickies::dispatch(action),
     }
 }
