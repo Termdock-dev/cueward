@@ -1,5 +1,6 @@
 use clap::Subcommand;
 use std::process;
+use std::str::FromStr;
 
 use super::helpers::print_external;
 
@@ -15,6 +16,24 @@ pub(crate) enum StickiesAction {
         /// Sticky body
         #[arg(long)]
         body: String,
+        /// Target display number
+        #[arg(long)]
+        display: Option<u32>,
+        /// Sticky color preset
+        #[arg(long)]
+        color: Option<String>,
+        /// X coordinate
+        #[arg(long, requires = "y")]
+        x: Option<i32>,
+        /// Y coordinate
+        #[arg(long, requires = "x")]
+        y: Option<i32>,
+        /// Sticky width
+        #[arg(long, requires = "height")]
+        width: Option<i32>,
+        /// Sticky height
+        #[arg(long, requires = "width")]
+        height: Option<i32>,
     },
     /// Update a sticky
     Update {
@@ -27,6 +46,24 @@ pub(crate) enum StickiesAction {
         /// New body
         #[arg(long)]
         body: Option<String>,
+        /// Target display number
+        #[arg(long)]
+        display: Option<u32>,
+        /// Sticky color preset
+        #[arg(long)]
+        color: Option<String>,
+        /// X coordinate
+        #[arg(long, requires = "y")]
+        x: Option<i32>,
+        /// Y coordinate
+        #[arg(long, requires = "x")]
+        y: Option<i32>,
+        /// Sticky width
+        #[arg(long, requires = "height")]
+        width: Option<i32>,
+        /// Sticky height
+        #[arg(long, requires = "width")]
+        height: Option<i32>,
     },
     /// Delete a sticky
     Delete {
@@ -48,8 +85,35 @@ pub(crate) fn dispatch(action: StickiesAction) {
                 process::exit(1);
             }
         },
-        StickiesAction::Create { title, body } => {
-            match cueward_adapter_macos::stickies::create_sticky(&title, &body) {
+        StickiesAction::Create {
+            title,
+            body,
+            display,
+            color,
+            x,
+            y,
+            width,
+            height,
+        } => {
+            let color = match color {
+                Some(value) => match cueward_adapter_macos::stickies::StickyColorPreset::from_str(&value) {
+                    Ok(color) => Some(color),
+                    Err(err) => {
+                        eprintln!("error: {err}");
+                        process::exit(1);
+                    }
+                },
+                None => None,
+            };
+            let options = cueward_adapter_macos::stickies::StickyMutationOptions {
+                color,
+                display,
+                x,
+                y,
+                width,
+                height,
+            };
+            match cueward_adapter_macos::stickies::create_sticky_with_options(&title, &body, &options) {
                 Ok(sticky) => {
                     let response = serde_json::json!({
                         "created": true,
@@ -67,8 +131,41 @@ pub(crate) fn dispatch(action: StickiesAction) {
                 }
             }
         }
-        StickiesAction::Update { id, title, body } => {
-            match cueward_adapter_macos::stickies::update_sticky(&id, title.as_deref(), body.as_deref()) {
+        StickiesAction::Update {
+            id,
+            title,
+            body,
+            display,
+            color,
+            x,
+            y,
+            width,
+            height,
+        } => {
+            let color = match color {
+                Some(value) => match cueward_adapter_macos::stickies::StickyColorPreset::from_str(&value) {
+                    Ok(color) => Some(color),
+                    Err(err) => {
+                        eprintln!("error: {err}");
+                        process::exit(1);
+                    }
+                },
+                None => None,
+            };
+            let options = cueward_adapter_macos::stickies::StickyMutationOptions {
+                color,
+                display,
+                x,
+                y,
+                width,
+                height,
+            };
+            match cueward_adapter_macos::stickies::update_sticky_with_options(
+                &id,
+                title.as_deref(),
+                body.as_deref(),
+                &options,
+            ) {
                 Ok(sticky) => {
                     let response = serde_json::json!({
                         "updated": true,
