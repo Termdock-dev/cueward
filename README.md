@@ -335,6 +335,15 @@ cueward screenshot --ocr
 # Specific display (1=main, 2=secondary, 3=third)
 cueward screenshot --display 2
 
+# List capturable windows
+cueward screenshot windows
+
+# Capture a specific window
+cueward screenshot window --id 12345
+
+# Capture a specific window with OCR
+cueward screenshot window --id 12345 --ocr
+
 # Custom output path
 cueward screenshot --output ~/Desktop/shot.png --ocr
 ```
