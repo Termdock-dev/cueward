@@ -33,6 +33,8 @@ mod safari_bookmarks_tests;
 #[cfg(test)]
 mod safari_tests;
 #[cfg(test)]
+mod screenshot_tests;
+#[cfg(test)]
 mod stickies_tests;
 #[cfg(test)]
 mod voice_memos_tests;
@@ -44,6 +46,7 @@ pub(crate) use quick_notes::QuickNotesAction;
 pub(crate) use reddit::RedditAction;
 pub(crate) use reminders::RemindersAction;
 pub(crate) use safari::SafariAction;
+pub(crate) use screenshot::ScreenshotAction;
 pub(crate) use stickies::StickiesAction;
 pub(crate) use voice_memos::VoiceMemosAction;
 
@@ -151,6 +154,8 @@ pub(crate) enum Command {
         /// Display number (1 = main, 2 = secondary, 3 = third)
         #[arg(long)]
         display: Option<u32>,
+        #[command(subcommand)]
+        action: Option<ScreenshotAction>,
     },
     /// Read or write the system clipboard
     Clipboard {
@@ -200,7 +205,8 @@ pub(crate) fn dispatch(command: Command) {
             ocr,
             output,
             display,
-        } => screenshot::dispatch(ocr, output, display),
+            action,
+        } => screenshot::dispatch(ocr, output, display, action),
         Command::Clipboard { action } => clipboard::dispatch(action),
         Command::VoiceMemos { action } => voice_memos::dispatch(action),
         Command::Stickies { action } => stickies::dispatch(action),
