@@ -15,6 +15,7 @@ pub mod safari;
 mod safari_guard;
 pub mod screenshot;
 pub mod stickies;
+pub mod voice_memos;
 
 pub use error::MacosError;
 pub use scan_state::{ScanEnvelope, ScanStatus};

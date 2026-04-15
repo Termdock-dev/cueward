@@ -17,6 +17,7 @@ pub(crate) mod search;
 pub(crate) mod send;
 pub(crate) mod stickies;
 pub(crate) mod triage;
+pub(crate) mod voice_memos;
 #[cfg(test)]
 mod calendar_tests;
 #[cfg(test)]
@@ -33,6 +34,8 @@ mod safari_bookmarks_tests;
 mod safari_tests;
 #[cfg(test)]
 mod stickies_tests;
+#[cfg(test)]
+mod voice_memos_tests;
 
 pub(crate) use calendar::CalendarAction;
 pub(crate) use clipboard::ClipboardAction;
@@ -42,6 +45,7 @@ pub(crate) use reddit::RedditAction;
 pub(crate) use reminders::RemindersAction;
 pub(crate) use safari::SafariAction;
 pub(crate) use stickies::StickiesAction;
+pub(crate) use voice_memos::VoiceMemosAction;
 
 #[derive(Parser)]
 #[command(
@@ -153,6 +157,11 @@ pub(crate) enum Command {
         #[command(subcommand)]
         action: ClipboardAction,
     },
+    /// Read Voice Memos metadata
+    VoiceMemos {
+        #[command(subcommand)]
+        action: VoiceMemosAction,
+    },
     /// Manage Stickies notes
     Stickies {
         #[command(subcommand)]
@@ -193,6 +202,7 @@ pub(crate) fn dispatch(command: Command) {
             display,
         } => screenshot::dispatch(ocr, output, display),
         Command::Clipboard { action } => clipboard::dispatch(action),
+        Command::VoiceMemos { action } => voice_memos::dispatch(action),
         Command::Stickies { action } => stickies::dispatch(action),
     }
 }
