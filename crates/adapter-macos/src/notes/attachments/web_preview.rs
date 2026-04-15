@@ -102,6 +102,7 @@ mod tests {
             &[],
             &[],
             &[],
+            &[],
         );
 
         assert_eq!(cues[0].content, "[Attachment 1: Cursor Docs]");
@@ -149,6 +150,7 @@ mod tests {
             &mut cues,
             &[],
             &web_preview_notes,
+            &[],
             &[],
             &[],
             &[],

@@ -8,7 +8,7 @@ use crate::MacosError;
 
 use super::attachments::{attachment_placeholder_count, enrich_cues_with_attachments};
 use super::db::{
-    load_audio_notes, load_file_backed_notes, load_map_notes, load_media_notes,
+    load_audio_notes, load_drawing_notes, load_file_backed_notes, load_map_notes, load_media_notes,
     load_web_preview_notes,
 };
 use super::{ATTACHMENT_LABEL, ATTACHMENT_PLACEHOLDER};
@@ -108,6 +108,7 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
         let map_notes = load_map_notes(since).unwrap_or_default();
         let file_backed_notes = load_file_backed_notes(since).unwrap_or_default();
         let audio_notes = load_audio_notes(since).unwrap_or_default();
+        let drawing_notes = load_drawing_notes(since).unwrap_or_default();
         enrich_cues_with_attachments(
             &mut cues,
             &media_notes,
@@ -115,6 +116,7 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
             &map_notes,
             &file_backed_notes,
             &audio_notes,
+            &drawing_notes,
         );
     }
 

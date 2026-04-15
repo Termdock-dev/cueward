@@ -1,4 +1,5 @@
 mod audio;
+mod drawing;
 mod file_backed;
 mod image;
 mod map;
@@ -12,13 +13,14 @@ use std::collections::HashMap;
 use cueward_core::{AttachmentKind, AttachmentSegment, Cue, CueSource};
 
 use super::{
-    ATTACHMENT_LABEL, AttachmentOcrBlock, AudioNote, FileBackedNote,
+    ATTACHMENT_LABEL, AttachmentOcrBlock, AudioNote, DrawingNote, FileBackedNote,
     MEDIA_MATCH_WINDOW_SECS, MediaAttachment, MediaNote, MapNote, WebPreviewNote,
 };
 use audio::{
     append_audio_transcripts, build_audio_segments, collect_audio_transcript_blocks,
     labels_for_audio, match_audio_note, materialize_audio_attachments,
 };
+use drawing::{build_drawing_segments, labels_for_drawings, match_drawing_note};
 use file_backed::{
     build_file_backed_segments, collect_file_backed_ocr_blocks, labels_for_file_backed,
     match_file_backed_note, materialize_file_backed_attachments,
@@ -36,6 +38,7 @@ pub(crate) fn enrich_cues_with_attachments(
     map_notes: &[MapNote],
     file_backed_notes: &[FileBackedNote],
     audio_notes: &[AudioNote],
+    drawing_notes: &[DrawingNote],
 ) {
     for cue in cues.iter_mut() {
         if !matches!(cue.source, CueSource::Notes) {
@@ -145,6 +148,20 @@ pub(crate) fn enrich_cues_with_attachments(
                             remaining,
                         ));
                     }
+                }
+            }
+        }
+
+        if labels.len() < placeholder_count {
+            if let Some(drawing_note) = match_drawing_note(cue, drawing_notes) {
+                if !drawing_note.attachments.is_empty() {
+                    let remaining = placeholder_count.saturating_sub(labels.len());
+                    labels.extend(labels_for_drawings(&drawing_note.attachments, remaining));
+                    segments.extend(build_drawing_segments(
+                        &drawing_note.attachments,
+                        segments.len(),
+                        remaining,
+                    ));
                 }
             }
         }

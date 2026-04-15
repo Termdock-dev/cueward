@@ -149,7 +149,7 @@ mod tests {
             }],
         }];
 
-        super::super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &[], &audio_notes);
+        super::super::enrich_cues_with_attachments(&mut cues, &[], &[], &[], &[], &audio_notes, &[]);
 
         assert_eq!(
             cues[0].content,
@@ -218,6 +218,7 @@ mod tests {
             &[],
             &[],
             &audio_notes,
+            &[],
         );
 
         assert_eq!(

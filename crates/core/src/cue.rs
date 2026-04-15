@@ -241,4 +241,28 @@ mod tests {
         assert_eq!(value["page_count"], 4);
         assert_eq!(value["has_ocr"], true);
     }
+
+    #[test]
+    fn attachment_segment_serializes_kind_for_drawing() {
+        let segment = AttachmentSegment {
+            index: 1,
+            kind: AttachmentKind::Drawing,
+            title: None,
+            url: None,
+            latitude: None,
+            longitude: None,
+            filename: None,
+            path: None,
+            sha256: None,
+            page_count: None,
+            duration_seconds: None,
+            transcript_text: None,
+            ocr_text: None,
+            has_ocr: false,
+        };
+
+        let value = serde_json::to_value(segment).expect("serialize drawing");
+
+        assert_eq!(value["kind"], "drawing");
+    }
 }

@@ -98,6 +98,18 @@ pub(crate) struct AudioNote {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DrawingAttachment {
+    pub(crate) title: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DrawingNote {
+    pub(crate) timestamp: i64,
+    pub(crate) title: Option<String>,
+    pub(crate) attachments: Vec<DrawingAttachment>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AttachmentOcrBlock {
     pub(crate) index: usize,
     pub(crate) filename: String,

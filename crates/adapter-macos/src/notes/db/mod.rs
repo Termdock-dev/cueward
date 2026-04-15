@@ -1,4 +1,5 @@
 mod audio;
+mod drawing;
 mod file_backed;
 #[cfg(test)]
 pub(crate) mod test_support;
@@ -19,6 +20,7 @@ use super::{APPLE_EPOCH_OFFSET, MAX_MEDIA_SEARCH_DEPTH, MediaAttachment, MediaNo
 
 pub(super) use file_backed::load_file_backed_notes;
 pub(super) use audio::load_audio_notes;
+pub(super) use drawing::load_drawing_notes;
 pub(super) use web_preview::{load_map_notes, load_web_preview_notes};
 
 pub(super) fn load_media_notes(since: DateTime<Utc>) -> Result<Vec<MediaNote>, MacosError> {
