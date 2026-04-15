@@ -12,7 +12,8 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
                     "safari/threads/feed",
                     &serde_json::to_string_pretty(&posts).unwrap(),
                 );
-                eprintln!("{} post(s)", posts.len());
+                let count = posts.data.as_ref().map(|items| items.len()).unwrap_or(0);
+                eprintln!("{count} post(s)");
             }
             Err(e) => {
                 eprintln!("error: {e}");

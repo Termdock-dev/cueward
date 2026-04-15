@@ -222,6 +222,24 @@ fn cli_parses_gemini_list() {
 }
 
 #[test]
+fn cli_parses_threads_list() {
+    let cli = Cli::try_parse_from(["cueward", "safari", "ai", "--provider", "threads", "list"])
+        .expect("parse");
+
+    match cli.command {
+        Command::Safari {
+            action:
+                SafariAction::Ai {
+                    provider,
+                    action: SafariAiAction::List,
+                    ..
+                },
+        } => assert_eq!(provider, SafariAiProvider::Threads),
+        _ => panic!("unexpected command"),
+    }
+}
+
+#[test]
 fn cli_parses_gemini_with_profile() {
     let cli = Cli::try_parse_from([
         "cueward",
