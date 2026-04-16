@@ -2,3 +2,9 @@
 .DS_Store
 .termdock/
 .worktrees/
+
+.codex/*
+.claude/*
+.gemini/*
+recall.md
+remember.md
