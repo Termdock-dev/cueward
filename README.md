@@ -34,6 +34,25 @@ Some integrations may additionally require:
 
 ## Usage
 
+### Discover Commands
+
+Use the built-in Clap help to explore the CLI surface:
+
+```bash
+# Top-level command list
+cueward --help
+
+# Subcommand-specific help
+cueward notes --help
+cueward reminders --help
+cueward safari --help
+
+# Alternative form
+cueward help doctor
+```
+
+This is the fastest way to see the current command tree and flags, especially as new integrations land.
+
 ### Capture
 
 Extract knowledge fragments from local sources:
@@ -365,6 +384,30 @@ cueward clipboard set "Hello from cueward"
 
 Text content returns JSON with `"type": "text"`. Image content is saved as PNG and returns `"type": "image"` with the file path.
 
+### Doctor
+
+Run a read-only macOS preflight before using integrations that depend on permissions:
+
+```bash
+# Human-readable summary
+cueward doctor
+
+# Machine-readable report
+cueward doctor --json
+
+# Opt-in Safari JavaScript probe
+cueward doctor --live-safari
+cueward doctor --json --live-safari
+```
+
+`doctor` checks:
+
+- filesystem / Full Disk Access access to the current local data sources
+- Apple Events / Automation access for Notes, Reminders, Calendar, and Safari
+- an optional Safari JavaScript probe that reuses the normal Safari guard path
+
+The JSON output includes stable check IDs such as `fda.messages.chat_db`, `automation.notes`, and `live.safari.js`.
+
 ### Quick Notes
 
 List, update, archive, and delete system Quick Notes (快速備忘錄):
@@ -389,6 +432,40 @@ cueward quick-notes create --title "Title" --body "Content"
 Quick Notes are identified by the system `ZISSYSTEMPAPER` flag — notes created via the macOS Quick Note gesture (hot corner, Apple Pencil, etc.). `list`, `update`, and `delete` operate on these system-tagged notes regardless of which folder they reside in. `create` places a regular note in the "Quick Notes" folder but does not mark it as a system Quick Note.
 
 `archive` is the cleanup workflow for real Quick Notes: it copies the note into a regular destination folder, waits for the new note to appear, and deletes the original Quick Note so it disappears from the Quick Notes smart view. This preserves link URLs, but Apple Notes rich-link cards may be flattened into normal links in the archived copy.
+
+### Voice Memos
+
+Read Voice Memos metadata from the local shared database:
+
+```bash
+# List all voice memos
+cueward voice-memos list
+
+# Read one voice memo by id
+cueward voice-memos read --id F45D4751-183C-4032-99F7-F1FE1F541BA2
+```
+
+Outputs JSON with `id`, `title`, `duration_seconds`, `timestamp`, and `path`.
+
+### Stickies
+
+Manage Stickies notes from the desktop:
+
+```bash
+# List notes
+cueward stickies list
+
+# Create a note
+cueward stickies create --title "Temp" --body "Remember this"
+
+# Update a note
+cueward stickies update --id sticky-1 --title "Updated title"
+
+# Delete a note
+cueward stickies delete --id sticky-1
+```
+
+Use `cueward stickies --help` to inspect the geometry and color flags for `create` / `update`.
 
 
 ## Agent Integration

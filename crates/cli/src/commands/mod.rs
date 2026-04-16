@@ -8,6 +8,8 @@ pub(crate) mod clipboard;
 pub(crate) mod doctor;
 #[cfg(test)]
 mod doctor_tests;
+#[cfg(test)]
+mod help_tests;
 pub(crate) mod helpers;
 pub(crate) mod notes;
 #[cfg(test)]
@@ -56,7 +58,8 @@ pub(crate) use voice_memos::VoiceMemosAction;
 #[derive(Parser)]
 #[command(
     name = "cueward",
-    about = "Capture and triage your scattered knowledge"
+    about = "Capture and triage your scattered knowledge",
+    after_help = "Discover commands:\n  cueward --help\n  cueward <command> --help\n  cueward help <command>"
 )]
 pub(crate) struct Cli {
     #[command(subcommand)]
