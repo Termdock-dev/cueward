@@ -32,6 +32,10 @@ pub(super) fn execute_js_for_profile(
     Ok(decode_field(stdout.trim()))
 }
 
+pub(crate) fn doctor_live_probe() -> Result<String, MacosError> {
+    with_safari_session(|| execute_js("1 + 1", "safari_doctor_live"))
+}
+
 pub fn tabs(profile_filter: Option<&str>) -> Result<Vec<SafariTab>, MacosError> {
     with_safari_session(|| {
         let stdout = run_capture(&build_tabs_script(), "safari_tabs")?;

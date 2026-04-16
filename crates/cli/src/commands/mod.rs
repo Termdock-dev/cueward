@@ -1,41 +1,44 @@
 use clap::{Parser, Subcommand, ValueEnum};
 
 pub(crate) mod calendar;
+#[cfg(test)]
+mod calendar_tests;
 pub(crate) mod capture;
 pub(crate) mod clipboard;
+pub(crate) mod doctor;
+#[cfg(test)]
+mod doctor_tests;
 pub(crate) mod helpers;
 pub(crate) mod notes;
+#[cfg(test)]
+mod notes_tests;
 pub(crate) mod ocr;
 pub(crate) mod quick_notes;
 pub(crate) mod reddit;
-pub(crate) mod reminders;
-pub(crate) mod safari;
-pub(crate) mod safari_ai;
-pub(crate) mod safari_bookmarks;
-pub(crate) mod screenshot;
-pub(crate) mod search;
-pub(crate) mod send;
-pub(crate) mod stickies;
-pub(crate) mod triage;
-pub(crate) mod voice_memos;
-#[cfg(test)]
-mod calendar_tests;
-#[cfg(test)]
-mod notes_tests;
 #[cfg(test)]
 mod reddit_tests;
+pub(crate) mod reminders;
 #[cfg(test)]
 mod reminders_tests;
+pub(crate) mod safari;
+pub(crate) mod safari_ai;
 #[cfg(test)]
 mod safari_ai_tests;
+pub(crate) mod safari_bookmarks;
 #[cfg(test)]
 mod safari_bookmarks_tests;
 #[cfg(test)]
 mod safari_tests;
+pub(crate) mod screenshot;
 #[cfg(test)]
 mod screenshot_tests;
+pub(crate) mod search;
+pub(crate) mod send;
+pub(crate) mod stickies;
 #[cfg(test)]
 mod stickies_tests;
+pub(crate) mod triage;
+pub(crate) mod voice_memos;
 #[cfg(test)]
 mod voice_memos_tests;
 
@@ -162,6 +165,15 @@ pub(crate) enum Command {
         #[command(subcommand)]
         action: ClipboardAction,
     },
+    /// Diagnose macOS permissions and runtime prerequisites
+    Doctor {
+        /// Emit machine-readable JSON
+        #[arg(long)]
+        json: bool,
+        /// Run opt-in live Safari probe
+        #[arg(long)]
+        live_safari: bool,
+    },
     /// Read Voice Memos metadata
     VoiceMemos {
         #[command(subcommand)]
@@ -208,6 +220,7 @@ pub(crate) fn dispatch(command: Command) {
             action,
         } => screenshot::dispatch(ocr, output, display, action),
         Command::Clipboard { action } => clipboard::dispatch(action),
+        Command::Doctor { json, live_safari } => doctor::dispatch(json, live_safari),
         Command::VoiceMemos { action } => voice_memos::dispatch(action),
         Command::Stickies { action } => stickies::dispatch(action),
     }

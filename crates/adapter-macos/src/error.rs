@@ -1,5 +1,9 @@
 use std::fmt;
 
+pub(crate) const FULL_DISK_ACCESS_GUIDANCE: &str = "Grant Full Disk Access to your terminal app";
+pub(crate) const FULL_DISK_ACCESS_SETTINGS_PATH: &str =
+    "System Settings > Privacy & Security > Full Disk Access";
+
 #[derive(Debug)]
 pub enum MacosError {
     Sqlite(rusqlite::Error),
@@ -15,8 +19,8 @@ impl fmt::Display for MacosError {
             Self::PermissionDenied(path) => write!(
                 f,
                 "permission denied: {path}\n\n\
-                 Grant Full Disk Access to your terminal app:\n  \
-                 System Settings > Privacy & Security > Full Disk Access"
+                 {FULL_DISK_ACCESS_GUIDANCE}:\n  \
+                 {FULL_DISK_ACCESS_SETTINGS_PATH}"
             ),
             Self::NotImplemented(name) => write!(f, "{name}: not yet implemented"),
             Self::Other(msg) => write!(f, "{msg}"),

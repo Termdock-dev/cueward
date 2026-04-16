@@ -34,6 +34,7 @@ pub use core::{
     active, click, close, close_tabs, exec, fill, focus_tab, open, read, scroll, scroll_and_read,
     source, tabs, wait,
 };
+pub(crate) use core::doctor_live_probe;
 pub use history::capture;
 pub use social::{SocialFeedPost, threads_extract_feed, x_extract_feed, x_read_post, x_search};
 pub use types::{
