@@ -4,6 +4,8 @@ pub(crate) mod calendar;
 pub(crate) mod capture;
 pub(crate) mod clipboard;
 pub(crate) mod helpers;
+#[cfg(test)]
+mod help_tests;
 pub(crate) mod notes;
 pub(crate) mod ocr;
 pub(crate) mod quick_notes;
@@ -53,7 +55,8 @@ pub(crate) use voice_memos::VoiceMemosAction;
 #[derive(Parser)]
 #[command(
     name = "cueward",
-    about = "Capture and triage your scattered knowledge"
+    about = "Capture and triage your scattered knowledge",
+    after_help = "Discover commands:\n  cueward --help\n  cueward <command> --help\n  cueward help <command>"
 )]
 pub(crate) struct Cli {
     #[command(subcommand)]
