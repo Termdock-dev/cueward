@@ -15,6 +15,7 @@ pub mod safari;
 mod safari_guard;
 pub mod scan_state;
 pub mod screenshot;
+pub mod shortcuts;
 pub mod stickies;
 pub mod voice_memos;
 

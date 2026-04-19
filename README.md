@@ -49,6 +49,7 @@ cueward safari --help
 
 # Alternative form
 cueward help doctor
+cueward help notes
 ```
 
 This is the fastest way to see the current command tree and flags, especially as new integrations land.

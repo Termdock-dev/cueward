@@ -1,46 +1,49 @@
 use clap::{Parser, Subcommand, ValueEnum};
 
 pub(crate) mod calendar;
-#[cfg(test)]
-mod calendar_tests;
 pub(crate) mod capture;
 pub(crate) mod clipboard;
 pub(crate) mod doctor;
-#[cfg(test)]
-mod doctor_tests;
+pub(crate) mod helpers;
 #[cfg(test)]
 mod help_tests;
-pub(crate) mod helpers;
 pub(crate) mod notes;
-#[cfg(test)]
-mod notes_tests;
 pub(crate) mod ocr;
 pub(crate) mod quick_notes;
 pub(crate) mod reddit;
-#[cfg(test)]
-mod reddit_tests;
 pub(crate) mod reminders;
-#[cfg(test)]
-mod reminders_tests;
 pub(crate) mod safari;
 pub(crate) mod safari_ai;
+pub(crate) mod safari_bookmarks;
+pub(crate) mod screenshot;
+pub(crate) mod search;
+pub(crate) mod send;
+pub(crate) mod shortcuts;
+pub(crate) mod stickies;
+pub(crate) mod triage;
+pub(crate) mod voice_memos;
+#[cfg(test)]
+mod calendar_tests;
+#[cfg(test)]
+mod doctor_tests;
+#[cfg(test)]
+mod notes_tests;
+#[cfg(test)]
+mod reddit_tests;
+#[cfg(test)]
+mod reminders_tests;
 #[cfg(test)]
 mod safari_ai_tests;
-pub(crate) mod safari_bookmarks;
 #[cfg(test)]
 mod safari_bookmarks_tests;
 #[cfg(test)]
 mod safari_tests;
-pub(crate) mod screenshot;
 #[cfg(test)]
 mod screenshot_tests;
-pub(crate) mod search;
-pub(crate) mod send;
-pub(crate) mod stickies;
+#[cfg(test)]
+mod shortcuts_tests;
 #[cfg(test)]
 mod stickies_tests;
-pub(crate) mod triage;
-pub(crate) mod voice_memos;
 #[cfg(test)]
 mod voice_memos_tests;
 
@@ -52,6 +55,7 @@ pub(crate) use reddit::RedditAction;
 pub(crate) use reminders::RemindersAction;
 pub(crate) use safari::SafariAction;
 pub(crate) use screenshot::ScreenshotAction;
+pub(crate) use shortcuts::ShortcutsAction;
 pub(crate) use stickies::StickiesAction;
 pub(crate) use voice_memos::VoiceMemosAction;
 
@@ -187,6 +191,11 @@ pub(crate) enum Command {
         #[command(subcommand)]
         action: StickiesAction,
     },
+    /// Manage Apple Shortcuts
+    Shortcuts {
+        #[command(subcommand)]
+        action: ShortcutsAction,
+    },
 }
 
 #[derive(Clone, ValueEnum)]
@@ -226,5 +235,6 @@ pub(crate) fn dispatch(command: Command) {
         Command::Doctor { json, live_safari } => doctor::dispatch(json, live_safari),
         Command::VoiceMemos { action } => voice_memos::dispatch(action),
         Command::Stickies { action } => stickies::dispatch(action),
+        Command::Shortcuts { action } => shortcuts::dispatch(action),
     }
 }
