@@ -2,6 +2,8 @@ use std::process::Command;
 
 use serde::Serialize;
 
+use cueward_core::{ShortcutAction, ShortcutReference, ShortcutSpec};
+
 use crate::applescript;
 use crate::MacosError;
 
@@ -13,7 +15,8 @@ mod types;
 pub use compiler::compile_actions;
 pub use db::{
     find_shortcut, find_shortcut_live, list_shortcuts, list_shortcuts_live,
-    rename_shortcut_name_by_workflow_id_live, write_shortcut_payload, write_shortcut_payload_live,
+    encode_input_classes, rename_shortcut_name_by_workflow_id_live, sync_shortcut_surfaces_live,
+    write_shortcut_payload, write_shortcut_payload_live,
 };
 pub use types::{ShortcutRecord, ShortcutSelector};
 
@@ -66,4 +69,49 @@ pub fn run_shortcut(selector: &ShortcutSelector) -> Result<(), MacosError> {
     }
 
     Ok(())
+}
+
+fn spec_uses_shortcut_input_variables(spec: &ShortcutSpec) -> bool {
+    fn reference_uses_extension_input(reference: &ShortcutReference) -> bool {
+        matches!(reference, ShortcutReference::ExtensionInput)
+    }
+
+    fn action_uses_extension_input(action: &ShortcutAction) -> bool {
+        match action {
+            ShortcutAction::Text { .. } => false,
+            ShortcutAction::GetText { from, .. }
+            | ShortcutAction::GetUrls { from, .. }
+            | ShortcutAction::CopyToClipboard { from }
+            | ShortcutAction::Share { from } => reference_uses_extension_input(from),
+            ShortcutAction::ReplaceText { from, .. } => reference_uses_extension_input(from),
+            ShortcutAction::IfEqualsText {
+                input,
+                then_actions,
+                ..
+            } => reference_uses_extension_input(input)
+                || then_actions.iter().any(action_uses_extension_input),
+            ShortcutAction::RepeatEach { input, body } => {
+                reference_uses_extension_input(input) || body.iter().any(action_uses_extension_input)
+            }
+        }
+    }
+
+    spec.actions.iter().any(action_uses_extension_input)
+}
+
+pub fn apply_shortcut_spec(spec: &ShortcutSpec) -> Result<ShortcutRecord, MacosError> {
+    let record = find_shortcut_live(&ShortcutSelector::Name(spec.name.clone()))?;
+    let payload = compile_actions(spec)?;
+    let input_classes = encode_input_classes(&spec.input)?;
+    let has_shortcut_input_variables = spec_uses_shortcut_input_variables(spec);
+
+    write_shortcut_payload_live(
+        record.pk,
+        &payload,
+        spec.actions.len(),
+        Some(&input_classes),
+        has_shortcut_input_variables,
+    )?;
+    sync_shortcut_surfaces_live(record.pk, &spec.surfaces)?;
+    find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
 }

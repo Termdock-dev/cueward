@@ -1,6 +1,8 @@
 use std::path::Path;
 
-use cueward_core::{ShortcutAction, ShortcutInputPolicy, ShortcutReference, ShortcutSpec};
+use cueward_core::{
+    ShortcutAction, ShortcutInputPolicy, ShortcutReference, ShortcutSpec, ShortcutSurface,
+};
 use rusqlite::{Connection, params};
 use tempfile::TempDir;
 
@@ -26,6 +28,16 @@ fn fixture_db(dir: &TempDir) -> String {
             ZSHORTCUT INTEGER NOT NULL,
             ZDATA BLOB NOT NULL
         );
+        CREATE TABLE ZCOLLECTION (
+            Z_PK INTEGER PRIMARY KEY,
+            ZNAME TEXT,
+            ZIDENTIFIER TEXT
+        );
+        CREATE TABLE Z_4SHORTCUTS (
+            Z_4PARENTS1 INTEGER NOT NULL,
+            Z_7SHORTCUTS INTEGER NOT NULL,
+            Z_FOK_7SHORTCUTS INTEGER
+        );
         "#,
     )
     .unwrap();
@@ -37,6 +49,36 @@ fn fixture_db(dir: &TempDir) -> String {
     .unwrap();
     conn.execute(
         "INSERT INTO ZSHORTCUTACTIONS (Z_PK, ZSHORTCUT, ZDATA) VALUES (1, 1, X'626C6F62')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO ZCOLLECTION (Z_PK, ZNAME, ZIDENTIFIER) VALUES (2, NULL, 'ShareSheet')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO ZCOLLECTION (Z_PK, ZNAME, ZIDENTIFIER) VALUES (6, NULL, 'Root')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO ZCOLLECTION (Z_PK, ZNAME, ZIDENTIFIER) VALUES (7, 'Work', 'work-folder')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO ZCOLLECTION (Z_PK, ZNAME, ZIDENTIFIER) VALUES (8, 'Old', 'old-folder')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO Z_4SHORTCUTS (Z_4PARENTS1, Z_7SHORTCUTS, Z_FOK_7SHORTCUTS) VALUES (6, 1, 6)",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO Z_4SHORTCUTS (Z_4PARENTS1, Z_7SHORTCUTS, Z_FOK_7SHORTCUTS) VALUES (8, 1, 8)",
         [],
     )
     .unwrap();
@@ -166,4 +208,36 @@ fn compile_actions_builds_text_and_clipboard_chain() {
         second.get("WFWorkflowActionIdentifier").unwrap().as_string(),
         Some("is.workflow.actions.setclipboard")
     );
+}
+
+#[test]
+fn encode_input_classes_for_url_round_trips_to_url_content_item() {
+    let blob = super::db::encode_input_classes(&ShortcutInputPolicy::Url).unwrap();
+    let classes = plist::from_bytes::<Vec<String>>(&blob).unwrap();
+
+    assert_eq!(classes, vec!["WFURLContentItem"]);
+}
+
+#[test]
+fn sync_shortcut_surfaces_replaces_named_folder_and_sets_share_sheet() {
+    let dir = TempDir::new().unwrap();
+    let db_path = fixture_db(&dir);
+
+    super::db::sync_shortcut_surfaces(
+        Path::new(&db_path),
+        1,
+        &[ShortcutSurface::ShareSheet, ShortcutSurface::Folder("Work".into())],
+    )
+    .unwrap();
+
+    let conn = Connection::open(&db_path).unwrap();
+    let rows: Vec<(i64, i64)> = conn
+        .prepare("SELECT Z_4PARENTS1, Z_7SHORTCUTS FROM Z_4SHORTCUTS WHERE Z_7SHORTCUTS = 1 ORDER BY Z_4PARENTS1")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    assert_eq!(rows, vec![(2, 1), (6, 1), (7, 1)]);
 }

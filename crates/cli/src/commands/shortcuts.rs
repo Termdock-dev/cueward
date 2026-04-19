@@ -1,6 +1,8 @@
-use std::process;
+use std::{fs, process};
 
 use clap::{Args, Subcommand, ValueEnum};
+
+use cueward_core::ShortcutSpec;
 
 use super::helpers::print_external;
 
@@ -206,6 +208,46 @@ pub(crate) fn dispatch(_action: ShortcutsAction) {
             eprintln!("error: shortcuts run is not yet implemented");
             process::exit(1);
         }
+        ShortcutsAction::Apply { path } => {
+            let spec = match load_shortcut_spec(&path) {
+                Ok(spec) => spec,
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            };
+
+            match cueward_adapter_macos::shortcuts::apply_shortcut_spec(&spec) {
+                Ok(shortcut) => {
+                    print_external(
+                        "shortcuts/apply",
+                        &serde_json::to_string_pretty(&shortcut).unwrap(),
+                    );
+                    eprintln!("shortcut updated: {}", shortcut.workflow_id);
+                }
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            }
+        }
+        ShortcutsAction::ValidateSpec { path } => {
+            let spec = match load_shortcut_spec(&path) {
+                Ok(spec) => spec,
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            };
+
+            match cueward_adapter_macos::shortcuts::compile_actions(&spec) {
+                Ok(_) => eprintln!("shortcut spec is valid"),
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            }
+        }
         _ => {
             eprintln!("error: shortcuts subcommand not yet implemented");
             process::exit(1);
@@ -221,4 +263,11 @@ impl ShortcutSelectorArgs {
             _ => unreachable!("clap enforces exactly one selector"),
         }
     }
+}
+
+fn load_shortcut_spec(path: &str) -> Result<ShortcutSpec, String> {
+    let source =
+        fs::read_to_string(path).map_err(|err| format!("failed to read shortcut spec '{path}': {err}"))?;
+    serde_yaml::from_str(&source)
+        .map_err(|err| format!("failed to parse shortcut spec '{path}': {err}"))
 }
