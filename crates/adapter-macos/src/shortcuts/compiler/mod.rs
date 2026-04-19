@@ -16,6 +16,17 @@ pub(crate) fn inferred_default_output_alias(action_identifier: &str) -> Option<S
     default_output_name(action_identifier).map(slugify_alias)
 }
 
+pub(crate) fn dedupe_alias(base: String, counts: &mut serde_json::Map<String, serde_json::Value>) -> String {
+    let count = counts.get(&base).and_then(serde_json::Value::as_u64).unwrap_or(0);
+    counts.insert(base.clone(), serde_json::Value::from(count + 1));
+
+    if count == 0 {
+        base
+    } else {
+        format!("{base}_{}", count + 1)
+    }
+}
+
 pub(crate) fn default_output_name(action_identifier: &str) -> Option<&'static str> {
     match action_identifier {
         "is.workflow.actions.gettext" => Some("Text"),

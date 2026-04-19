@@ -4,7 +4,7 @@ use cueward_core::{ShortcutAction, ShortcutReference};
 
 use crate::MacosError;
 
-use super::inferred_default_output_alias;
+use super::{dedupe_alias, inferred_default_output_alias};
 
 pub fn decompile_actions(payload: &[u8]) -> Result<Vec<ShortcutAction>, MacosError> {
     let actions = plist::from_bytes::<Vec<Value>>(payload)
@@ -381,12 +381,5 @@ fn infer_alias(
         .map(ToOwned::to_owned)
         .or_else(|| inferred_default_output_alias(action_identifier))?;
 
-    let count = counts.get(&base).and_then(Value::as_u64).unwrap_or(0);
-    counts.insert(base.clone(), Value::from(count + 1));
-
-    if count == 0 {
-        Some(base)
-    } else {
-        Some(format!("{base}_{}", count + 1))
-    }
+    Some(dedupe_alias(base, counts))
 }

@@ -8,7 +8,7 @@ use cueward_core::{ShortcutAction, ShortcutReference, ShortcutSpec};
 use crate::MacosError;
 
 use super::super::actions::{build_action, resolve_reference, variable_wrapper};
-use super::{default_output_name, inferred_default_output_alias};
+use super::{dedupe_alias, default_output_name, inferred_default_output_alias};
 
 pub fn compile_actions(spec: &ShortcutSpec) -> Result<Vec<u8>, MacosError> {
     let mut outputs = Map::<String, Value>::new();
@@ -71,6 +71,7 @@ fn compile_action_sequence(
 
 fn collect_outputs(actions: &[Value]) -> Map<String, Value> {
     let mut outputs = Map::new();
+    let mut counts = Map::new();
 
     for action in actions {
         let Some(action_dict) = action.as_object() else {
@@ -103,6 +104,7 @@ fn collect_outputs(actions: &[Value]) -> Map<String, Value> {
             .or_else(|| default_output_name(action_identifier).map(ToOwned::to_owned));
 
         if let (Some(output_alias), Some(output_name)) = (output_alias, output_name) {
+            let output_alias = dedupe_alias(output_alias, &mut counts);
             outputs.insert(
                 output_alias,
                 serde_json::json!({

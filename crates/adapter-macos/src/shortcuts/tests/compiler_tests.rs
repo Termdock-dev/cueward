@@ -119,6 +119,70 @@ fn append_action_uses_exported_default_output_alias_as_reference() {
 }
 
 #[test]
+fn append_action_deduplicates_inferred_default_output_aliases() {
+    let actions = vec![
+        json!({
+            "WFWorkflowActionIdentifier": "is.workflow.actions.gettext",
+            "WFWorkflowActionParameters": {
+                "UUID": "12345678-1234-1234-1234-1234567890AB",
+                "WFTextActionText": "first"
+            }
+        }),
+        json!({
+            "WFWorkflowActionIdentifier": "is.workflow.actions.gettext",
+            "WFWorkflowActionParameters": {
+                "UUID": "22345678-1234-1234-1234-1234567890AB",
+                "WFTextActionText": "second"
+            }
+        }),
+    ];
+    let mut payload = Vec::new();
+    plist::to_writer_binary(&mut payload, &actions).unwrap();
+
+    let appended = append_action(
+        &payload,
+        &ShortcutAction::CopyToClipboard {
+            from: ShortcutReference::Output("text_2".into()),
+        },
+    )
+    .unwrap();
+
+    let actions = plist::from_bytes::<Vec<plist::Value>>(&appended).unwrap();
+    let second_uuid = actions[1]
+        .as_dictionary()
+        .unwrap()
+        .get("WFWorkflowActionParameters")
+        .unwrap()
+        .as_dictionary()
+        .unwrap()
+        .get("UUID")
+        .and_then(plist::Value::as_string)
+        .unwrap()
+        .to_string();
+    let appended_input_uuid = actions[2]
+        .as_dictionary()
+        .unwrap()
+        .get("WFWorkflowActionParameters")
+        .unwrap()
+        .as_dictionary()
+        .unwrap()
+        .get("WFInput")
+        .unwrap()
+        .as_dictionary()
+        .unwrap()
+        .get("Value")
+        .unwrap()
+        .as_dictionary()
+        .unwrap()
+        .get("OutputUUID")
+        .and_then(plist::Value::as_string)
+        .unwrap()
+        .to_string();
+
+    assert_eq!(appended_input_uuid, second_uuid);
+}
+
+#[test]
 fn compile_actions_resolves_input_before_reusing_same_output_name() {
     let spec = ShortcutSpec {
         name: "Alias Reuse".into(),
