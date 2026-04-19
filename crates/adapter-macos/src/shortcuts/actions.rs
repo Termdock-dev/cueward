@@ -94,17 +94,20 @@ fn build_text_action(
         outputs.insert(
             output.to_string(),
             json!({
-                "OutputName": "Text",
+                "OutputName": output,
                 "OutputUUID": uuid,
             }),
         );
     }
+    let mut params = Map::new();
+    params.insert("UUID".into(), json!(uuid));
+    params.insert("WFTextActionText".into(), json!(value));
+    if let Some(output) = output {
+        params.insert("CustomOutputName".into(), json!(output));
+    }
     json!({
         "WFWorkflowActionIdentifier": "is.workflow.actions.gettext",
-        "WFWorkflowActionParameters": {
-            "UUID": uuid,
-            "WFTextActionText": value,
-        }
+        "WFWorkflowActionParameters": params
     })
 }
 
@@ -118,17 +121,20 @@ fn build_get_text_action(
         outputs.insert(
             output.to_string(),
             json!({
-                "OutputName": "Text",
+                "OutputName": output,
                 "OutputUUID": uuid,
             }),
         );
     }
+    let mut params = Map::new();
+    params.insert("UUID".into(), json!(uuid));
+    params.insert("WFTextActionText".into(), resolve_reference(outputs, from, true)?);
+    if let Some(output) = output {
+        params.insert("CustomOutputName".into(), json!(output));
+    }
     Ok(json!({
         "WFWorkflowActionIdentifier": "is.workflow.actions.gettext",
-        "WFWorkflowActionParameters": {
-            "UUID": uuid,
-            "WFTextActionText": resolve_reference(outputs, from, true)?,
-        }
+        "WFWorkflowActionParameters": params
     }))
 }
 
@@ -146,21 +152,24 @@ fn build_replace_text_action(
         outputs.insert(
             output.to_string(),
             json!({
-                "OutputName": "Updated Text",
+                "OutputName": output,
                 "OutputUUID": uuid,
             }),
         );
     }
+    let mut params = Map::new();
+    params.insert("UUID".into(), json!(uuid));
+    params.insert("WFInput".into(), resolve_reference(outputs, from, true)?);
+    params.insert("WFReplaceTextFind".into(), json!(find));
+    params.insert("WFReplaceTextReplace".into(), json!(replace));
+    params.insert("WFReplaceTextRegularExpression".into(), json!(regex));
+    params.insert("WFReplaceTextCaseSensitive".into(), json!(!ignore_case));
+    if let Some(output) = output {
+        params.insert("CustomOutputName".into(), json!(output));
+    }
     Ok(json!({
         "WFWorkflowActionIdentifier": "is.workflow.actions.text.replace",
-        "WFWorkflowActionParameters": {
-            "UUID": uuid,
-            "WFInput": resolve_reference(outputs, from, true)?,
-            "WFReplaceTextFind": find,
-            "WFReplaceTextReplace": replace,
-            "WFReplaceTextRegularExpression": regex,
-            "WFReplaceTextCaseSensitive": !ignore_case,
-        }
+        "WFWorkflowActionParameters": params
     }))
 }
 

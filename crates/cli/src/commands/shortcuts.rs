@@ -2,7 +2,7 @@ use std::{fs, process};
 
 use clap::{Args, Subcommand, ValueEnum};
 
-use cueward_core::{ShortcutInputPolicy, ShortcutSpec, ShortcutSurface};
+use cueward_core::{ShortcutAction, ShortcutInputPolicy, ShortcutReference, ShortcutSpec, ShortcutSurface};
 
 use super::helpers::print_external;
 
@@ -296,6 +296,53 @@ pub(crate) fn dispatch(_action: ShortcutsAction) {
                 }
             }
         }
+        ShortcutsAction::AddText { selector, value, output } => {
+            let selector = selector.into_selector();
+            let action = ShortcutAction::Text { value, output };
+            append_action(selector, action, "shortcuts/add-text");
+        }
+        ShortcutsAction::AddGetText { selector, from, output } => {
+            let selector = selector.into_selector();
+            let action = ShortcutAction::GetText {
+                from: parse_reference(&from),
+                output,
+            };
+            append_action(selector, action, "shortcuts/add-get-text");
+        }
+        ShortcutsAction::AddReplaceText {
+            selector,
+            from,
+            find,
+            replace,
+            regex,
+            ignore_case,
+            output,
+        } => {
+            let selector = selector.into_selector();
+            let action = ShortcutAction::ReplaceText {
+                from: parse_reference(&from),
+                find,
+                replace,
+                regex,
+                ignore_case,
+                output,
+            };
+            append_action(selector, action, "shortcuts/add-replace-text");
+        }
+        ShortcutsAction::AddCopyToClipboard { selector, from } => {
+            let selector = selector.into_selector();
+            let action = ShortcutAction::CopyToClipboard {
+                from: parse_reference(&from),
+            };
+            append_action(selector, action, "shortcuts/add-copy-to-clipboard");
+        }
+        ShortcutsAction::AddShare { selector, from } => {
+            let selector = selector.into_selector();
+            let action = ShortcutAction::Share {
+                from: parse_reference(&from),
+            };
+            append_action(selector, action, "shortcuts/add-share");
+        }
         _ => {
             eprintln!("error: shortcuts subcommand not yet implemented");
             process::exit(1);
@@ -338,6 +385,32 @@ impl From<ShortcutInputTypeArg> for ShortcutInputPolicy {
             ShortcutInputTypeArg::Text => ShortcutInputPolicy::Text,
             ShortcutInputTypeArg::Image => ShortcutInputPolicy::Image,
             ShortcutInputTypeArg::File => ShortcutInputPolicy::File,
+        }
+    }
+}
+
+fn parse_reference(input: &str) -> ShortcutReference {
+    match input {
+        "extension-input" => ShortcutReference::ExtensionInput,
+        "repeat-item" => ShortcutReference::RepeatItem,
+        "repeat-index" => ShortcutReference::RepeatIndex,
+        other => ShortcutReference::Output(other.to_string()),
+    }
+}
+
+fn append_action(
+    selector: cueward_adapter_macos::shortcuts::ShortcutSelector,
+    action: ShortcutAction,
+    source: &str,
+) {
+    match cueward_adapter_macos::shortcuts::append_shortcut_action(&selector, &action) {
+        Ok(shortcut) => {
+            print_external(source, &serde_json::to_string_pretty(&shortcut).unwrap());
+            eprintln!("shortcut updated: {}", shortcut.workflow_id);
+        }
+        Err(err) => {
+            eprintln!("error: {err}");
+            process::exit(1);
         }
     }
 }

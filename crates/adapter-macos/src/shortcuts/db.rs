@@ -257,6 +257,76 @@ pub fn update_shortcut_input_classes_live(
     update_shortcut_input_classes(&db_path, shortcut_pk, input_classes)
 }
 
+pub fn load_shortcut_payload(db_path: &Path, shortcut_pk: i64) -> Result<Vec<u8>, MacosError> {
+    let conn = open_db(db_path)?;
+    let payload = conn
+        .query_row(
+            "SELECT ZDATA FROM ZSHORTCUTACTIONS WHERE ZSHORTCUT = ?1",
+            params![shortcut_pk],
+            |row| row.get::<_, Option<Vec<u8>>>(0),
+        )
+        .map_err(MacosError::from)?;
+
+    match payload {
+        Some(payload) => Ok(payload),
+        None => {
+            let mut buffer = Vec::new();
+            plist::to_writer_binary(&mut buffer, &Vec::<String>::new()).map_err(|error| {
+                MacosError::Other(format!("failed to encode empty shortcut actions plist: {error}"))
+            })?;
+            Ok(buffer)
+        }
+    }
+}
+
+pub fn load_shortcut_payload_live(shortcut_pk: i64) -> Result<Vec<u8>, MacosError> {
+    let db_path = default_db_path()?;
+    load_shortcut_payload(&db_path, shortcut_pk)
+}
+
+pub fn update_shortcut_actions_blob(
+    db_path: &Path,
+    shortcut_pk: i64,
+    payload: &[u8],
+    action_count: usize,
+) -> Result<(), MacosError> {
+    let mut conn = open_db(db_path)?;
+    let tx = conn.transaction()?;
+
+    tx.execute(
+        "UPDATE ZSHORTCUTACTIONS SET ZDATA = ?1 WHERE ZSHORTCUT = ?2",
+        params![payload, shortcut_pk],
+    )?;
+    tx.execute(
+        r#"
+        UPDATE ZSHORTCUT
+        SET
+            ZACTIONCOUNT = ?1,
+            ZACTIONSDESCRIPTION = ?2,
+            ZWORKFLOWSUBTITLE = ?3
+        WHERE Z_PK = ?4
+        "#,
+        params![
+            action_count as i64,
+            format!("{action_count} actions"),
+            format!("{action_count} actions"),
+            shortcut_pk,
+        ],
+    )?;
+
+    tx.commit()?;
+    Ok(())
+}
+
+pub fn update_shortcut_actions_blob_live(
+    shortcut_pk: i64,
+    payload: &[u8],
+    action_count: usize,
+) -> Result<(), MacosError> {
+    let db_path = default_db_path()?;
+    update_shortcut_actions_blob(&db_path, shortcut_pk, payload, action_count)
+}
+
 pub fn list_shortcuts(db_path: &Path) -> Result<Vec<ShortcutRecord>, MacosError> {
     let conn = open_db(db_path)?;
     let mut stmt = conn.prepare(

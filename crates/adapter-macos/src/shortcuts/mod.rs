@@ -12,11 +12,12 @@ mod compiler;
 mod db;
 mod types;
 
-pub use compiler::compile_actions;
+pub use compiler::{append_action, compile_actions};
 pub use db::{
     encode_input_classes, ensure_shortcut_relation_live, find_shortcut, find_shortcut_live,
-    list_shortcuts, list_shortcuts_live, rename_shortcut_name_by_workflow_id_live,
-    sync_shortcut_surfaces_live, update_shortcut_input_classes_live, write_shortcut_payload,
+    list_shortcuts, list_shortcuts_live, load_shortcut_payload_live,
+    rename_shortcut_name_by_workflow_id_live, sync_shortcut_surfaces_live,
+    update_shortcut_actions_blob_live, update_shortcut_input_classes_live, write_shortcut_payload,
     write_shortcut_payload_live,
 };
 pub use types::{ShortcutRecord, ShortcutSelector};
@@ -145,5 +146,16 @@ pub fn set_input_type(
     let record = find_shortcut_live(selector)?;
     let input_classes = encode_input_classes(policy)?;
     update_shortcut_input_classes_live(record.pk, &input_classes)?;
+    find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
+}
+
+pub fn append_shortcut_action(
+    selector: &ShortcutSelector,
+    action: &ShortcutAction,
+) -> Result<ShortcutRecord, MacosError> {
+    let record = find_shortcut_live(selector)?;
+    let existing_payload = load_shortcut_payload_live(record.pk)?;
+    let appended = append_action(&existing_payload, action)?;
+    update_shortcut_actions_blob_live(record.pk, &appended, record.action_count as usize + 1)?;
     find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
 }

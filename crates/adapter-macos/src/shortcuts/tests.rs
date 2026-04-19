@@ -6,7 +6,7 @@ use cueward_core::{
 use rusqlite::{Connection, params};
 use tempfile::TempDir;
 
-use super::{ShortcutSelector, compile_actions, find_shortcut, write_shortcut_payload};
+use super::{ShortcutSelector, append_action, compile_actions, find_shortcut, write_shortcut_payload};
 
 fn fixture_db(dir: &TempDir) -> String {
     let path = dir.path().join("Shortcuts.sqlite");
@@ -26,7 +26,7 @@ fn fixture_db(dir: &TempDir) -> String {
         CREATE TABLE ZSHORTCUTACTIONS (
             Z_PK INTEGER PRIMARY KEY,
             ZSHORTCUT INTEGER NOT NULL,
-            ZDATA BLOB NOT NULL
+            ZDATA BLOB
         );
         CREATE TABLE ZCOLLECTION (
             Z_PK INTEGER PRIMARY KEY,
@@ -202,12 +202,71 @@ fn compile_actions_builds_text_and_clipboard_chain() {
         first.get("WFWorkflowActionIdentifier").unwrap().as_string(),
         Some("is.workflow.actions.gettext")
     );
+    let first_params = first.get("WFWorkflowActionParameters").unwrap().as_dictionary().unwrap();
+    assert_eq!(
+        first_params.get("CustomOutputName").and_then(plist::Value::as_string),
+        Some("greeting")
+    );
 
     let second = actions[1].as_dictionary().unwrap();
     assert_eq!(
         second.get("WFWorkflowActionIdentifier").unwrap().as_string(),
         Some("is.workflow.actions.setclipboard")
     );
+    let second_params = second.get("WFWorkflowActionParameters").unwrap().as_dictionary().unwrap();
+    let input = second_params.get("WFInput").unwrap().as_dictionary().unwrap();
+    let value = input.get("Value").unwrap().as_dictionary().unwrap();
+    assert_eq!(
+        value.get("OutputName").and_then(plist::Value::as_string),
+        Some("greeting")
+    );
+}
+
+#[test]
+fn append_action_uses_existing_custom_output_name_as_reference() {
+    let spec = ShortcutSpec {
+        name: "Plan Smoke".into(),
+        surfaces: vec![],
+        input: ShortcutInputPolicy::Any,
+        actions: vec![ShortcutAction::Text {
+            value: "hello".into(),
+            output: Some("greeting".into()),
+        }],
+    };
+
+    let existing = compile_actions(&spec).unwrap();
+    let appended = append_action(
+        &existing,
+        &ShortcutAction::CopyToClipboard {
+            from: ShortcutReference::Output("greeting".into()),
+        },
+    )
+    .unwrap();
+
+    let actions = plist::from_bytes::<Vec<plist::Value>>(&appended).unwrap();
+    assert_eq!(actions.len(), 2);
+    let second = actions[1].as_dictionary().unwrap();
+    let second_params = second.get("WFWorkflowActionParameters").unwrap().as_dictionary().unwrap();
+    let input = second_params.get("WFInput").unwrap().as_dictionary().unwrap();
+    let value = input.get("Value").unwrap().as_dictionary().unwrap();
+    assert_eq!(
+        value.get("OutputName").and_then(plist::Value::as_string),
+        Some("greeting")
+    );
+}
+
+#[test]
+fn load_shortcut_payload_treats_null_blob_as_empty_action_array() {
+    let dir = TempDir::new().unwrap();
+    let db_path = fixture_db(&dir);
+    let conn = Connection::open(&db_path).unwrap();
+    conn.execute("UPDATE ZSHORTCUTACTIONS SET ZDATA = NULL WHERE ZSHORTCUT = 1", [])
+        .unwrap();
+
+    let payload = super::db::load_shortcut_payload(Path::new(&db_path), 1).unwrap();
+    let actions = plist::from_bytes::<Vec<plist::Value>>(&payload).unwrap();
+
+    assert!(actions.is_empty());
 }
 
 #[test]
