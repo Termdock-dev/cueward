@@ -1,20 +1,17 @@
 use std::io::Cursor;
 
 use serde_json::{Map, Value};
+use uuid::Uuid;
 
 use cueward_core::{ShortcutAction, ShortcutReference, ShortcutSpec};
 
 use crate::MacosError;
 
-use super::actions::build_action;
+use super::actions::{build_action, resolve_reference, variable_wrapper};
 
 pub fn compile_actions(spec: &ShortcutSpec) -> Result<Vec<u8>, MacosError> {
     let mut outputs = Map::<String, Value>::new();
-    let mut actions = Vec::<Value>::with_capacity(spec.actions.len());
-
-    for action in &spec.actions {
-        actions.push(build_action(action, &mut outputs)?);
-    }
+    let actions = compile_action_sequence(&spec.actions, &mut outputs)?;
 
     let value = plist::to_value(&actions)
         .map_err(|error| MacosError::Other(format!("failed to convert shortcut actions to plist value: {error}")))?;
@@ -23,6 +20,99 @@ pub fn compile_actions(spec: &ShortcutSpec) -> Result<Vec<u8>, MacosError> {
     plist::to_writer_binary(&mut buffer, &value)
         .map_err(|error| MacosError::Other(format!("failed to encode shortcut actions plist: {error}")))?;
     Ok(buffer.into_inner())
+}
+
+fn new_grouping_id() -> String {
+    Uuid::new_v4().to_string().to_uppercase()
+}
+
+fn compile_action_sequence(
+    actions: &[ShortcutAction],
+    outputs: &mut Map<String, Value>,
+) -> Result<Vec<Value>, MacosError> {
+    let mut compiled = Vec::new();
+
+    for action in actions {
+        match action {
+            ShortcutAction::IfEqualsText {
+                input,
+                value,
+                then_actions,
+            } => {
+                let grouping_id = new_grouping_id();
+                compiled.push(compile_if_start(input, value, &grouping_id, outputs)?);
+                compiled.extend(compile_action_sequence(then_actions, outputs)?);
+                compiled.push(compile_if_end(&grouping_id));
+            }
+            ShortcutAction::RepeatEach { input, body } => {
+                let grouping_id = new_grouping_id();
+                compiled.push(compile_repeat_each_start(input, &grouping_id, outputs)?);
+                compiled.extend(compile_action_sequence(body, outputs)?);
+                compiled.push(compile_repeat_each_end(&grouping_id));
+            }
+            _ => compiled.push(build_action(action, outputs)?),
+        }
+    }
+
+    Ok(compiled)
+}
+
+fn compile_if_start(
+    input: &ShortcutReference,
+    value: &str,
+    grouping_id: &str,
+    outputs: &mut Map<String, Value>,
+) -> Result<Value, MacosError> {
+    Ok(serde_json::json!({
+        "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
+        "WFWorkflowActionParameters": {
+            "GroupingIdentifier": grouping_id,
+            "WFControlFlowMode": 0,
+            "WFCondition": 4,
+            "WFInput": variable_wrapper(resolve_reference(outputs, input, false)?),
+            "WFConditionalActionString": {
+                "Value": {
+                    "string": value
+                },
+                "WFSerializationType": "WFTextTokenString"
+            }
+        }
+    }))
+}
+
+fn compile_if_end(grouping_id: &str) -> Value {
+    serde_json::json!({
+        "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
+        "WFWorkflowActionParameters": {
+            "GroupingIdentifier": grouping_id,
+            "WFControlFlowMode": 2
+        }
+    })
+}
+
+fn compile_repeat_each_start(
+    input: &ShortcutReference,
+    grouping_id: &str,
+    outputs: &mut Map<String, Value>,
+) -> Result<Value, MacosError> {
+    Ok(serde_json::json!({
+        "WFWorkflowActionIdentifier": "is.workflow.actions.repeat.each",
+        "WFWorkflowActionParameters": {
+            "GroupingIdentifier": grouping_id,
+            "WFControlFlowMode": 0,
+            "WFInput": resolve_reference(outputs, input, false)?
+        }
+    }))
+}
+
+fn compile_repeat_each_end(grouping_id: &str) -> Value {
+    serde_json::json!({
+        "WFWorkflowActionIdentifier": "is.workflow.actions.repeat.each",
+        "WFWorkflowActionParameters": {
+            "GroupingIdentifier": grouping_id,
+            "WFControlFlowMode": 2
+        }
+    })
 }
 
 fn default_output_name(action_identifier: &str) -> Option<&'static str> {
@@ -81,7 +171,7 @@ pub fn append_action(existing_payload: &[u8], action: &ShortcutAction) -> Result
     let mut actions = plist::from_bytes::<Vec<Value>>(existing_payload)
         .map_err(|error| MacosError::Other(format!("failed to decode existing shortcut actions: {error}")))?;
     let mut outputs = collect_outputs(&actions);
-    actions.push(build_action(action, &mut outputs)?);
+    actions.extend(compile_action_sequence(std::slice::from_ref(action), &mut outputs)?);
 
     let value = plist::to_value(&actions)
         .map_err(|error| MacosError::Other(format!("failed to convert appended shortcut actions to plist value: {error}")))?;
@@ -255,10 +345,55 @@ pub fn decompile_actions(payload: &[u8]) -> Result<Vec<ShortcutAction>, MacosErr
     let actions = plist::from_bytes::<Vec<Value>>(payload)
         .map_err(|error| MacosError::Other(format!("failed to decode shortcut actions payload: {error}")))?;
     let aliases = alias_map(&actions);
-    let mut decoded = Vec::with_capacity(actions.len());
+    let (decoded, next_index) = decompile_sequence(&actions, 0, &aliases, None)?;
+    if next_index != actions.len() {
+        return Err(MacosError::Other("did not consume entire shortcut action payload".into()));
+    }
+    Ok(decoded)
+}
 
-    for action in actions {
-        let action_dict = action
+fn decode_conditional_input(
+    params: &Map<String, Value>,
+    aliases: &Map<String, Value>,
+) -> Result<ShortcutReference, MacosError> {
+    let variable = params
+        .get("WFInput")
+        .and_then(Value::as_object)
+        .and_then(|value| value.get("Variable"))
+        .and_then(Value::as_object)
+        .ok_or_else(|| MacosError::Other("conditional missing variable wrapper".into()))?;
+    decode_attachment_reference(variable, aliases)
+}
+
+fn decode_text_token_literal(value: &Map<String, Value>) -> Result<String, MacosError> {
+    let serialization = value
+        .get("WFSerializationType")
+        .and_then(Value::as_str)
+        .ok_or_else(|| MacosError::Other("missing text token serialization".into()))?;
+    if serialization != "WFTextTokenString" {
+        return Err(MacosError::Other(format!(
+            "unsupported text token serialization for conditional literal: {serialization}"
+        )));
+    }
+    let text = value
+        .get("Value")
+        .and_then(Value::as_object)
+        .and_then(|inner| inner.get("string"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| MacosError::Other("missing conditional string literal".into()))?;
+    Ok(text.to_string())
+}
+
+fn decompile_sequence(
+    actions: &[Value],
+    mut index: usize,
+    aliases: &Map<String, Value>,
+    end_group: Option<(&str, &str)>,
+) -> Result<(Vec<ShortcutAction>, usize), MacosError> {
+    let mut decoded = Vec::new();
+
+    while index < actions.len() {
+        let action_dict = actions[index]
             .as_object()
             .ok_or_else(|| MacosError::Other("invalid shortcut action payload".into()))?;
         let action_identifier = action_dict
@@ -269,6 +404,18 @@ pub fn decompile_actions(payload: &[u8]) -> Result<Vec<ShortcutAction>, MacosErr
             .get("WFWorkflowActionParameters")
             .and_then(Value::as_object)
             .ok_or_else(|| MacosError::Other("shortcut action missing parameters".into()))?;
+
+        if let Some((expected_identifier, expected_group)) = end_group {
+            let control_flow_mode = params.get("WFControlFlowMode").and_then(Value::as_i64);
+            let grouping_id = params.get("GroupingIdentifier").and_then(Value::as_str);
+            if action_identifier == expected_identifier
+                && control_flow_mode == Some(2)
+                && grouping_id == Some(expected_group)
+            {
+                return Ok((decoded, index + 1));
+            }
+        }
+
         let output = params
             .get("CustomOutputName")
             .and_then(Value::as_str)
@@ -330,6 +477,59 @@ pub fn decompile_actions(payload: &[u8]) -> Result<Vec<ShortcutAction>, MacosErr
                 )?,
                 output,
             },
+            "is.workflow.actions.conditional" if params.get("WFControlFlowMode").and_then(Value::as_i64) == Some(0)
+                && params.get("WFCondition").and_then(Value::as_i64) == Some(4) =>
+            {
+                let grouping_id = params
+                    .get("GroupingIdentifier")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| MacosError::Other("if action missing GroupingIdentifier".into()))?
+                    .to_string();
+                let input = decode_conditional_input(params, aliases)?;
+                let value = decode_text_token_literal(
+                    params
+                        .get("WFConditionalActionString")
+                        .and_then(Value::as_object)
+                        .ok_or_else(|| MacosError::Other("if action missing WFConditionalActionString".into()))?,
+                )?;
+                let (then_actions, next_index) = decompile_sequence(
+                    actions,
+                    index + 1,
+                    aliases,
+                    Some(("is.workflow.actions.conditional", &grouping_id)),
+                )?;
+                decoded.push(ShortcutAction::IfEqualsText {
+                    input,
+                    value,
+                    then_actions,
+                });
+                index = next_index;
+                continue;
+            }
+            "is.workflow.actions.repeat.each" if params.get("WFControlFlowMode").and_then(Value::as_i64) == Some(0) =>
+            {
+                let grouping_id = params
+                    .get("GroupingIdentifier")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| MacosError::Other("repeat action missing GroupingIdentifier".into()))?
+                    .to_string();
+                let input = decode_attachment_reference(
+                    params
+                        .get("WFInput")
+                        .and_then(Value::as_object)
+                        .ok_or_else(|| MacosError::Other("repeat action missing WFInput".into()))?,
+                    aliases,
+                )?;
+                let (body, next_index) = decompile_sequence(
+                    actions,
+                    index + 1,
+                    aliases,
+                    Some(("is.workflow.actions.repeat.each", &grouping_id)),
+                )?;
+                decoded.push(ShortcutAction::RepeatEach { input, body });
+                index = next_index;
+                continue;
+            }
             "is.workflow.actions.setclipboard" => ShortcutAction::CopyToClipboard {
                 from: decode_attachment_reference(
                     params
@@ -356,7 +556,14 @@ pub fn decompile_actions(payload: &[u8]) -> Result<Vec<ShortcutAction>, MacosErr
         };
 
         decoded.push(decoded_action);
+        index += 1;
     }
 
-    Ok(decoded)
+    if let Some((expected_identifier, expected_group)) = end_group {
+        return Err(MacosError::Other(format!(
+            "missing control flow terminator for {expected_identifier} group {expected_group}"
+        )));
+    }
+
+    Ok((decoded, index))
 }

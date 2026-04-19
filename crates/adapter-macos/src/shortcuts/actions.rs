@@ -9,7 +9,7 @@ fn new_uuid() -> String {
     Uuid::new_v4().to_string().to_uppercase()
 }
 
-fn action_output_ref(output_name: &str, output_uuid: &str) -> Value {
+pub(crate) fn action_output_ref(output_name: &str, output_uuid: &str) -> Value {
     json!({
         "Value": {
             "OutputName": output_name,
@@ -20,7 +20,7 @@ fn action_output_ref(output_name: &str, output_uuid: &str) -> Value {
     })
 }
 
-fn extension_input_text_token() -> Value {
+pub(crate) fn extension_input_text_token() -> Value {
     json!({
         "Value": {
             "attachmentsByRange": {
@@ -34,7 +34,7 @@ fn extension_input_text_token() -> Value {
     })
 }
 
-fn text_token_from_output(output_name: &str, output_uuid: &str) -> Value {
+pub(crate) fn text_token_from_output(output_name: &str, output_uuid: &str) -> Value {
     json!({
         "Value": {
             "attachmentsByRange": {
@@ -50,7 +50,32 @@ fn text_token_from_output(output_name: &str, output_uuid: &str) -> Value {
     })
 }
 
-fn resolve_reference(
+fn variable_ref(variable_name: &str) -> Value {
+    json!({
+        "Value": {
+            "VariableName": variable_name,
+            "Type": "Variable"
+        },
+        "WFSerializationType": "WFTextTokenAttachment"
+    })
+}
+
+fn text_token_from_variable(variable_name: &str) -> Value {
+    json!({
+        "Value": {
+            "attachmentsByRange": {
+                "{0, 1}": {
+                    "VariableName": variable_name,
+                    "Type": "Variable"
+                }
+            },
+            "string": "\u{fffc}"
+        },
+        "WFSerializationType": "WFTextTokenString"
+    })
+}
+
+pub(crate) fn resolve_reference(
     outputs: &Map<String, Value>,
     reference: &ShortcutReference,
     as_text_token: bool,
@@ -78,10 +103,18 @@ fn resolve_reference(
         ShortcutReference::ExtensionInput => Err(MacosError::Other(
             "extension-input is only supported for text-token builders right now".into(),
         )),
-        ShortcutReference::RepeatItem | ShortcutReference::RepeatIndex => Err(MacosError::Other(
-            "repeat references are not yet supported by the shortcut compiler".into(),
-        )),
+        ShortcutReference::RepeatItem if as_text_token => Ok(text_token_from_variable("Repeat Item")),
+        ShortcutReference::RepeatItem => Ok(variable_ref("Repeat Item")),
+        ShortcutReference::RepeatIndex if as_text_token => Ok(text_token_from_variable("Repeat Index")),
+        ShortcutReference::RepeatIndex => Ok(variable_ref("Repeat Index")),
     }
+}
+
+pub(crate) fn variable_wrapper(reference: Value) -> Value {
+    json!({
+        "Type": "Variable",
+        "Variable": reference
+    })
 }
 
 fn build_text_action(

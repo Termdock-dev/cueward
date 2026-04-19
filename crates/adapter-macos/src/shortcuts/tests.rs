@@ -301,6 +301,45 @@ fn decompile_actions_round_trips_supported_clean_url_subset() {
 }
 
 #[test]
+fn compile_and_decompile_if_and_repeat_round_trip() {
+    let spec = ShortcutSpec {
+        name: "Control Flow Smoke".into(),
+        surfaces: vec![],
+        input: ShortcutInputPolicy::Any,
+        actions: vec![
+            ShortcutAction::Text {
+                value: "match".into(),
+                output: Some("input_text".into()),
+            },
+            ShortcutAction::IfEqualsText {
+                input: ShortcutReference::Output("input_text".into()),
+                value: "match".into(),
+                then_actions: vec![
+                    ShortcutAction::Text {
+                        value: "ok".into(),
+                        output: Some("condition_result".into()),
+                    },
+                    ShortcutAction::CopyToClipboard {
+                        from: ShortcutReference::Output("condition_result".into()),
+                    },
+                ],
+            },
+            ShortcutAction::RepeatEach {
+                input: ShortcutReference::Output("input_text".into()),
+                body: vec![ShortcutAction::Share {
+                    from: ShortcutReference::RepeatItem,
+                }],
+            },
+        ],
+    };
+
+    let payload = compile_actions(&spec).unwrap();
+    let decompiled = decompile_actions(&payload).unwrap();
+
+    assert_eq!(decompiled, spec.actions);
+}
+
+#[test]
 fn load_shortcut_payload_treats_null_blob_as_empty_action_array() {
     let dir = TempDir::new().unwrap();
     let db_path = fixture_db(&dir);
