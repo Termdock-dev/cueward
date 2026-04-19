@@ -217,9 +217,15 @@ pub(crate) fn dispatch(_action: ShortcutsAction) {
                 }
             }
         }
-        ShortcutsAction::Run { .. } => {
-            eprintln!("error: shortcuts run is not yet implemented");
-            process::exit(1);
+        ShortcutsAction::Run { selector } => {
+            let selector = selector.into_selector();
+            match cueward_adapter_macos::shortcuts::run_shortcut(&selector) {
+                Ok(()) => eprintln!("shortcut executed"),
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            }
         }
         ShortcutsAction::Apply { path } => {
             let spec = match load_shortcut_spec(&path) {

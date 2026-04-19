@@ -70,13 +70,18 @@ pub fn create_shortcut(name: &str) -> Result<ShortcutCreateResult, MacosError> {
 
 pub fn run_shortcut(selector: &ShortcutSelector) -> Result<(), MacosError> {
     let record = find_shortcut_live(selector)?;
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(r#"tell application "Shortcuts Events""#)
-        .arg("-e")
-        .arg(format!(r#"run shortcut named "{}""#, applescript::escape(&record.name)))
-        .arg("-e")
-        .arg("end tell")
+    let command = format!(
+        "osascript -e {} -e {} -e {}",
+        shell_quote(r#"tell application "Shortcuts Events""#),
+        shell_quote(&format!(
+            r#"run shortcut named "{}""#,
+            applescript::escape(&record.name)
+        )),
+        shell_quote("end tell"),
+    );
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(command)
         .output()
         .map_err(|err| MacosError::Other(format!("run shortcut shell command failed: {err}")))?;
 
@@ -86,6 +91,10 @@ pub fn run_shortcut(selector: &ShortcutSelector) -> Result<(), MacosError> {
     }
 
     Ok(())
+}
+
+fn shell_quote(input: &str) -> String {
+    format!("'{}'", input.replace('\'', "'\"'\"'"))
 }
 
 fn spec_uses_shortcut_input_variables(spec: &ShortcutSpec) -> bool {
