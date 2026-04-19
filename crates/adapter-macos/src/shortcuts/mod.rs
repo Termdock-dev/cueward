@@ -126,7 +126,14 @@ fn spec_uses_shortcut_input_variables(spec: &ShortcutSpec) -> bool {
 }
 
 pub fn apply_shortcut_spec(spec: &ShortcutSpec) -> Result<ShortcutRecord, MacosError> {
-    let record = find_shortcut_live(&ShortcutSelector::Name(spec.name.clone()))?;
+    let record = match find_shortcut_live(&ShortcutSelector::Name(spec.name.clone())) {
+        Ok(record) => record,
+        Err(MacosError::Other(message)) if message == format!("shortcut not found: {}", spec.name) => {
+            create_shortcut(&spec.name)?;
+            find_shortcut_live(&ShortcutSelector::Name(spec.name.clone()))?
+        }
+        Err(err) => return Err(err),
+    };
     let payload = compile_actions(spec)?;
     let input_classes = encode_input_classes(&spec.input)?;
     let has_shortcut_input_variables = spec_uses_shortcut_input_variables(spec);

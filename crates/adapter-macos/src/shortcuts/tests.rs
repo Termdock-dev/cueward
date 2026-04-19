@@ -102,6 +102,25 @@ fn find_shortcut_returns_exact_match_by_name() {
 }
 
 #[test]
+fn find_shortcut_rejects_ambiguous_name_matches() {
+    let dir = TempDir::new().unwrap();
+    let db_path = fixture_db(&dir);
+    let conn = Connection::open(&db_path).unwrap();
+    conn.execute(
+        "INSERT INTO ZSHORTCUT (Z_PK, ZNAME, ZWORKFLOWID, ZACTIONCOUNT) VALUES (2, ?1, ?2, 0)",
+        params!["Clean URL Share", "WF-2"],
+    )
+    .unwrap();
+
+    let err = find_shortcut(Path::new(&db_path), &ShortcutSelector::Name("Clean URL Share".into()))
+        .unwrap_err();
+
+    let message = err.to_string();
+    assert!(message.contains("multiple shortcuts matched"));
+    assert!(message.contains("Clean URL Share"));
+}
+
+#[test]
 fn write_shortcut_payload_updates_blob_and_counts() {
     let dir = TempDir::new().unwrap();
     let db_path = fixture_db(&dir);
