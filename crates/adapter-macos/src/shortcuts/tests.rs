@@ -1,9 +1,10 @@
 use std::path::Path;
 
+use cueward_core::{ShortcutAction, ShortcutInputPolicy, ShortcutReference, ShortcutSpec};
 use rusqlite::{Connection, params};
 use tempfile::TempDir;
 
-use super::{ShortcutSelector, find_shortcut, write_shortcut_payload};
+use super::{ShortcutSelector, compile_actions, find_shortcut, write_shortcut_payload};
 
 fn fixture_db(dir: &TempDir) -> String {
     let path = dir.path().join("Shortcuts.sqlite");
@@ -106,4 +107,39 @@ fn write_shortcut_payload_updates_blob_and_counts() {
     assert_eq!(has_input_vars, 1);
     assert_eq!(blob, payload);
     assert_eq!(classes, input_classes);
+}
+
+#[test]
+fn compile_actions_builds_text_and_clipboard_chain() {
+    let spec = ShortcutSpec {
+        name: "Plan Smoke".into(),
+        surfaces: vec![],
+        input: ShortcutInputPolicy::Any,
+        actions: vec![
+            ShortcutAction::Text {
+                value: "hello".into(),
+                output: Some("greeting".into()),
+            },
+            ShortcutAction::CopyToClipboard {
+                from: ShortcutReference::Output("greeting".into()),
+            },
+        ],
+    };
+
+    let payload = compile_actions(&spec).unwrap();
+    let actions = plist::from_bytes::<Vec<plist::Value>>(&payload).unwrap();
+
+    assert_eq!(actions.len(), 2);
+
+    let first = actions[0].as_dictionary().unwrap();
+    assert_eq!(
+        first.get("WFWorkflowActionIdentifier").unwrap().as_string(),
+        Some("is.workflow.actions.gettext")
+    );
+
+    let second = actions[1].as_dictionary().unwrap();
+    assert_eq!(
+        second.get("WFWorkflowActionIdentifier").unwrap().as_string(),
+        Some("is.workflow.actions.setclipboard")
+    );
 }
