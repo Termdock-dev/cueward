@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::path::PathBuf;
 
 use rusqlite::{Connection, OptionalExtension, params};
 
@@ -8,6 +9,65 @@ use super::types::{ShortcutRecord, ShortcutSelector};
 
 fn open_db(db_path: &Path) -> Result<Connection, MacosError> {
     Connection::open(db_path).map_err(MacosError::from)
+}
+
+fn default_db_path() -> Result<PathBuf, MacosError> {
+    let home = std::env::var("HOME")
+        .map_err(|err| MacosError::Other(format!("failed to resolve HOME for Shortcuts db: {err}")))?;
+    Ok(PathBuf::from(home).join("Library/Shortcuts/Shortcuts.sqlite"))
+}
+
+pub fn list_shortcuts_live() -> Result<Vec<ShortcutRecord>, MacosError> {
+    let db_path = default_db_path()?;
+    list_shortcuts(&db_path)
+}
+
+pub fn find_shortcut_live(selector: &ShortcutSelector) -> Result<ShortcutRecord, MacosError> {
+    let db_path = default_db_path()?;
+    find_shortcut(&db_path, selector)
+}
+
+pub fn write_shortcut_payload_live(
+    shortcut_pk: i64,
+    payload: &[u8],
+    action_count: usize,
+    input_classes: Option<&[u8]>,
+    has_shortcut_input_variables: bool,
+) -> Result<(), MacosError> {
+    let db_path = default_db_path()?;
+    write_shortcut_payload(
+        &db_path,
+        shortcut_pk,
+        payload,
+        action_count,
+        input_classes,
+        has_shortcut_input_variables,
+    )
+}
+
+pub fn rename_shortcut_name_by_workflow_id(
+    db_path: &Path,
+    workflow_id: &str,
+    new_name: &str,
+) -> Result<(), MacosError> {
+    let conn = open_db(db_path)?;
+    conn.execute(
+        r#"
+        UPDATE ZSHORTCUT
+        SET ZNAME = ?1
+        WHERE ZWORKFLOWID = ?2
+        "#,
+        params![new_name, workflow_id],
+    )?;
+    Ok(())
+}
+
+pub fn rename_shortcut_name_by_workflow_id_live(
+    workflow_id: &str,
+    new_name: &str,
+) -> Result<(), MacosError> {
+    let db_path = default_db_path()?;
+    rename_shortcut_name_by_workflow_id(&db_path, workflow_id, new_name)
 }
 
 pub fn list_shortcuts(db_path: &Path) -> Result<Vec<ShortcutRecord>, MacosError> {
@@ -21,11 +81,12 @@ pub fn list_shortcuts(db_path: &Path) -> Result<Vec<ShortcutRecord>, MacosError>
     )?;
 
     let rows = stmt.query_map([], |row| {
+        let action_count = row.get::<_, Option<i64>>(3)?.unwrap_or_default();
         Ok(ShortcutRecord {
             pk: row.get(0)?,
             name: row.get(1)?,
             workflow_id: row.get(2)?,
-            action_count: row.get(3)?,
+            action_count,
         })
     })?;
 
@@ -60,11 +121,12 @@ pub fn find_shortcut(
     };
 
     conn.query_row(sql, params![needle], |row| {
+        let action_count = row.get::<_, Option<i64>>(3)?.unwrap_or_default();
         Ok(ShortcutRecord {
             pk: row.get(0)?,
             name: row.get(1)?,
             workflow_id: row.get(2)?,
-            action_count: row.get(3)?,
+            action_count,
         })
     })
     .optional()?

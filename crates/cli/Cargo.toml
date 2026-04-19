@@ -19,3 +19,4 @@ cueward-adapter-macos = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 chrono = "0.4"
 serde_json = "1"
+serde_yaml = "0.9"

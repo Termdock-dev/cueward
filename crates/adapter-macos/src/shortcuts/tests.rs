@@ -110,6 +110,30 @@ fn write_shortcut_payload_updates_blob_and_counts() {
 }
 
 #[test]
+fn rename_shortcut_name_by_workflow_id_updates_row() {
+    let dir = TempDir::new().unwrap();
+    let db_path = fixture_db(&dir);
+
+    super::db::rename_shortcut_name_by_workflow_id(
+        Path::new(&db_path),
+        "WF-1",
+        "Renamed Shortcut",
+    )
+    .unwrap();
+
+    let conn = Connection::open(&db_path).unwrap();
+    let renamed: String = conn
+        .query_row(
+            "SELECT ZNAME FROM ZSHORTCUT WHERE ZWORKFLOWID = 'WF-1'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    assert_eq!(renamed, "Renamed Shortcut");
+}
+
+#[test]
 fn compile_actions_builds_text_and_clipboard_chain() {
     let spec = ShortcutSpec {
         name: "Plan Smoke".into(),

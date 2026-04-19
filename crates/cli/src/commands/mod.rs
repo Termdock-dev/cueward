@@ -17,6 +17,7 @@ pub(crate) mod safari_bookmarks;
 pub(crate) mod screenshot;
 pub(crate) mod search;
 pub(crate) mod send;
+pub(crate) mod shortcuts;
 pub(crate) mod stickies;
 pub(crate) mod triage;
 pub(crate) mod voice_memos;
@@ -37,6 +38,8 @@ mod safari_tests;
 #[cfg(test)]
 mod screenshot_tests;
 #[cfg(test)]
+mod shortcuts_tests;
+#[cfg(test)]
 mod stickies_tests;
 #[cfg(test)]
 mod voice_memos_tests;
@@ -49,6 +52,7 @@ pub(crate) use reddit::RedditAction;
 pub(crate) use reminders::RemindersAction;
 pub(crate) use safari::SafariAction;
 pub(crate) use screenshot::ScreenshotAction;
+pub(crate) use shortcuts::ShortcutsAction;
 pub(crate) use stickies::StickiesAction;
 pub(crate) use voice_memos::VoiceMemosAction;
 
@@ -175,6 +179,11 @@ pub(crate) enum Command {
         #[command(subcommand)]
         action: StickiesAction,
     },
+    /// Manage Apple Shortcuts
+    Shortcuts {
+        #[command(subcommand)]
+        action: ShortcutsAction,
+    },
 }
 
 #[derive(Clone, ValueEnum)]
@@ -213,5 +222,6 @@ pub(crate) fn dispatch(command: Command) {
         Command::Clipboard { action } => clipboard::dispatch(action),
         Command::VoiceMemos { action } => voice_memos::dispatch(action),
         Command::Stickies { action } => stickies::dispatch(action),
+        Command::Shortcuts { action } => shortcuts::dispatch(action),
     }
 }

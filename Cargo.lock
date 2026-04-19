@@ -348,6 +348,7 @@ dependencies = [
  "cueward-adapter-macos",
  "cueward-core",
  "serde_json",
+ "serde_yaml",
 ]
 
 [[package]]

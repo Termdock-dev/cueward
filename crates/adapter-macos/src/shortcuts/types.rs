@@ -1,10 +1,12 @@
+use serde::Serialize;
+
 #[derive(Debug, Clone)]
 pub enum ShortcutSelector {
     Id(String),
     Name(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ShortcutRecord {
     pub pk: i64,
     pub name: String,
