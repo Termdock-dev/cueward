@@ -264,6 +264,22 @@ pub(crate) fn dispatch(_action: ShortcutsAction) {
                 }
             }
         }
+        ShortcutsAction::Move { selector, folder } => {
+            let selector = selector.into_selector();
+            match cueward_adapter_macos::shortcuts::move_shortcut(&selector, &folder) {
+                Ok(shortcut) => {
+                    print_external(
+                        "shortcuts/move",
+                        &serde_json::to_string_pretty(&shortcut).unwrap(),
+                    );
+                    eprintln!("shortcut moved: {}", shortcut.workflow_id);
+                }
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            }
+        }
         ShortcutsAction::Surface { selector, surface } => {
             let selector = selector.into_selector();
             match cueward_adapter_macos::shortcuts::attach_surface(&selector, &surface.into()) {

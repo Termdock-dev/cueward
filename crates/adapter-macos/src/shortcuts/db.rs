@@ -129,9 +129,8 @@ pub fn sync_shortcut_surfaces(
         DELETE FROM Z_4SHORTCUTS
         WHERE Z_7SHORTCUTS = ?1
           AND Z_4PARENTS1 = 2
-          AND ?2 = 0
         "#,
-        params![shortcut_pk, if want_share { 1 } else { 0 }],
+        params![shortcut_pk],
     )?;
 
     tx.execute(
@@ -230,6 +229,28 @@ pub fn ensure_shortcut_relation(
 pub fn ensure_shortcut_relation_live(shortcut_pk: i64, collection_pk: i64) -> Result<(), MacosError> {
     let db_path = default_db_path()?;
     ensure_shortcut_relation(&db_path, shortcut_pk, collection_pk)
+}
+
+pub fn shortcut_has_relation(
+    db_path: &Path,
+    shortcut_pk: i64,
+    collection_pk: i64,
+) -> Result<bool, MacosError> {
+    let conn = open_db(db_path)?;
+    let exists = conn
+        .query_row(
+            "SELECT 1 FROM Z_4SHORTCUTS WHERE Z_7SHORTCUTS = ?1 AND Z_4PARENTS1 = ?2 LIMIT 1",
+            params![shortcut_pk, collection_pk],
+            |_| Ok(true),
+        )
+        .optional()?
+        .unwrap_or(false);
+    Ok(exists)
+}
+
+pub fn shortcut_has_relation_live(shortcut_pk: i64, collection_pk: i64) -> Result<bool, MacosError> {
+    let db_path = default_db_path()?;
+    shortcut_has_relation(&db_path, shortcut_pk, collection_pk)
 }
 
 pub fn update_shortcut_input_classes(

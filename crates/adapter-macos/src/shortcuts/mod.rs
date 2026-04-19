@@ -17,8 +17,8 @@ pub use db::{
     encode_input_classes, ensure_shortcut_relation_live, find_shortcut, find_shortcut_live,
     list_shortcuts, list_shortcuts_live, load_shortcut_payload_live,
     rename_shortcut_name_by_workflow_id_live, sync_shortcut_surfaces_live,
-    update_shortcut_actions_blob_live, update_shortcut_input_classes_live, write_shortcut_payload,
-    write_shortcut_payload_live,
+    shortcut_has_relation_live, update_shortcut_actions_blob_live,
+    update_shortcut_input_classes_live, write_shortcut_payload, write_shortcut_payload_live,
 };
 pub use types::{ShortcutRecord, ShortcutSelector};
 
@@ -146,6 +146,20 @@ pub fn set_input_type(
     let record = find_shortcut_live(selector)?;
     let input_classes = encode_input_classes(policy)?;
     update_shortcut_input_classes_live(record.pk, &input_classes)?;
+    find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
+}
+
+pub fn move_shortcut(
+    selector: &ShortcutSelector,
+    folder_name: &str,
+) -> Result<ShortcutRecord, MacosError> {
+    let record = find_shortcut_live(selector)?;
+    let mut surfaces = Vec::new();
+    if shortcut_has_relation_live(record.pk, 2)? {
+        surfaces.push(cueward_core::ShortcutSurface::ShareSheet);
+    }
+    surfaces.push(cueward_core::ShortcutSurface::Folder(folder_name.to_string()));
+    sync_shortcut_surfaces_live(record.pk, &surfaces)?;
     find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
 }
 

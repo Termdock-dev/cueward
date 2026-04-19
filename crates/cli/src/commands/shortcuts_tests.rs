@@ -50,6 +50,24 @@ fn cli_parses_shortcuts_add_replace_text() {
 }
 
 #[test]
+fn cli_parses_shortcuts_move() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "shortcuts",
+        "move",
+        "--name",
+        "Clean URL Share",
+        "Work",
+    ])
+    .unwrap();
+
+    match cli.command {
+        Command::Shortcuts { .. } => {}
+        _ => panic!("expected shortcuts command"),
+    }
+}
+
+#[test]
 fn cli_rejects_shortcuts_selector_with_id_and_name() {
     let result = Cli::try_parse_from([
         "cueward",
