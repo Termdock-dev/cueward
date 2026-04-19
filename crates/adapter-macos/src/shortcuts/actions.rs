@@ -157,6 +157,7 @@ fn build_get_text_action(
     outputs: &mut Map<String, Value>,
 ) -> Result<Value, MacosError> {
     let uuid = new_uuid();
+    let resolved_input = resolve_reference(outputs, from, true)?;
     if let Some(output) = output {
         outputs.insert(
             output.to_string(),
@@ -168,7 +169,7 @@ fn build_get_text_action(
     }
     let mut params = Map::new();
     params.insert("UUID".into(), json!(uuid));
-    params.insert("WFTextActionText".into(), resolve_reference(outputs, from, true)?);
+    params.insert("WFTextActionText".into(), resolved_input);
     if let Some(output) = output {
         params.insert("CustomOutputName".into(), json!(output));
     }
@@ -184,6 +185,7 @@ fn build_get_urls_action(
     outputs: &mut Map<String, Value>,
 ) -> Result<Value, MacosError> {
     let uuid = new_uuid();
+    let resolved_input = resolve_reference(outputs, from, false)?;
     if let Some(output) = output {
         outputs.insert(
             output.to_string(),
@@ -195,7 +197,7 @@ fn build_get_urls_action(
     }
     let mut params = Map::new();
     params.insert("UUID".into(), json!(uuid));
-    params.insert("WFInput".into(), resolve_reference(outputs, from, false)?);
+    params.insert("WFInput".into(), resolved_input);
     if let Some(output) = output {
         params.insert("CustomOutputName".into(), json!(output));
     }
@@ -215,6 +217,7 @@ fn build_replace_text_action(
     outputs: &mut Map<String, Value>,
 ) -> Result<Value, MacosError> {
     let uuid = new_uuid();
+    let resolved_input = resolve_reference(outputs, from, true)?;
     if let Some(output) = output {
         outputs.insert(
             output.to_string(),
@@ -226,7 +229,7 @@ fn build_replace_text_action(
     }
     let mut params = Map::new();
     params.insert("UUID".into(), json!(uuid));
-    params.insert("WFInput".into(), resolve_reference(outputs, from, true)?);
+    params.insert("WFInput".into(), resolved_input);
     params.insert("WFReplaceTextFind".into(), json!(find));
     params.insert("WFReplaceTextReplace".into(), json!(replace));
     params.insert("WFReplaceTextRegularExpression".into(), json!(regex));
