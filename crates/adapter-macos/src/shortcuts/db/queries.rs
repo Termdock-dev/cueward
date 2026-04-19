@@ -114,7 +114,7 @@ fn find_shortcut_by_id(db_path: &Path, workflow_id: &str) -> Result<ShortcutReco
         },
     )
     .optional()?
-    .ok_or_else(|| MacosError::Other(format!("shortcut not found: {workflow_id}")))
+    .ok_or_else(|| MacosError::NotFound(format!("shortcut not found: {workflow_id}")))
 }
 
 fn find_shortcut_by_name(db_path: &Path, name: &str) -> Result<ShortcutRecord, MacosError> {
@@ -138,7 +138,7 @@ fn find_shortcut_by_name(db_path: &Path, name: &str) -> Result<ShortcutRecord, M
     let records = rows.collect::<Result<Vec<_>, _>>()?;
 
     match records.as_slice() {
-        [] => Err(MacosError::Other(format!("shortcut not found: {name}"))),
+        [] => Err(MacosError::NotFound(format!("shortcut not found: {name}"))),
         [record] => Ok(record.clone()),
         _ => Err(MacosError::Other(format!("multiple shortcuts matched: {name}"))),
     }

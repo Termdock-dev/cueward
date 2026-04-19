@@ -5,6 +5,7 @@ use rusqlite::{Connection, params};
 use tempfile::TempDir;
 
 use crate::shortcuts::{ShortcutSelector, find_shortcut, write_shortcut_payload};
+use crate::MacosError;
 
 use super::fixture_db;
 
@@ -37,6 +38,20 @@ fn find_shortcut_rejects_ambiguous_name_matches() {
     let message = err.to_string();
     assert!(message.contains("multiple shortcuts matched"));
     assert!(message.contains("Clean URL Share"));
+}
+
+#[test]
+fn find_shortcut_returns_not_found_variant_for_missing_name() {
+    let dir = TempDir::new().unwrap();
+    let db_path = fixture_db(&dir);
+
+    let err = find_shortcut(Path::new(&db_path), &ShortcutSelector::Name("Missing Shortcut".into()))
+        .unwrap_err();
+
+    match err {
+        MacosError::NotFound(message) => assert!(message.contains("Missing Shortcut")),
+        other => panic!("expected not found error, got {other}"),
+    }
 }
 
 #[test]
