@@ -2,7 +2,7 @@ use std::{fs, process};
 
 use clap::{Args, Subcommand, ValueEnum};
 
-use cueward_core::ShortcutSpec;
+use cueward_core::{ShortcutInputPolicy, ShortcutSpec, ShortcutSurface};
 
 use super::helpers::print_external;
 
@@ -248,6 +248,54 @@ pub(crate) fn dispatch(_action: ShortcutsAction) {
                 }
             }
         }
+        ShortcutsAction::Rename { selector, new_name } => {
+            let selector = selector.into_selector();
+            match cueward_adapter_macos::shortcuts::rename_shortcut(&selector, &new_name) {
+                Ok(shortcut) => {
+                    print_external(
+                        "shortcuts/rename",
+                        &serde_json::to_string_pretty(&shortcut).unwrap(),
+                    );
+                    eprintln!("shortcut renamed: {}", shortcut.workflow_id);
+                }
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            }
+        }
+        ShortcutsAction::Surface { selector, surface } => {
+            let selector = selector.into_selector();
+            match cueward_adapter_macos::shortcuts::attach_surface(&selector, &surface.into()) {
+                Ok(shortcut) => {
+                    print_external(
+                        "shortcuts/surface",
+                        &serde_json::to_string_pretty(&shortcut).unwrap(),
+                    );
+                    eprintln!("shortcut surface updated: {}", shortcut.workflow_id);
+                }
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            }
+        }
+        ShortcutsAction::InputType { selector, input_type } => {
+            let selector = selector.into_selector();
+            match cueward_adapter_macos::shortcuts::set_input_type(&selector, &input_type.into()) {
+                Ok(shortcut) => {
+                    print_external(
+                        "shortcuts/input-type",
+                        &serde_json::to_string_pretty(&shortcut).unwrap(),
+                    );
+                    eprintln!("shortcut input type updated: {}", shortcut.workflow_id);
+                }
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            }
+        }
         _ => {
             eprintln!("error: shortcuts subcommand not yet implemented");
             process::exit(1);
@@ -270,4 +318,26 @@ fn load_shortcut_spec(path: &str) -> Result<ShortcutSpec, String> {
         fs::read_to_string(path).map_err(|err| format!("failed to read shortcut spec '{path}': {err}"))?;
     serde_yaml::from_str(&source)
         .map_err(|err| format!("failed to parse shortcut spec '{path}': {err}"))
+}
+
+impl From<ShortcutSurfaceArg> for ShortcutSurface {
+    fn from(value: ShortcutSurfaceArg) -> Self {
+        match value {
+            ShortcutSurfaceArg::ShareSheet => ShortcutSurface::ShareSheet,
+            ShortcutSurfaceArg::LibraryRoot => ShortcutSurface::LibraryRoot,
+        }
+    }
+}
+
+impl From<ShortcutInputTypeArg> for ShortcutInputPolicy {
+    fn from(value: ShortcutInputTypeArg) -> Self {
+        match value {
+            ShortcutInputTypeArg::Any => ShortcutInputPolicy::Any,
+            ShortcutInputTypeArg::Url => ShortcutInputPolicy::Url,
+            ShortcutInputTypeArg::Urls => ShortcutInputPolicy::Urls,
+            ShortcutInputTypeArg::Text => ShortcutInputPolicy::Text,
+            ShortcutInputTypeArg::Image => ShortcutInputPolicy::Image,
+            ShortcutInputTypeArg::File => ShortcutInputPolicy::File,
+        }
+    }
 }

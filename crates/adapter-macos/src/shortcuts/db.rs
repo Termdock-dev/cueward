@@ -205,6 +205,58 @@ pub fn sync_shortcut_surfaces_live(
     sync_shortcut_surfaces(&db_path, shortcut_pk, surfaces)
 }
 
+pub fn ensure_shortcut_relation(
+    db_path: &Path,
+    shortcut_pk: i64,
+    collection_pk: i64,
+) -> Result<(), MacosError> {
+    let conn = open_db(db_path)?;
+    conn.execute(
+        r#"
+        INSERT INTO Z_4SHORTCUTS (Z_4PARENTS1, Z_7SHORTCUTS, Z_FOK_7SHORTCUTS)
+        SELECT ?1, ?2, ?1
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM Z_4SHORTCUTS
+            WHERE Z_4PARENTS1 = ?1
+              AND Z_7SHORTCUTS = ?2
+        )
+        "#,
+        params![collection_pk, shortcut_pk],
+    )?;
+    Ok(())
+}
+
+pub fn ensure_shortcut_relation_live(shortcut_pk: i64, collection_pk: i64) -> Result<(), MacosError> {
+    let db_path = default_db_path()?;
+    ensure_shortcut_relation(&db_path, shortcut_pk, collection_pk)
+}
+
+pub fn update_shortcut_input_classes(
+    db_path: &Path,
+    shortcut_pk: i64,
+    input_classes: &[u8],
+) -> Result<(), MacosError> {
+    let conn = open_db(db_path)?;
+    conn.execute(
+        r#"
+        UPDATE ZSHORTCUT
+        SET ZINPUTCLASSESDATA = ?1
+        WHERE Z_PK = ?2
+        "#,
+        params![input_classes, shortcut_pk],
+    )?;
+    Ok(())
+}
+
+pub fn update_shortcut_input_classes_live(
+    shortcut_pk: i64,
+    input_classes: &[u8],
+) -> Result<(), MacosError> {
+    let db_path = default_db_path()?;
+    update_shortcut_input_classes(&db_path, shortcut_pk, input_classes)
+}
+
 pub fn list_shortcuts(db_path: &Path) -> Result<Vec<ShortcutRecord>, MacosError> {
     let conn = open_db(db_path)?;
     let mut stmt = conn.prepare(

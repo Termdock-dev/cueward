@@ -14,9 +14,10 @@ mod types;
 
 pub use compiler::compile_actions;
 pub use db::{
-    find_shortcut, find_shortcut_live, list_shortcuts, list_shortcuts_live,
-    encode_input_classes, rename_shortcut_name_by_workflow_id_live, sync_shortcut_surfaces_live,
-    write_shortcut_payload, write_shortcut_payload_live,
+    encode_input_classes, ensure_shortcut_relation_live, find_shortcut, find_shortcut_live,
+    list_shortcuts, list_shortcuts_live, rename_shortcut_name_by_workflow_id_live,
+    sync_shortcut_surfaces_live, update_shortcut_input_classes_live, write_shortcut_payload,
+    write_shortcut_payload_live,
 };
 pub use types::{ShortcutRecord, ShortcutSelector};
 
@@ -113,5 +114,36 @@ pub fn apply_shortcut_spec(spec: &ShortcutSpec) -> Result<ShortcutRecord, MacosE
         has_shortcut_input_variables,
     )?;
     sync_shortcut_surfaces_live(record.pk, &spec.surfaces)?;
+    find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
+}
+
+pub fn rename_shortcut(selector: &ShortcutSelector, new_name: &str) -> Result<ShortcutRecord, MacosError> {
+    let record = find_shortcut_live(selector)?;
+    rename_shortcut_name_by_workflow_id_live(&record.workflow_id, new_name)?;
+    find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
+}
+
+pub fn attach_surface(
+    selector: &ShortcutSelector,
+    surface: &cueward_core::ShortcutSurface,
+) -> Result<ShortcutRecord, MacosError> {
+    let record = find_shortcut_live(selector)?;
+    match surface {
+        cueward_core::ShortcutSurface::LibraryRoot => ensure_shortcut_relation_live(record.pk, 6)?,
+        cueward_core::ShortcutSurface::ShareSheet => ensure_shortcut_relation_live(record.pk, 2)?,
+        cueward_core::ShortcutSurface::Folder(folder_name) => {
+            sync_shortcut_surfaces_live(record.pk, &[cueward_core::ShortcutSurface::Folder(folder_name.clone())])?;
+        }
+    }
+    find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
+}
+
+pub fn set_input_type(
+    selector: &ShortcutSelector,
+    policy: &cueward_core::ShortcutInputPolicy,
+) -> Result<ShortcutRecord, MacosError> {
+    let record = find_shortcut_live(selector)?;
+    let input_classes = encode_input_classes(policy)?;
+    update_shortcut_input_classes_live(record.pk, &input_classes)?;
     find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
 }
