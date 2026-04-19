@@ -42,7 +42,10 @@ pub(crate) fn dispatch(action: ShortcutsAction) {
         ShortcutsAction::ExportSpec { selector } => {
             let selector = selector.into_selector();
             let spec = or_exit(cueward_adapter_macos::shortcuts::export_shortcut_spec(&selector));
-            let yaml = serde_yaml::to_string(&spec).unwrap();
+            let yaml = or_exit(
+                serde_yaml::to_string(&spec)
+                    .map_err(|e| format!("failed to serialize shortcut spec: {e}")),
+            );
             print_external("shortcuts/export-spec", &yaml);
         }
         ShortcutsAction::Rename { selector, new_name } => {
@@ -194,7 +197,10 @@ fn append_action(
 }
 
 fn print_json<T: serde::Serialize>(source: &str, value: &T) {
-    print_external(source, &serde_json::to_string_pretty(value).unwrap());
+    let json = or_exit(
+        serde_json::to_string_pretty(value).map_err(|e| format!("failed to serialize output: {e}")),
+    );
+    print_external(source, &json);
 }
 
 fn or_exit<T, E: std::fmt::Display>(result: Result<T, E>) -> T {

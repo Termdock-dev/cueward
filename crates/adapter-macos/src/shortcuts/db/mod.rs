@@ -18,7 +18,9 @@ pub use queries::{
     list_shortcuts, list_shortcuts_live, load_shortcut_input_policy_live, load_shortcut_payload_live,
     load_shortcut_surfaces_live, shortcut_has_relation_live,
 };
-pub use relations::{ensure_shortcut_relation_live, sync_shortcut_surfaces_live};
+pub use relations::{
+    ensure_shortcut_folder_relation_live, ensure_shortcut_relation_live, sync_shortcut_surfaces_live,
+};
 
 #[cfg(test)]
 pub use payloads::rename_shortcut_name_by_workflow_id;
@@ -26,6 +28,10 @@ pub use payloads::rename_shortcut_name_by_workflow_id;
 pub use queries::find_latest_shortcut_after_pk;
 #[cfg(test)]
 pub use queries::load_shortcut_payload;
+#[cfg(test)]
+pub use relations::ensure_shortcut_folder_relation;
+#[cfg(test)]
+pub use relations::ensure_shortcut_relation;
 #[cfg(test)]
 pub use relations::sync_shortcut_surfaces;
 

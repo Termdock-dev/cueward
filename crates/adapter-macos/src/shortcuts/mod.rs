@@ -14,9 +14,10 @@ mod compiler;
 mod db;
 mod types;
 
-pub use compiler::{append_action, compile_actions, decompile_actions};
+pub use compiler::{append_action, compile_actions, compiled_action_count, decompile_actions};
 pub use db::{
-    encode_input_classes, ensure_shortcut_relation_live, find_shortcut, find_shortcut_live,
+    encode_input_classes, ensure_shortcut_folder_relation_live, ensure_shortcut_relation_live,
+    find_shortcut, find_shortcut_live,
     find_latest_shortcut_after_pk_live, latest_shortcut_pk_live, list_shortcuts, list_shortcuts_live,
     load_shortcut_input_policy_live, load_shortcut_payload_live, load_shortcut_surfaces_live,
     rename_shortcut_name_by_workflow_id_live, sync_shortcut_surfaces_live,
@@ -70,31 +71,24 @@ pub fn create_shortcut(name: &str) -> Result<ShortcutCreateResult, MacosError> {
 
 pub fn run_shortcut(selector: &ShortcutSelector) -> Result<(), MacosError> {
     let record = find_shortcut_live(selector)?;
-    let command = format!(
-        "osascript -e {} -e {} -e {}",
-        shell_quote(r#"tell application "Shortcuts Events""#),
-        shell_quote(&format!(
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(r#"tell application "Shortcuts Events""#)
+        .arg("-e")
+        .arg(format!(
             r#"run shortcut named "{}""#,
             applescript::escape(&record.name)
-        )),
-        shell_quote("end tell"),
-    );
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(command)
+        ))
+        .arg("-e")
+        .arg("end tell")
         .output()
-        .map_err(|err| MacosError::Other(format!("run shortcut shell command failed: {err}")))?;
+        .map_err(|err| MacosError::Other(format!("run shortcut command failed: {err}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(MacosError::Other(format!("run shortcut: {stderr}")));
     }
-
     Ok(())
-}
-
-fn shell_quote(input: &str) -> String {
-    format!("'{}'", input.replace('\'', "'\"'\"'"))
 }
 
 fn spec_uses_shortcut_input_variables(spec: &ShortcutSpec) -> bool {
@@ -135,13 +129,14 @@ pub fn apply_shortcut_spec(spec: &ShortcutSpec) -> Result<ShortcutRecord, MacosE
         Err(err) => return Err(err),
     };
     let payload = compile_actions(spec)?;
+    let action_count = compiled_action_count(&payload)?;
     let input_classes = encode_input_classes(&spec.input)?;
     let has_shortcut_input_variables = spec_uses_shortcut_input_variables(spec);
 
     write_shortcut_payload_live(
         record.pk,
         &payload,
-        spec.actions.len(),
+        action_count,
         Some(&input_classes),
         has_shortcut_input_variables,
     )?;
@@ -164,7 +159,7 @@ pub fn attach_surface(
         cueward_core::ShortcutSurface::LibraryRoot => ensure_shortcut_relation_live(record.pk, 6)?,
         cueward_core::ShortcutSurface::ShareSheet => ensure_shortcut_relation_live(record.pk, 2)?,
         cueward_core::ShortcutSurface::Folder(folder_name) => {
-            sync_shortcut_surfaces_live(record.pk, &[cueward_core::ShortcutSurface::Folder(folder_name.clone())])?;
+            ensure_shortcut_folder_relation_live(record.pk, folder_name)?;
         }
     }
     find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
@@ -201,7 +196,8 @@ pub fn append_shortcut_action(
     let record = find_shortcut_live(selector)?;
     let existing_payload = load_shortcut_payload_live(record.pk)?;
     let appended = append_action(&existing_payload, action)?;
-    update_shortcut_actions_blob_live(record.pk, &appended, record.action_count as usize + 1)?;
+    let action_count = compiled_action_count(&appended)?;
+    update_shortcut_actions_blob_live(record.pk, &appended, action_count)?;
     find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
 }
 

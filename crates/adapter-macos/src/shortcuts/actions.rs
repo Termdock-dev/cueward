@@ -34,6 +34,15 @@ pub(crate) fn extension_input_text_token() -> Value {
     })
 }
 
+fn extension_input_attachment() -> Value {
+    json!({
+        "Value": {
+            "Type": "ExtensionInput"
+        },
+        "WFSerializationType": "WFTextTokenAttachment"
+    })
+}
+
 pub(crate) fn text_token_from_output(output_name: &str, output_uuid: &str) -> Value {
     json!({
         "Value": {
@@ -100,9 +109,7 @@ pub(crate) fn resolve_reference(
             })
         }
         ShortcutReference::ExtensionInput if as_text_token => Ok(extension_input_text_token()),
-        ShortcutReference::ExtensionInput => Err(MacosError::Other(
-            "extension-input is only supported for text-token builders right now".into(),
-        )),
+        ShortcutReference::ExtensionInput => Ok(extension_input_attachment()),
         ShortcutReference::RepeatItem if as_text_token => Ok(text_token_from_variable("Repeat Item")),
         ShortcutReference::RepeatItem => Ok(variable_ref("Repeat Item")),
         ShortcutReference::RepeatIndex if as_text_token => Ok(text_token_from_variable("Repeat Index")),

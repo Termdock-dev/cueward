@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use serde_json::json;
+
 use cueward_core::{
     ShortcutAction, ShortcutInputPolicy, ShortcutReference, ShortcutSpec, ShortcutSurface,
 };
@@ -7,8 +9,8 @@ use rusqlite::{Connection, params};
 use tempfile::TempDir;
 
 use super::{
-    ShortcutSelector, append_action, compile_actions, decompile_actions, find_shortcut,
-    write_shortcut_payload,
+    ShortcutSelector, append_action, compile_actions, compiled_action_count, decompile_actions,
+    find_shortcut, write_shortcut_payload,
 };
 
 fn fixture_db(dir: &TempDir) -> String {
@@ -278,6 +280,37 @@ fn append_action_uses_existing_custom_output_name_as_reference() {
 }
 
 #[test]
+fn compile_actions_supports_extension_input_as_direct_reference() {
+    let spec = ShortcutSpec {
+        name: "Extension Input".into(),
+        surfaces: vec![],
+        input: ShortcutInputPolicy::Url,
+        actions: vec![ShortcutAction::GetUrls {
+            from: ShortcutReference::ExtensionInput,
+            output: Some("urls".into()),
+        }],
+    };
+
+    let payload = compile_actions(&spec).unwrap();
+    let actions = plist::from_bytes::<Vec<plist::Value>>(&payload).unwrap();
+    let params = actions[0]
+        .as_dictionary()
+        .unwrap()
+        .get("WFWorkflowActionParameters")
+        .unwrap()
+        .as_dictionary()
+        .unwrap();
+    let input = params.get("WFInput").unwrap().as_dictionary().unwrap();
+    let value = input.get("Value").unwrap().as_dictionary().unwrap();
+
+    assert_eq!(
+        input.get("WFSerializationType").and_then(plist::Value::as_string),
+        Some("WFTextTokenAttachment")
+    );
+    assert_eq!(value.get("Type").and_then(plist::Value::as_string), Some("ExtensionInput"));
+}
+
+#[test]
 fn decompile_actions_round_trips_supported_clean_url_subset() {
     let spec = ShortcutSpec {
         name: "Clean URL Share".into(),
@@ -320,6 +353,49 @@ fn decompile_actions_round_trips_supported_clean_url_subset() {
 }
 
 #[test]
+fn decompile_actions_preserves_inferred_default_output_aliases() {
+    let actions = vec![
+        json!({
+            "WFWorkflowActionIdentifier": "is.workflow.actions.gettext",
+            "WFWorkflowActionParameters": {
+                "UUID": "12345678-1234-1234-1234-1234567890AB",
+                "WFTextActionText": "hello"
+            }
+        }),
+        json!({
+            "WFWorkflowActionIdentifier": "is.workflow.actions.setclipboard",
+            "WFWorkflowActionParameters": {
+                "WFInput": {
+                    "Value": {
+                        "OutputName": "Text",
+                        "OutputUUID": "12345678-1234-1234-1234-1234567890AB",
+                        "Type": "ActionOutput"
+                    },
+                    "WFSerializationType": "WFTextTokenAttachment"
+                }
+            }
+        }),
+    ];
+    let mut payload = Vec::new();
+    plist::to_writer_binary(&mut payload, &actions).unwrap();
+
+    let decompiled = decompile_actions(&payload).unwrap();
+
+    assert_eq!(
+        decompiled,
+        vec![
+            ShortcutAction::Text {
+                value: "hello".into(),
+                output: Some("text".into()),
+            },
+            ShortcutAction::CopyToClipboard {
+                from: ShortcutReference::Output("text".into()),
+            },
+        ]
+    );
+}
+
+#[test]
 fn compile_and_decompile_if_and_repeat_round_trip() {
     let spec = ShortcutSpec {
         name: "Control Flow Smoke".into(),
@@ -356,6 +432,44 @@ fn compile_and_decompile_if_and_repeat_round_trip() {
     let decompiled = decompile_actions(&payload).unwrap();
 
     assert_eq!(decompiled, spec.actions);
+}
+
+#[test]
+fn compiled_action_count_flattens_control_flow_wrappers() {
+    let spec = ShortcutSpec {
+        name: "Control Flow Smoke".into(),
+        surfaces: vec![],
+        input: ShortcutInputPolicy::Any,
+        actions: vec![
+            ShortcutAction::Text {
+                value: "match".into(),
+                output: Some("input_text".into()),
+            },
+            ShortcutAction::IfEqualsText {
+                input: ShortcutReference::Output("input_text".into()),
+                value: "match".into(),
+                then_actions: vec![
+                    ShortcutAction::Text {
+                        value: "ok".into(),
+                        output: Some("condition_result".into()),
+                    },
+                    ShortcutAction::CopyToClipboard {
+                        from: ShortcutReference::Output("condition_result".into()),
+                    },
+                ],
+            },
+            ShortcutAction::RepeatEach {
+                input: ShortcutReference::Output("input_text".into()),
+                body: vec![ShortcutAction::Share {
+                    from: ShortcutReference::RepeatItem,
+                }],
+            },
+        ],
+    };
+
+    let payload = compile_actions(&spec).unwrap();
+
+    assert_eq!(compiled_action_count(&payload).unwrap(), 8);
 }
 
 #[test]
@@ -431,6 +545,49 @@ fn sync_shortcut_surfaces_can_replace_folder_without_removing_existing_share_she
         .unwrap();
 
     assert_eq!(rows, vec![(2, 1), (6, 1), (7, 1)]);
+}
+
+#[test]
+fn ensure_shortcut_folder_relation_adds_folder_without_dropping_existing_relations() {
+    let dir = TempDir::new().unwrap();
+    let db_path = fixture_db(&dir);
+    let conn = Connection::open(&db_path).unwrap();
+    conn.execute(
+        "INSERT INTO Z_4SHORTCUTS (Z_4PARENTS1, Z_7SHORTCUTS, Z_FOK_7SHORTCUTS) VALUES (2, 1, 0)",
+        [],
+    )
+    .unwrap();
+
+    super::db::ensure_shortcut_folder_relation(Path::new(&db_path), 1, "Work").unwrap();
+
+    let rows: Vec<(i64, i64)> = conn
+        .prepare("SELECT Z_4PARENTS1, Z_7SHORTCUTS FROM Z_4SHORTCUTS WHERE Z_7SHORTCUTS = 1 ORDER BY Z_4PARENTS1")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    assert_eq!(rows, vec![(2, 1), (6, 1), (7, 1), (8, 1)]);
+}
+
+#[test]
+fn ensure_shortcut_relation_assigns_next_collection_order_index() {
+    let dir = TempDir::new().unwrap();
+    let db_path = fixture_db(&dir);
+
+    super::db::ensure_shortcut_relation(Path::new(&db_path), 1, 2).unwrap();
+
+    let conn = Connection::open(&db_path).unwrap();
+    let order_index: i64 = conn
+        .query_row(
+            "SELECT Z_FOK_7SHORTCUTS FROM Z_4SHORTCUTS WHERE Z_4PARENTS1 = 2 AND Z_7SHORTCUTS = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    assert_eq!(order_index, 0);
 }
 
 #[test]

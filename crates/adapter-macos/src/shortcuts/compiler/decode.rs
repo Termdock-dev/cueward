@@ -50,7 +50,8 @@ fn decompile_sequence(
         let output = params
             .get("CustomOutputName")
             .and_then(Value::as_str)
-            .map(ToOwned::to_owned);
+            .map(ToOwned::to_owned)
+            .or_else(|| inferred_output_alias(params, aliases));
 
         let decoded_action = match action_identifier {
             "is.workflow.actions.gettext" => decode_get_text_action(params, aliases, output)?,
@@ -154,6 +155,11 @@ fn decode_get_text_action(
             "unsupported gettext payload during export".into(),
         )),
     }
+}
+
+fn inferred_output_alias(params: &Map<String, Value>, aliases: &Map<String, Value>) -> Option<String> {
+    let uuid = params.get("UUID").and_then(Value::as_str)?;
+    aliases.get(uuid).and_then(Value::as_str).map(ToOwned::to_owned)
 }
 
 fn decode_get_urls_action(
