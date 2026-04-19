@@ -4,6 +4,8 @@ use cueward_core::{ShortcutAction, ShortcutReference};
 
 use crate::MacosError;
 
+use super::inferred_default_output_alias;
+
 pub fn decompile_actions(payload: &[u8]) -> Result<Vec<ShortcutAction>, MacosError> {
     let actions = plist::from_bytes::<Vec<Value>>(payload)
         .map_err(|error| MacosError::Other(format!("failed to decode shortcut actions payload: {error}")))?;
@@ -377,7 +379,7 @@ fn infer_alias(
         .get("CustomOutputName")
         .and_then(Value::as_str)
         .map(ToOwned::to_owned)
-        .or_else(|| default_output_name(action_identifier).map(slugify_alias))?;
+        .or_else(|| inferred_default_output_alias(action_identifier))?;
 
     let count = counts.get(&base).and_then(Value::as_u64).unwrap_or(0);
     counts.insert(base.clone(), Value::from(count + 1));
@@ -387,30 +389,4 @@ fn infer_alias(
     } else {
         Some(format!("{base}_{}", count + 1))
     }
-}
-
-fn default_output_name(action_identifier: &str) -> Option<&'static str> {
-    match action_identifier {
-        "is.workflow.actions.gettext" => Some("Text"),
-        "is.workflow.actions.text.replace" => Some("Updated Text"),
-        "is.workflow.actions.detect.link" => Some("URLs"),
-        "is.workflow.actions.getitemfromlist" => Some("Item from List"),
-        "is.workflow.actions.count" => Some("Count"),
-        _ => None,
-    }
-}
-
-fn slugify_alias(input: &str) -> String {
-    let mut out = String::new();
-    let mut last_was_sep = false;
-    for ch in input.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
-            last_was_sep = false;
-        } else if !last_was_sep {
-            out.push('_');
-            last_was_sep = true;
-        }
-    }
-    out.trim_matches('_').to_string()
 }

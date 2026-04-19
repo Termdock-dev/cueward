@@ -8,6 +8,7 @@ use cueward_core::{ShortcutAction, ShortcutReference, ShortcutSpec};
 use crate::MacosError;
 
 use super::super::actions::{build_action, resolve_reference, variable_wrapper};
+use super::{default_output_name, inferred_default_output_alias};
 
 pub fn compile_actions(spec: &ShortcutSpec) -> Result<Vec<u8>, MacosError> {
     let mut outputs = Map::<String, Value>::new();
@@ -90,14 +91,20 @@ fn collect_outputs(actions: &[Value]) -> Map<String, Value> {
         let Some(output_uuid) = params.get("UUID").and_then(Value::as_str) else {
             continue;
         };
+        let output_alias = params
+            .get("CustomOutputName")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned)
+            .or_else(|| inferred_default_output_alias(action_identifier));
         let output_name = params
             .get("CustomOutputName")
             .and_then(Value::as_str)
-            .or_else(|| default_output_name(action_identifier));
+            .map(ToOwned::to_owned)
+            .or_else(|| default_output_name(action_identifier).map(ToOwned::to_owned));
 
-        if let Some(output_name) = output_name {
+        if let (Some(output_alias), Some(output_name)) = (output_alias, output_name) {
             outputs.insert(
-                output_name.to_string(),
+                output_alias,
                 serde_json::json!({
                     "OutputName": output_name,
                     "OutputUUID": output_uuid,
@@ -163,17 +170,6 @@ fn compile_control_flow_end(identifier: &str, grouping_id: &str) -> Value {
             "WFControlFlowMode": 2
         }
     })
-}
-
-fn default_output_name(action_identifier: &str) -> Option<&'static str> {
-    match action_identifier {
-        "is.workflow.actions.gettext" => Some("Text"),
-        "is.workflow.actions.text.replace" => Some("Updated Text"),
-        "is.workflow.actions.detect.link" => Some("URLs"),
-        "is.workflow.actions.getitemfromlist" => Some("Item from List"),
-        "is.workflow.actions.count" => Some("Count"),
-        _ => None,
-    }
 }
 
 fn new_grouping_id() -> String {

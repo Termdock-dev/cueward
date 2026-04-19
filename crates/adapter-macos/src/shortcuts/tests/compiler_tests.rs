@@ -88,6 +88,37 @@ fn append_action_uses_existing_custom_output_name_as_reference() {
 }
 
 #[test]
+fn append_action_uses_exported_default_output_alias_as_reference() {
+    let actions = vec![json!({
+        "WFWorkflowActionIdentifier": "is.workflow.actions.gettext",
+        "WFWorkflowActionParameters": {
+            "UUID": "12345678-1234-1234-1234-1234567890AB",
+            "WFTextActionText": "hello"
+        }
+    })];
+    let mut payload = Vec::new();
+    plist::to_writer_binary(&mut payload, &actions).unwrap();
+
+    let appended = append_action(
+        &payload,
+        &ShortcutAction::CopyToClipboard {
+            from: ShortcutReference::Output("text".into()),
+        },
+    )
+    .unwrap();
+
+    let actions = plist::from_bytes::<Vec<plist::Value>>(&appended).unwrap();
+    let second = actions[1].as_dictionary().unwrap();
+    let second_params = second.get("WFWorkflowActionParameters").unwrap().as_dictionary().unwrap();
+    let input = second_params.get("WFInput").unwrap().as_dictionary().unwrap();
+    let value = input.get("Value").unwrap().as_dictionary().unwrap();
+    assert_eq!(
+        value.get("OutputName").and_then(plist::Value::as_string),
+        Some("Text")
+    );
+}
+
+#[test]
 fn compile_actions_resolves_input_before_reusing_same_output_name() {
     let spec = ShortcutSpec {
         name: "Alias Reuse".into(),
