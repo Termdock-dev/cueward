@@ -248,6 +248,19 @@ pub(crate) fn dispatch(_action: ShortcutsAction) {
                 }
             }
         }
+        ShortcutsAction::ExportSpec { selector } => {
+            let selector = selector.into_selector();
+            match cueward_adapter_macos::shortcuts::export_shortcut_spec(&selector) {
+                Ok(spec) => {
+                    let yaml = serde_yaml::to_string(&spec).unwrap();
+                    print_external("shortcuts/export-spec", &yaml);
+                }
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            }
+        }
         ShortcutsAction::Rename { selector, new_name } => {
             let selector = selector.into_selector();
             match cueward_adapter_macos::shortcuts::rename_shortcut(&selector, &new_name) {

@@ -12,10 +12,11 @@ mod compiler;
 mod db;
 mod types;
 
-pub use compiler::{append_action, compile_actions};
+pub use compiler::{append_action, compile_actions, decompile_actions};
 pub use db::{
     encode_input_classes, ensure_shortcut_relation_live, find_shortcut, find_shortcut_live,
-    list_shortcuts, list_shortcuts_live, load_shortcut_payload_live,
+    list_shortcuts, list_shortcuts_live, load_shortcut_input_policy_live, load_shortcut_payload_live,
+    load_shortcut_surfaces_live,
     rename_shortcut_name_by_workflow_id_live, sync_shortcut_surfaces_live,
     shortcut_has_relation_live, update_shortcut_actions_blob_live,
     update_shortcut_input_classes_live, write_shortcut_payload, write_shortcut_payload_live,
@@ -172,4 +173,19 @@ pub fn append_shortcut_action(
     let appended = append_action(&existing_payload, action)?;
     update_shortcut_actions_blob_live(record.pk, &appended, record.action_count as usize + 1)?;
     find_shortcut_live(&ShortcutSelector::Id(record.workflow_id))
+}
+
+pub fn export_shortcut_spec(selector: &ShortcutSelector) -> Result<ShortcutSpec, MacosError> {
+    let record = find_shortcut_live(selector)?;
+    let payload = load_shortcut_payload_live(record.pk)?;
+    let actions = decompile_actions(&payload)?;
+    let surfaces = load_shortcut_surfaces_live(record.pk)?;
+    let input = load_shortcut_input_policy_live(record.pk)?;
+
+    Ok(ShortcutSpec {
+        name: record.name,
+        surfaces,
+        input,
+        actions,
+    })
 }

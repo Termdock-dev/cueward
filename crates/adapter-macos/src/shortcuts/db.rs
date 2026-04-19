@@ -253,6 +253,42 @@ pub fn shortcut_has_relation_live(shortcut_pk: i64, collection_pk: i64) -> Resul
     shortcut_has_relation(&db_path, shortcut_pk, collection_pk)
 }
 
+pub fn load_shortcut_surfaces(db_path: &Path, shortcut_pk: i64) -> Result<Vec<ShortcutSurface>, MacosError> {
+    let conn = open_db(db_path)?;
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT c.Z_PK, c.ZNAME
+        FROM Z_4SHORTCUTS rel
+        JOIN ZCOLLECTION c ON c.Z_PK = rel.Z_4PARENTS1
+        WHERE rel.Z_7SHORTCUTS = ?1
+        ORDER BY c.Z_PK
+        "#,
+    )?;
+    let rows = stmt.query_map(params![shortcut_pk], |row| {
+        Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?))
+    })?;
+
+    let mut surfaces = Vec::new();
+    for row in rows {
+        let (pk, name) = row?;
+        match pk {
+            2 => surfaces.push(ShortcutSurface::ShareSheet),
+            6 => surfaces.push(ShortcutSurface::LibraryRoot),
+            _ => {
+                if let Some(name) = name {
+                    surfaces.push(ShortcutSurface::Folder(name));
+                }
+            }
+        }
+    }
+    Ok(surfaces)
+}
+
+pub fn load_shortcut_surfaces_live(shortcut_pk: i64) -> Result<Vec<ShortcutSurface>, MacosError> {
+    let db_path = default_db_path()?;
+    load_shortcut_surfaces(&db_path, shortcut_pk)
+}
+
 pub fn update_shortcut_input_classes(
     db_path: &Path,
     shortcut_pk: i64,
@@ -276,6 +312,42 @@ pub fn update_shortcut_input_classes_live(
 ) -> Result<(), MacosError> {
     let db_path = default_db_path()?;
     update_shortcut_input_classes(&db_path, shortcut_pk, input_classes)
+}
+
+pub fn decode_input_policy(input_classes: &[u8]) -> Result<ShortcutInputPolicy, MacosError> {
+    let classes = plist::from_bytes::<Vec<String>>(input_classes)
+        .map_err(|error| MacosError::Other(format!("failed to decode shortcut input classes: {error}")))?;
+
+    let policy = match classes.as_slice() {
+        [] => ShortcutInputPolicy::Any,
+        [single] if single == "WFURLContentItem" => ShortcutInputPolicy::Url,
+        [single] if single == "WFStringContentItem" => ShortcutInputPolicy::Text,
+        [single] if single == "WFImageContentItem" => ShortcutInputPolicy::Image,
+        [single] if single == "WFGenericFileContentItem" => ShortcutInputPolicy::File,
+        _ => ShortcutInputPolicy::Any,
+    };
+    Ok(policy)
+}
+
+pub fn load_shortcut_input_policy(db_path: &Path, shortcut_pk: i64) -> Result<ShortcutInputPolicy, MacosError> {
+    let conn = open_db(db_path)?;
+    let blob = conn
+        .query_row(
+            "SELECT ZINPUTCLASSESDATA FROM ZSHORTCUT WHERE Z_PK = ?1",
+            params![shortcut_pk],
+            |row| row.get::<_, Option<Vec<u8>>>(0),
+        )
+        .map_err(MacosError::from)?;
+
+    match blob {
+        Some(blob) => decode_input_policy(&blob),
+        None => Ok(ShortcutInputPolicy::Any),
+    }
+}
+
+pub fn load_shortcut_input_policy_live(shortcut_pk: i64) -> Result<ShortcutInputPolicy, MacosError> {
+    let db_path = default_db_path()?;
+    load_shortcut_input_policy(&db_path, shortcut_pk)
 }
 
 pub fn load_shortcut_payload(db_path: &Path, shortcut_pk: i64) -> Result<Vec<u8>, MacosError> {

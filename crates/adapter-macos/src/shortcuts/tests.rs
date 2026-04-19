@@ -6,7 +6,10 @@ use cueward_core::{
 use rusqlite::{Connection, params};
 use tempfile::TempDir;
 
-use super::{ShortcutSelector, append_action, compile_actions, find_shortcut, write_shortcut_payload};
+use super::{
+    ShortcutSelector, append_action, compile_actions, decompile_actions, find_shortcut,
+    write_shortcut_payload,
+};
 
 fn fixture_db(dir: &TempDir) -> String {
     let path = dir.path().join("Shortcuts.sqlite");
@@ -253,6 +256,40 @@ fn append_action_uses_existing_custom_output_name_as_reference() {
         value.get("OutputName").and_then(plist::Value::as_string),
         Some("greeting")
     );
+}
+
+#[test]
+fn decompile_actions_round_trips_supported_clean_url_subset() {
+    let spec = ShortcutSpec {
+        name: "Clean URL Share".into(),
+        surfaces: vec![ShortcutSurface::ShareSheet, ShortcutSurface::LibraryRoot],
+        input: ShortcutInputPolicy::Url,
+        actions: vec![
+            ShortcutAction::GetText {
+                from: ShortcutReference::ExtensionInput,
+                output: Some("input_url_text".into()),
+            },
+            ShortcutAction::ReplaceText {
+                from: ShortcutReference::Output("input_url_text".into()),
+                find: "foo".into(),
+                replace: "bar".into(),
+                regex: true,
+                ignore_case: true,
+                output: Some("tracking_removed".into()),
+            },
+            ShortcutAction::CopyToClipboard {
+                from: ShortcutReference::Output("tracking_removed".into()),
+            },
+            ShortcutAction::Share {
+                from: ShortcutReference::Output("tracking_removed".into()),
+            },
+        ],
+    };
+
+    let payload = compile_actions(&spec).unwrap();
+    let decompiled = decompile_actions(&payload).unwrap();
+
+    assert_eq!(decompiled, spec.actions);
 }
 
 #[test]
