@@ -71,6 +71,50 @@ fn cli_parses_shortcuts_add_get_urls() {
 }
 
 #[test]
+fn cli_parses_shortcuts_add_if() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "shortcuts",
+        "add-if",
+        "--name",
+        "Clean URL Share",
+        "--input",
+        "input_url_text",
+        "--value",
+        "match",
+        "--then-actions",
+        "then-actions.yaml",
+    ])
+    .unwrap();
+
+    match cli.command {
+        Command::Shortcuts { .. } => {}
+        _ => panic!("expected shortcuts command"),
+    }
+}
+
+#[test]
+fn cli_parses_shortcuts_add_repeat() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "shortcuts",
+        "add-repeat",
+        "--name",
+        "Clean URL Share",
+        "--input",
+        "urls",
+        "--body-actions",
+        "repeat-body.yaml",
+    ])
+    .unwrap();
+
+    match cli.command {
+        Command::Shortcuts { .. } => {}
+        _ => panic!("expected shortcuts command"),
+    }
+}
+
+#[test]
 fn cli_parses_shortcuts_move() {
     let cli = Cli::try_parse_from([
         "cueward",

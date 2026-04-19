@@ -145,6 +145,8 @@ pub(crate) enum ShortcutsAction {
         input: String,
         #[arg(long)]
         value: String,
+        #[arg(long = "then-actions")]
+        then_actions: String,
     },
     /// Append a repeat action
     AddRepeat {
@@ -152,6 +154,8 @@ pub(crate) enum ShortcutsAction {
         selector: ShortcutSelectorArgs,
         #[arg(long)]
         input: String,
+        #[arg(long = "body-actions")]
+        body_actions: String,
     },
     /// Apply a shortcut spec file
     Apply {
@@ -389,9 +393,45 @@ pub(crate) fn dispatch(_action: ShortcutsAction) {
             };
             append_action(selector, action, "shortcuts/add-share");
         }
-        _ => {
-            eprintln!("error: shortcuts subcommand not yet implemented");
-            process::exit(1);
+        ShortcutsAction::AddIf {
+            selector,
+            input,
+            value,
+            then_actions,
+        } => {
+            let selector = selector.into_selector();
+            let then_actions = match load_actions_file(&then_actions) {
+                Ok(actions) => actions,
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            };
+            let action = ShortcutAction::IfEqualsText {
+                input: parse_reference(&input),
+                value,
+                then_actions,
+            };
+            append_action(selector, action, "shortcuts/add-if");
+        }
+        ShortcutsAction::AddRepeat {
+            selector,
+            input,
+            body_actions,
+        } => {
+            let selector = selector.into_selector();
+            let body = match load_actions_file(&body_actions) {
+                Ok(actions) => actions,
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    process::exit(1);
+                }
+            };
+            let action = ShortcutAction::RepeatEach {
+                input: parse_reference(&input),
+                body,
+            };
+            append_action(selector, action, "shortcuts/add-repeat");
         }
     }
 }
@@ -411,6 +451,13 @@ fn load_shortcut_spec(path: &str) -> Result<ShortcutSpec, String> {
         fs::read_to_string(path).map_err(|err| format!("failed to read shortcut spec '{path}': {err}"))?;
     serde_yaml::from_str(&source)
         .map_err(|err| format!("failed to parse shortcut spec '{path}': {err}"))
+}
+
+fn load_actions_file(path: &str) -> Result<Vec<ShortcutAction>, String> {
+    let source = fs::read_to_string(path)
+        .map_err(|err| format!("failed to read shortcut actions file '{path}': {err}"))?;
+    serde_yaml::from_str(&source)
+        .map_err(|err| format!("failed to parse shortcut actions file '{path}': {err}"))
 }
 
 impl From<ShortcutSurfaceArg> for ShortcutSurface {
