@@ -1,4 +1,6 @@
 use std::process::Command;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
@@ -15,8 +17,8 @@ mod types;
 pub use compiler::{append_action, compile_actions, decompile_actions};
 pub use db::{
     encode_input_classes, ensure_shortcut_relation_live, find_shortcut, find_shortcut_live,
-    list_shortcuts, list_shortcuts_live, load_shortcut_input_policy_live, load_shortcut_payload_live,
-    load_shortcut_surfaces_live,
+    find_latest_shortcut_after_pk_live, latest_shortcut_pk_live, list_shortcuts, list_shortcuts_live,
+    load_shortcut_input_policy_live, load_shortcut_payload_live, load_shortcut_surfaces_live,
     rename_shortcut_name_by_workflow_id_live, sync_shortcut_surfaces_live,
     shortcut_has_relation_live, update_shortcut_actions_blob_live,
     update_shortcut_input_classes_live, write_shortcut_payload, write_shortcut_payload_live,
@@ -33,23 +35,35 @@ pub struct ShortcutCreateResult {
 }
 
 pub fn create_shortcut(name: &str) -> Result<ShortcutCreateResult, MacosError> {
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg("osascript -e 'tell application \"Shortcuts\"' -e 'return id of (make new shortcut)' -e 'end tell'")
+    let before_pk = latest_shortcut_pk_live()?.unwrap_or_default();
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(r#"open location "shortcuts://create-shortcut""#)
         .output()
-        .map_err(|err| MacosError::Other(format!("create shortcut shell command failed: {err}")))?;
+        .map_err(|err| MacosError::Other(format!("create shortcut launcher failed: {err}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(MacosError::Other(format!("create shortcut: {stderr}")));
     }
 
-    let workflow_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let created = loop {
+        if let Some(record) = find_latest_shortcut_after_pk_live(before_pk)? {
+            break record;
+        }
+        if Instant::now() >= deadline {
+            return Err(MacosError::Other(
+                "create shortcut: timed out waiting for new shortcut to appear in the Shortcuts database".into(),
+            ));
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
 
-    rename_shortcut_name_by_workflow_id_live(&workflow_id, name)?;
+    rename_shortcut_name_by_workflow_id_live(&created.workflow_id, name)?;
 
     Ok(ShortcutCreateResult {
-        workflow_id,
+        workflow_id: created.workflow_id,
         name: name.to_string(),
     })
 }

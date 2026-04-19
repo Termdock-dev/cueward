@@ -24,6 +24,49 @@ pub fn list_shortcuts_live() -> Result<Vec<ShortcutRecord>, MacosError> {
     list_shortcuts(&db_path)
 }
 
+pub fn latest_shortcut_pk(db_path: &Path) -> Result<Option<i64>, MacosError> {
+    let conn = open_db(db_path)?;
+    conn.query_row("SELECT MAX(Z_PK) FROM ZSHORTCUT", [], |row| row.get(0))
+        .map_err(MacosError::from)
+}
+
+pub fn latest_shortcut_pk_live() -> Result<Option<i64>, MacosError> {
+    let db_path = default_db_path()?;
+    latest_shortcut_pk(&db_path)
+}
+
+pub fn find_latest_shortcut_after_pk(
+    db_path: &Path,
+    min_pk: i64,
+) -> Result<Option<ShortcutRecord>, MacosError> {
+    let conn = open_db(db_path)?;
+    conn.query_row(
+        r#"
+        SELECT Z_PK, ZNAME, ZWORKFLOWID, ZACTIONCOUNT
+        FROM ZSHORTCUT
+        WHERE Z_PK > ?1
+        ORDER BY Z_PK DESC
+        LIMIT 1
+        "#,
+        params![min_pk],
+        |row| {
+            Ok(ShortcutRecord {
+                pk: row.get(0)?,
+                name: row.get(1)?,
+                workflow_id: row.get(2)?,
+                action_count: row.get::<_, Option<i64>>(3)?.unwrap_or_default(),
+            })
+        },
+    )
+    .optional()
+    .map_err(MacosError::from)
+}
+
+pub fn find_latest_shortcut_after_pk_live(min_pk: i64) -> Result<Option<ShortcutRecord>, MacosError> {
+    let db_path = default_db_path()?;
+    find_latest_shortcut_after_pk(&db_path, min_pk)
+}
+
 pub fn find_shortcut_live(selector: &ShortcutSelector) -> Result<ShortcutRecord, MacosError> {
     let db_path = default_db_path()?;
     find_shortcut(&db_path, selector)

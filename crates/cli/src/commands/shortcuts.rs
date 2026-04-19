@@ -172,10 +172,19 @@ pub(crate) enum ShortcutsAction {
 
 pub(crate) fn dispatch(_action: ShortcutsAction) {
     match _action {
-        ShortcutsAction::Create { .. } => {
-            eprintln!("error: shortcuts create is not yet implemented");
-            process::exit(1);
-        }
+        ShortcutsAction::Create { name } => match cueward_adapter_macos::shortcuts::create_shortcut(&name) {
+            Ok(result) => {
+                print_external(
+                    "shortcuts/create",
+                    &serde_json::to_string_pretty(&result).unwrap(),
+                );
+                eprintln!("shortcut created: {}", result.workflow_id);
+            }
+            Err(err) => {
+                eprintln!("error: {err}");
+                process::exit(1);
+            }
+        },
         ShortcutsAction::List => match cueward_adapter_macos::shortcuts::list_shortcuts_live() {
             Ok(shortcuts) => {
                 print_external(

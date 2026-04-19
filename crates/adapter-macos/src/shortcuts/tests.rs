@@ -413,3 +413,22 @@ fn sync_shortcut_surfaces_can_replace_folder_without_removing_existing_share_she
 
     assert_eq!(rows, vec![(2, 1), (6, 1), (7, 1)]);
 }
+
+#[test]
+fn find_latest_shortcut_after_pk_returns_newer_row() {
+    let dir = TempDir::new().unwrap();
+    let db_path = fixture_db(&dir);
+    let conn = Connection::open(&db_path).unwrap();
+    conn.execute(
+        "INSERT INTO ZSHORTCUT (Z_PK, ZNAME, ZWORKFLOWID, ZACTIONCOUNT) VALUES (5, 'New Shortcut', 'WF-5', 0)",
+        [],
+    )
+    .unwrap();
+
+    let record = super::db::find_latest_shortcut_after_pk(Path::new(&db_path), 1)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(record.pk, 5);
+    assert_eq!(record.workflow_id, "WF-5");
+}
