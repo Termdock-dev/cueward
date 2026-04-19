@@ -269,8 +269,16 @@ fn decompile_actions_round_trips_supported_clean_url_subset() {
                 from: ShortcutReference::ExtensionInput,
                 output: Some("input_url_text".into()),
             },
-            ShortcutAction::ReplaceText {
+            ShortcutAction::GetUrls {
                 from: ShortcutReference::Output("input_url_text".into()),
+                output: Some("urls".into()),
+            },
+            ShortcutAction::GetText {
+                from: ShortcutReference::Output("urls".into()),
+                output: Some("normalized_url_text".into()),
+            },
+            ShortcutAction::ReplaceText {
+                from: ShortcutReference::Output("normalized_url_text".into()),
                 find: "foo".into(),
                 replace: "bar".into(),
                 regex: true,

@@ -138,6 +138,33 @@ fn build_get_text_action(
     }))
 }
 
+fn build_get_urls_action(
+    from: &ShortcutReference,
+    output: Option<&str>,
+    outputs: &mut Map<String, Value>,
+) -> Result<Value, MacosError> {
+    let uuid = new_uuid();
+    if let Some(output) = output {
+        outputs.insert(
+            output.to_string(),
+            json!({
+                "OutputName": output,
+                "OutputUUID": uuid,
+            }),
+        );
+    }
+    let mut params = Map::new();
+    params.insert("UUID".into(), json!(uuid));
+    params.insert("WFInput".into(), resolve_reference(outputs, from, false)?);
+    if let Some(output) = output {
+        params.insert("CustomOutputName".into(), json!(output));
+    }
+    Ok(json!({
+        "WFWorkflowActionIdentifier": "is.workflow.actions.detect.link",
+        "WFWorkflowActionParameters": params
+    }))
+}
+
 fn build_replace_text_action(
     from: &ShortcutReference,
     find: &str,
@@ -198,6 +225,7 @@ pub fn build_action(
     match action {
         ShortcutAction::Text { value, output } => Ok(build_text_action(value, output.as_deref(), outputs)),
         ShortcutAction::GetText { from, output } => build_get_text_action(from, output.as_deref(), outputs),
+        ShortcutAction::GetUrls { from, output } => build_get_urls_action(from, output.as_deref(), outputs),
         ShortcutAction::ReplaceText {
             from,
             find,
@@ -216,8 +244,7 @@ pub fn build_action(
         ),
         ShortcutAction::CopyToClipboard { from } => build_setclipboard_action(from, outputs),
         ShortcutAction::Share { from } => build_share_action(from, outputs),
-        ShortcutAction::GetUrls { .. }
-        | ShortcutAction::IfEqualsText { .. }
+        ShortcutAction::IfEqualsText { .. }
         | ShortcutAction::RepeatEach { .. } => Err(MacosError::Other(
             "shortcut action not yet supported by compiler".into(),
         )),

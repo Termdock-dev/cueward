@@ -29,6 +29,7 @@ fn default_output_name(action_identifier: &str) -> Option<&'static str> {
     match action_identifier {
         "is.workflow.actions.gettext" => Some("Text"),
         "is.workflow.actions.text.replace" => Some("Updated Text"),
+        "is.workflow.actions.detect.link" => Some("URLs"),
         "is.workflow.actions.getitemfromlist" => Some("Item from List"),
         "is.workflow.actions.count" => Some("Count"),
         _ => None,
@@ -317,6 +318,16 @@ pub fn decompile_actions(payload: &[u8]) -> Result<Vec<ShortcutAction>, MacosErr
                     .get("WFReplaceTextCaseSensitive")
                     .and_then(Value::as_bool)
                     .unwrap_or(false),
+                output,
+            },
+            "is.workflow.actions.detect.link" => ShortcutAction::GetUrls {
+                from: decode_attachment_reference(
+                    params
+                        .get("WFInput")
+                        .and_then(Value::as_object)
+                        .ok_or_else(|| MacosError::Other("get-urls missing WFInput".into()))?,
+                    &aliases,
+                )?,
                 output,
             },
             "is.workflow.actions.setclipboard" => ShortcutAction::CopyToClipboard {

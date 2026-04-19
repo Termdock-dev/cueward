@@ -338,6 +338,14 @@ pub(crate) fn dispatch(_action: ShortcutsAction) {
             };
             append_action(selector, action, "shortcuts/add-get-text");
         }
+        ShortcutsAction::AddGetUrls { selector, from, output } => {
+            let selector = selector.into_selector();
+            let action = ShortcutAction::GetUrls {
+                from: parse_reference(&from),
+                output,
+            };
+            append_action(selector, action, "shortcuts/add-get-urls");
+        }
         ShortcutsAction::AddReplaceText {
             selector,
             from,
