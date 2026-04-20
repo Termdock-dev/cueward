@@ -5,6 +5,7 @@ use crate::MacosError;
 use crate::applescript::{escape, run_capture};
 
 mod crud;
+mod eventkit;
 
 pub use crud::{
     ReminderSelector, complete_reminder, create_reminder, delete_reminder, update_reminder,
@@ -210,6 +211,10 @@ fn build_list_script(list_filter: Option<&str>) -> String {
 }
 
 pub fn list(list_filter: Option<&str>) -> Result<Vec<ReminderItem>, MacosError> {
+    if let Some(reminders) = eventkit::list(list_filter)? {
+        return Ok(reminders);
+    }
+
     let stdout = run_capture(&build_list_script(list_filter), "list_reminders")?;
     Ok(parse_reminders_output(&stdout))
 }
@@ -296,6 +301,15 @@ pub fn list_due_between(
     to: DateTime<Local>,
     list_filter: Option<&str>,
 ) -> Result<Vec<ReminderItem>, MacosError> {
+    if let Some(reminders) = eventkit::list(list_filter)? {
+        return Ok(
+            reminders
+                .into_iter()
+                .filter(|reminder| reminder_due_in_range(reminder, from, to))
+                .collect(),
+        );
+    }
+
     let stdout = run_capture(
         &build_due_range_script(&from.to_rfc3339(), &to.to_rfc3339(), list_filter),
         "list_reminders_due_between",
@@ -325,6 +339,24 @@ pub fn today() -> Result<Vec<ReminderItem>, MacosError> {
         MacosError::Other(message) => MacosError::Other(format!("today_reminders: {message}")),
         other => other,
     })
+}
+
+fn reminder_due_in_range(reminder: &ReminderItem, from: DateTime<Local>, to: DateTime<Local>) -> bool {
+    reminder
+        .due_date
+        .as_deref()
+        .and_then(parse_due_date)
+        .map(|due| due >= from && due <= to)
+        .unwrap_or(false)
+}
+
+fn parse_due_date(value: &str) -> Option<DateTime<Local>> {
+    let naive = chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S").ok()?;
+    Local
+        .from_local_datetime(&naive)
+        .single()
+        .or_else(|| Local.from_local_datetime(&naive).earliest())
+        .or_else(|| Local.from_local_datetime(&naive).latest())
 }
 
 #[cfg(test)]

@@ -22,3 +22,7 @@ base64 = "0.22"
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
 ureq = "2"
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSCalendar", "NSDate", "NSString", "NSTimeZone", "NSEnumerator"] }
+objc2-event-kit = { version = "0.3.2", default-features = false, features = ["std", "block2", "EKCalendar", "EKCalendarItem", "EKEventStore", "EKReminder", "EKObject", "EKTypes"] }
