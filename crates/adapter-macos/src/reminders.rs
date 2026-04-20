@@ -226,17 +226,33 @@ fn build_due_range_script(from: &str, to: &str, list_filter: Option<&str>) -> St
     let (from_year, from_month, from_day, from_seconds) = local_datetime_components(&from_dt);
     let (to_year, to_month, to_day, to_seconds) = local_datetime_components(&to_dt);
     let list_filter_block = build_target_lists_block(list_filter);
-    let reminder_rows = reminder_rows_block(Some(
-        r#"if reminderDueValue is not missing value then
+    let reminder_rows = r#"
+                set reminderRefs to reminders of aList
+                set reminderDueValues to due date of every reminder of aList
+                set reminderCount to count of reminderDueValues
+                repeat with idx from 1 to reminderCount
+                    set reminderDueValue to item idx of reminderDueValues
+                    if reminderDueValue is not missing value then
                         if reminderDueValue is greater than or equal to fromDate and reminderDueValue is less than or equal to toDate then
-                            set shouldInclude to true
-                        else
-                            set shouldInclude to false
+                            set reminderRef to item idx of reminderRefs
+                            set reminderId to my encode_field(id of reminderRef)
+                            set reminderTitle to my encode_field(name of reminderRef)
+                            if body of reminderRef is missing value then
+                                set reminderNotes to ""
+                            else
+                                set reminderNotes to my encode_field(body of reminderRef)
+                            end if
+                            set reminderDue to my format_reminder_date(reminderDueValue)
+                            if completed of reminderRef then
+                                set reminderCompleted to "true"
+                            else
+                                set reminderCompleted to "false"
+                            end if
+                            set output to output & reminderId & tab & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
                         end if
-                    else
-                        set shouldInclude to false
-                    end if"#,
-    ));
+                    end if
+                end repeat
+    "#;
 
     format!(
         r#"
@@ -371,7 +387,8 @@ mod tests {
         assert!(today_script.contains("format_reminder_date"));
         assert!(list_script.contains("set reminderId to my encode_field(id of reminderInfo)"));
         assert!(list_script.contains("set reminderCompleted to \"true\""));
-        assert!(today_script.contains("set reminderProps to properties of reminders of aList"));
+        assert!(today_script.contains("set reminderRefs to reminders of aList"));
+        assert!(today_script.contains("set reminderDueValues to due date of every reminder of aList"));
     }
 
     #[test]
@@ -396,9 +413,13 @@ mod tests {
             .expect("to");
         let script = build_today_script(&from.to_rfc3339(), &to.to_rfc3339());
 
+        assert!(script.contains("set reminderRefs to reminders of aList"));
+        assert!(script.contains("set reminderDueValues to due date of every reminder of aList"));
         assert!(script.contains("if reminderDueValue is not missing value then"));
         assert!(script.contains("if reminderDueValue is greater than or equal to fromDate and reminderDueValue is less than or equal to toDate then"));
+        assert!(script.contains("set reminderRef to item idx of reminderRefs"));
         assert!(!script.contains("set matchingReminders to"));
+        assert!(!script.contains("set reminderProps to properties of reminders of aList"));
         assert!(!script.contains("whose due date is not missing value"));
     }
 
