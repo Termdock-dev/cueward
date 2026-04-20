@@ -231,7 +231,8 @@ fn build_due_range_script(from: &str, to: &str, list_filter: Option<&str>) -> St
     let (from_year, from_month, from_day, from_seconds) = local_datetime_components(&from_dt);
     let (to_year, to_month, to_day, to_seconds) = local_datetime_components(&to_dt);
     let list_filter_block = build_target_lists_block(list_filter);
-    let reminder_rows = r#"
+    let reminder_rows = format!(
+        r#"
                 set reminderRefs to reminders of aList
                 set reminderDueValues to due date of every reminder of aList
                 set reminderCount to count of reminderDueValues
@@ -257,7 +258,8 @@ fn build_due_range_script(from: &str, to: &str, list_filter: Option<&str>) -> St
                         end if
                     end if
                 end repeat
-    "#;
+    "#,
+    );
 
     format!(
         r#"
@@ -453,6 +455,8 @@ mod tests {
         assert!(!script.contains("set matchingReminders to"));
         assert!(!script.contains("set reminderProps to properties of reminders of aList"));
         assert!(!script.contains("whose due date is not missing value"));
+        assert!(script.contains(REMINDER_SEPARATOR));
+        assert!(!script.contains("{REMINDER_SEPARATOR}"));
     }
 
     #[test]
