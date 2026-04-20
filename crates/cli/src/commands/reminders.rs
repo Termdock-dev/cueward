@@ -172,31 +172,54 @@ pub(crate) fn dispatch(action: RemindersAction) {
             due_before,
             due_tomorrow,
         } => {
-            match cueward_adapter_macos::reminders::list(list.as_deref()) {
-                Ok(reminders) => {
-                    let due_before_dt = match due_before.as_deref() {
-                        Some(value) => match normalize_due_before_cutoff(value) {
-                            Ok(dt) => Some(dt),
-                            Err(err) => {
-                                eprintln!("{err}");
-                                process::exit(1);
-                            }
-                        },
-                        None => None,
-                    };
-                    let tomorrow_bounds = if due_tomorrow {
-                        let tomorrow = Local::now() + Duration::days(1);
-                        match local_day_bounds(tomorrow) {
-                            Ok(bounds) => Some(bounds),
-                            Err(err) => {
-                                eprintln!("{err}");
-                                process::exit(1);
-                            }
-                        }
+            let due_before_dt = match due_before.as_deref() {
+                Some(value) => match normalize_due_before_cutoff(value) {
+                    Ok(dt) => Some(dt),
+                    Err(err) => {
+                        eprintln!("{err}");
+                        process::exit(1);
+                    }
+                },
+                None => None,
+            };
+            let tomorrow_bounds = if due_tomorrow {
+                let tomorrow = Local::now() + Duration::days(1);
+                match local_day_bounds(tomorrow) {
+                    Ok(bounds) => Some(bounds),
+                    Err(err) => {
+                        eprintln!("{err}");
+                        process::exit(1);
+                    }
+                }
+            } else {
+                None
+            };
+
+            let reminders_result = match tomorrow_bounds {
+                Some((from, to)) => {
+                    let effective_to = due_before_dt
+                        .map(|cutoff| if cutoff < to { cutoff } else { to })
+                        .unwrap_or(to);
+                    if effective_to < from {
+                        Ok(Vec::new())
                     } else {
-                        None
+                        cueward_adapter_macos::reminders::list_due_between(
+                            from,
+                            effective_to,
+                            list.as_deref(),
+                        )
+                    }
+                }
+                None => cueward_adapter_macos::reminders::list(list.as_deref()),
+            };
+
+            match reminders_result {
+                Ok(reminders) => {
+                    let reminders = if due_tomorrow {
+                        reminders
+                    } else {
+                        filter_reminders(reminders, due_before_dt, tomorrow_bounds)
                     };
-                    let reminders = filter_reminders(reminders, due_before_dt, tomorrow_bounds);
                     println!("{}", serde_json::to_string_pretty(&reminders).unwrap());
                     eprintln!("{} reminder(s)", reminders.len());
                 }

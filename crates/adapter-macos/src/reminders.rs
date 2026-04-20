@@ -5,6 +5,7 @@ use crate::MacosError;
 use crate::applescript::{escape, run_capture};
 
 mod crud;
+mod eventkit;
 
 pub use crud::{
     ReminderSelector, complete_reminder, create_reminder, delete_reminder, update_reminder,
@@ -139,8 +140,8 @@ fn reminders_script_prelude() -> String {
     )
 }
 
-fn build_list_script(list_filter: Option<&str>) -> String {
-    let list_filter_block = match list_filter {
+fn build_target_lists_block(list_filter: Option<&str>) -> String {
+    match list_filter {
         Some(name) => {
             let escaped = escape(name);
             format!(
@@ -151,7 +152,45 @@ fn build_list_script(list_filter: Option<&str>) -> String {
             )
         }
         None => "set targetLists to lists".to_string(),
-    };
+    }
+}
+
+fn reminder_rows_block(filter_clause: Option<&str>) -> String {
+    let filter_clause = filter_clause.unwrap_or("set shouldInclude to true");
+    format!(
+        r#"
+                set reminderProps to properties of reminders of aList
+                repeat with reminderInfo in reminderProps
+                    set reminderDueValue to due date of reminderInfo
+                    {filter_clause}
+                    if shouldInclude then
+                        set reminderId to my encode_field(id of reminderInfo)
+                        set reminderTitle to my encode_field(name of reminderInfo)
+                        if body of reminderInfo is missing value then
+                            set reminderNotes to ""
+                        else
+                            set reminderNotes to my encode_field(body of reminderInfo)
+                        end if
+                        if reminderDueValue is missing value then
+                            set reminderDue to ""
+                        else
+                            set reminderDue to my format_reminder_date(reminderDueValue)
+                        end if
+                        if completed of reminderInfo then
+                            set reminderCompleted to "true"
+                        else
+                            set reminderCompleted to "false"
+                        end if
+                        set output to output & reminderId & tab & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
+                    end if
+                end repeat
+        "#,
+    )
+}
+
+fn build_list_script(list_filter: Option<&str>) -> String {
+    let list_filter_block = build_target_lists_block(list_filter);
+    let reminder_rows = reminder_rows_block(None);
 
     format!(
         r#"
@@ -161,40 +200,26 @@ fn build_list_script(list_filter: Option<&str>) -> String {
             {list_filter_block}
             repeat with aList in targetLists
                 set listName to my encode_field(name of aList)
-                repeat with aReminder in reminders of aList
-                    set reminderId to my encode_field(id of aReminder)
-                    set reminderTitle to my encode_field(name of aReminder)
-                    if body of aReminder is missing value then
-                        set reminderNotes to ""
-                    else
-                        set reminderNotes to my encode_field(body of aReminder)
-                    end if
-                    if due date of aReminder is missing value then
-                        set reminderDue to ""
-                    else
-                        set reminderDue to my format_reminder_date(due date of aReminder)
-                    end if
-                    if completed of aReminder then
-                        set reminderCompleted to "true"
-                    else
-                        set reminderCompleted to "false"
-                    end if
-                    set output to output & reminderId & tab & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
-                end repeat
+                {reminder_rows}
             end repeat
             return output
         end tell
         "#,
         prelude = reminders_script_prelude(),
+        reminder_rows = reminder_rows,
     )
 }
 
 pub fn list(list_filter: Option<&str>) -> Result<Vec<ReminderItem>, MacosError> {
+    if let Some(reminders) = eventkit::list(list_filter)? {
+        return Ok(reminders);
+    }
+
     let stdout = run_capture(&build_list_script(list_filter), "list_reminders")?;
     Ok(parse_reminders_output(&stdout))
 }
 
-fn build_today_script(from: &str, to: &str) -> String {
+fn build_due_range_script(from: &str, to: &str, list_filter: Option<&str>) -> String {
     let from_dt = DateTime::parse_from_rfc3339(from)
         .ok()
         .map(|dt| dt.with_timezone(&Local))
@@ -205,6 +230,36 @@ fn build_today_script(from: &str, to: &str) -> String {
         .unwrap_or_else(Local::now);
     let (from_year, from_month, from_day, from_seconds) = local_datetime_components(&from_dt);
     let (to_year, to_month, to_day, to_seconds) = local_datetime_components(&to_dt);
+    let list_filter_block = build_target_lists_block(list_filter);
+    let reminder_rows = format!(
+        r#"
+                set reminderRefs to reminders of aList
+                set reminderDueValues to due date of every reminder of aList
+                set reminderCount to count of reminderDueValues
+                repeat with idx from 1 to reminderCount
+                    set reminderDueValue to item idx of reminderDueValues
+                    if reminderDueValue is not missing value then
+                        if reminderDueValue is greater than or equal to fromDate and reminderDueValue is less than or equal to toDate then
+                            set reminderRef to item idx of reminderRefs
+                            set reminderId to my encode_field(id of reminderRef)
+                            set reminderTitle to my encode_field(name of reminderRef)
+                            if body of reminderRef is missing value then
+                                set reminderNotes to ""
+                            else
+                                set reminderNotes to my encode_field(body of reminderRef)
+                            end if
+                            set reminderDue to my format_reminder_date(reminderDueValue)
+                            if completed of reminderRef then
+                                set reminderCompleted to "true"
+                            else
+                                set reminderCompleted to "false"
+                            end if
+                            set output to output & reminderId & tab & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
+                        end if
+                    end if
+                end repeat
+    "#,
+    );
 
     format!(
         r#"
@@ -221,25 +276,10 @@ fn build_today_script(from: &str, to: &str) -> String {
             set day of toDate to {to_day}
             set time of toDate to {to_seconds}
             set output to ""
-            repeat with aList in lists
+            {list_filter_block}
+            repeat with aList in targetLists
                 set listName to my encode_field(name of aList)
-                set matchingReminders to (reminders of aList whose due date is not missing value and due date is greater than or equal to fromDate and due date is less than or equal to toDate)
-                repeat with aReminder in matchingReminders
-                    set reminderId to my encode_field(id of aReminder)
-                    set reminderTitle to my encode_field(name of aReminder)
-                    if body of aReminder is missing value then
-                        set reminderNotes to ""
-                    else
-                        set reminderNotes to my encode_field(body of aReminder)
-                    end if
-                    set reminderDue to my format_reminder_date(due date of aReminder)
-                    if completed of aReminder then
-                        set reminderCompleted to "true"
-                    else
-                        set reminderCompleted to "false"
-                    end if
-                    set output to output & reminderId & tab & reminderTitle & tab & reminderNotes & tab & reminderDue & tab & reminderCompleted & tab & listName & "{REMINDER_SEPARATOR}"
-                end repeat
+                {reminder_rows}
             end repeat
             return output
         end tell
@@ -253,7 +293,35 @@ fn build_today_script(from: &str, to: &str) -> String {
         to_month = to_month,
         to_day = to_day,
         to_seconds = to_seconds,
+        list_filter_block = list_filter_block,
+        reminder_rows = reminder_rows,
     )
+}
+
+pub fn list_due_between(
+    from: DateTime<Local>,
+    to: DateTime<Local>,
+    list_filter: Option<&str>,
+) -> Result<Vec<ReminderItem>, MacosError> {
+    if let Some(reminders) = eventkit::list(list_filter)? {
+        return Ok(
+            reminders
+                .into_iter()
+                .filter(|reminder| reminder_due_in_range(reminder, from, to))
+                .collect(),
+        );
+    }
+
+    let stdout = run_capture(
+        &build_due_range_script(&from.to_rfc3339(), &to.to_rfc3339(), list_filter),
+        "list_reminders_due_between",
+    )?;
+    Ok(parse_reminders_output(&stdout))
+}
+
+#[cfg(test)]
+fn build_today_script(from: &str, to: &str) -> String {
+    build_due_range_script(from, to, None)
 }
 
 pub fn today() -> Result<Vec<ReminderItem>, MacosError> {
@@ -269,18 +337,38 @@ pub fn today() -> Result<Vec<ReminderItem>, MacosError> {
         .and_then(|dt| Local.from_local_datetime(&dt).single())
         .ok_or_else(|| MacosError::Other("failed to determine end of today".into()))?;
 
-    let stdout = run_capture(
-        &build_today_script(&from.to_rfc3339(), &to.to_rfc3339()),
-        "today_reminders",
-    )?;
-    Ok(parse_reminders_output(&stdout))
+    list_due_between(from, to, None).map_err(|err| match err {
+        MacosError::Other(message) => MacosError::Other(format!("today_reminders: {message}")),
+        other => other,
+    })
+}
+
+fn reminder_due_in_range(reminder: &ReminderItem, from: DateTime<Local>, to: DateTime<Local>) -> bool {
+    reminder
+        .due_date
+        .as_deref()
+        .and_then(parse_due_date)
+        .map(|due| due >= from && due <= to)
+        .unwrap_or(false)
+}
+
+fn parse_due_date(value: &str) -> Option<DateTime<Local>> {
+    let naive = chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S").ok()?;
+    Local
+        .from_local_datetime(&naive)
+        .single()
+        .or_else(|| Local.from_local_datetime(&naive).earliest())
+        .or_else(|| Local.from_local_datetime(&naive).latest())
 }
 
 #[cfg(test)]
 mod tests {
     use chrono::{Local, TimeZone};
 
-    use super::{REMINDER_SEPARATOR, build_list_script, build_today_script, parse_reminder_line, parse_reminders_output};
+    use super::{
+        REMINDER_SEPARATOR, build_list_script, build_today_script, parse_reminder_line,
+        parse_reminders_output,
+    };
 
     #[test]
     fn parse_reminder_line_unescapes_fields() {
@@ -331,9 +419,44 @@ mod tests {
         assert!(!today_script.contains("class isot"));
         assert!(list_script.contains("format_reminder_date"));
         assert!(today_script.contains("format_reminder_date"));
-        assert!(list_script.contains("set reminderId to my encode_field(id of aReminder)"));
+        assert!(list_script.contains("set reminderId to my encode_field(id of reminderInfo)"));
         assert!(list_script.contains("set reminderCompleted to \"true\""));
-        assert!(today_script.contains("set matchingReminders to"));
+        assert!(today_script.contains("set reminderRefs to reminders of aList"));
+        assert!(today_script.contains("set reminderDueValues to due date of every reminder of aList"));
+    }
+
+    #[test]
+    fn list_script_uses_bulk_properties_lookup() {
+        let script = build_list_script(None);
+
+        assert!(script.contains("set reminderProps to properties of reminders of aList"));
+        assert!(!script.contains("repeat with aReminder in reminders of aList"));
+        assert!(!script.contains("id of aReminder"));
+        assert!(!script.contains("name of aReminder"));
+    }
+
+    #[test]
+    fn today_script_filters_due_dates_without_whose_clause() {
+        let from = Local
+            .with_ymd_and_hms(2026, 4, 11, 0, 0, 0)
+            .single()
+            .expect("from");
+        let to = Local
+            .with_ymd_and_hms(2026, 4, 11, 23, 59, 59)
+            .single()
+            .expect("to");
+        let script = build_today_script(&from.to_rfc3339(), &to.to_rfc3339());
+
+        assert!(script.contains("set reminderRefs to reminders of aList"));
+        assert!(script.contains("set reminderDueValues to due date of every reminder of aList"));
+        assert!(script.contains("if reminderDueValue is not missing value then"));
+        assert!(script.contains("if reminderDueValue is greater than or equal to fromDate and reminderDueValue is less than or equal to toDate then"));
+        assert!(script.contains("set reminderRef to item idx of reminderRefs"));
+        assert!(!script.contains("set matchingReminders to"));
+        assert!(!script.contains("set reminderProps to properties of reminders of aList"));
+        assert!(!script.contains("whose due date is not missing value"));
+        assert!(script.contains(REMINDER_SEPARATOR));
+        assert!(!script.contains("{REMINDER_SEPARATOR}"));
     }
 
     #[test]
