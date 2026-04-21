@@ -1,12 +1,24 @@
 # Cueward
 
-A CLI tool that captures scattered knowledge from macOS native sources and makes it searchable.
+Local memory and automation for AI agents on macOS.
 
-Cueward reads Safari history, Apple Notes, and iMessage locally — no cloud APIs, no web scraping, no third-party dependencies. It auto-tags content using keyword rules and indexes everything for fast BM25 search.
+Cueward is a Unix-style CLI for agents that need structured access to native macOS data and actions. It reads Safari, Notes, Reminders, Calendar, Messages, Voice Memos, Stickies, Quick Notes, and Apple Shortcuts locally, then returns machine-friendly JSON that agents can actually use.
 
-Designed as a Unix-style tool: it outputs structured JSON for AI Agents to consume.
+It is designed for agent workflows first:
 
-Most first-time macOS integrations will require system permissions before they work. If a command fails immediately on first use, check Privacy & Security settings first, grant the needed access, then run it again.
+- Native macOS reach: SQLite reads, AppleScript, EventKit, Vision OCR, and Shortcuts integration
+- Agent-friendly output: structured JSON instead of chatty terminal prose
+- Local-first privacy: no cloud APIs, no scraping proxy, no third-party data backend
+- Practical automation: diagnose permissions with `cueward doctor`, then read, capture, search, and act
+
+Common use cases:
+
+- Give an agent a searchable local memory layer for what you read, saved, and wrote on macOS
+- Build Shortcuts programmatically from CLI or spec files
+- Read reminders and calendar events fast enough for background agents and daily briefings
+- Capture Safari, Notes, screenshots, clipboard, and OCR results into a local index
+
+Most first-time macOS integrations require system permissions before they work. If a command fails immediately on first use, check Privacy & Security settings first, grant the needed access, then run it again.
 
 ## Install
 
