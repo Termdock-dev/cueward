@@ -10,6 +10,14 @@ Most first-time macOS integrations will require system permissions before they w
 
 ## Install
 
+Install the latest published release from crates.io:
+
+```bash
+cargo install cueward-cli --locked
+```
+
+To build from the local repo instead:
+
 ```bash
 git clone https://github.com/HCYT/cueward.git
 cd cueward
@@ -17,6 +25,16 @@ cargo install --path crates/cli
 ```
 
 Requires Rust 1.85+ (edition 2024).
+
+## What's New in 0.3.0
+
+Cueward `0.3.0` adds several major capabilities and reliability improvements:
+
+- Shortcuts CLI: create, run, rename, move, apply/export spec, Share Sheet setup, and action editing
+- `cueward doctor`: audit Full Disk Access, Automation, and optional Safari live probes before using integrations
+- Reminders reads moved to EventKit-first with AppleScript fallback, removing the previous multi-second read bottleneck on supported setups
+- Calendar reads moved to EventKit-first with AppleScript fallback
+- Notes attachment support expanded, including drawing attachments and richer structured attachment enrichment
 
 ### macOS Permissions
 
@@ -31,6 +49,25 @@ For Apple Notes, Reminders, and Calendar operations, also allow automation:
 Some integrations may additionally require:
 - **Accessibility / 輔助使用** for UI scripting style automations
 - app-specific data access via **Full Disk Access** when reading container files
+
+### Calendar / Reminders Read Access
+
+As of `0.3.0`, Cueward prefers EventKit for `reminders` and `calendar` read commands because it is dramatically faster and more reliable than app scripting.
+
+- `cueward reminders list`
+- `cueward reminders today`
+- `cueward reminders list --due-tomorrow`
+- `cueward calendar list`
+- `cueward calendar today`
+
+For Reminders, allow the terminal app to read reminders when macOS prompts for access.
+
+For Calendar, newer macOS versions may expose more than one permission level. Depending on your system language/version, you may see labels similar to:
+
+- `取用` / `僅寫入`
+- `完整取用`
+
+If Calendar only has write-only access, Cueward will fall back to AppleScript for reads. That keeps commands working, but `calendar list` / `calendar today` can be much slower on some calendars. For the best performance, grant **Calendar full access / 完整取用** to your terminal app.
 
 ## Usage
 
@@ -277,7 +314,7 @@ cueward plan --title "Review PR" --notes "Check bot comments" --list Cueward
 
 ### Reminders
 
-Read existing Apple Reminders:
+Read and manage Apple Reminders:
 
 ```bash
 # List all reminders
@@ -288,6 +325,19 @@ cueward reminders list --list Work
 
 # Reminders due today
 cueward reminders today
+
+# Create a reminder
+cueward reminders create --title "Review PR" --due "2026-04-22 10:00" --list Cueward --notes "Check review threads"
+
+# Update a reminder by id or title
+cueward reminders update --id x-apple-reminder://123 --new-title "Review PR #114" --priority 5
+cueward reminders update --title "Review PR" --list Archive
+
+# Mark complete
+cueward reminders complete --title "Review PR"
+
+# Delete
+cueward reminders delete --title "Review PR"
 ```
 
 Outputs JSON with `title`, `notes`, `due_date`, `completed`, and `list_name`.
@@ -308,6 +358,9 @@ Supports PNG, JPG, PDF. Languages: zh-Hant, zh-Hans, en-US, ja.
 Update, delete, or move Apple Notes:
 
 ```bash
+# Create a note
+cueward notes create --title "Daily Digest" --body "Summary..." --folder Cueward
+
 # Update a note's body
 cueward notes update --title "Note Title" --body "New content" --folder Cueward
 
@@ -336,10 +389,57 @@ cueward calendar list --calendar Work
 cueward calendar create --title "Team Sync" --start "2026-04-12 14:00" --end "2026-04-12 15:00" --calendar Work --location "Google Meet" --notes "Weekly sync"
 
 # Delete an event (matches by title + start time)
-cueward calendar delete --title "Team Sync" --start "2026-04-12 14:00"
+cueward calendar delete --title "Team Sync" --start "2026-04-12 14:00" --calendar Work
+
+# Update an event
+cueward calendar update --title "Team Sync" --calendar Work --new-start "2026-04-12 14:30" --new-end "2026-04-12 15:30"
 ```
 
 Datetime format: ISO 8601 (`2026-04-11T14:00:00`) or `YYYY-MM-DD HH:MM`.
+
+### Shortcuts
+
+Create and manage Apple Shortcuts, including declarative spec workflows:
+
+```bash
+# List shortcuts
+cueward shortcuts list
+
+# Create a blank shortcut
+cueward shortcuts create "Clean URL Share"
+
+# Show one shortcut as a high-level YAML-like spec
+cueward shortcuts show --name "Clean URL Share"
+
+# Set accepted input and attach Share Sheet surface
+cueward shortcuts input-type --name "Clean URL Share" url
+cueward shortcuts surface --name "Clean URL Share" share-sheet
+cueward shortcuts surface --name "Clean URL Share" library-root
+
+# Append actions incrementally
+cueward shortcuts add-text --name "Clean URL Share" --value "hello"
+cueward shortcuts add-get-urls --name "Clean URL Share" --from extension-input --output urls
+cueward shortcuts add-get-text --name "Clean URL Share" --from urls --output url_text
+cueward shortcuts add-replace-text --name "Clean URL Share" --from text --find "hello" --replace "world"
+cueward shortcuts add-copy-to-clipboard --name "Clean URL Share" --from text_2
+cueward shortcuts add-share --name "Clean URL Share" --from text_2
+
+# Control flow
+cueward shortcuts add-if --name "Clean URL Share" --input text --value world --then-actions then.yaml
+cueward shortcuts add-repeat --name "Clean URL Share" --input urls --body-actions repeat.yaml
+
+# Spec-based workflow
+cueward shortcuts validate-spec clean-url-share.yaml
+cueward shortcuts apply clean-url-share.yaml
+cueward shortcuts export-spec --name "Clean URL Share"
+
+# Rename, move, and run
+cueward shortcuts rename --name "Clean URL Share" "Clean URL Share v2"
+cueward shortcuts move --name "Clean URL Share v2" "Utilities"
+cueward shortcuts run --name "Clean URL Share v2"
+```
+
+Selector-based commands generally accept either `--name` or `--id`.
 
 ### Screenshot
 
@@ -495,48 +595,56 @@ mkdir -p ~/.claude/skills/ && cp -r skills/cueward-agent ~/.claude/skills/
 
 ```
 crates/
-├── core/               Cue struct, PlatformAdapter trait, BM25 index, auto-tagger
+├── core/               Cue types, adapter trait, inbox/state/index, shortcuts spec model
 ├── cli/
 │   ├── main.rs         CLI entrypoint
-│   └── commands/       Command-local clap enums, dispatch, and parse tests
+│   └── commands/       Per-command clap enums, dispatch, and parse tests
 ├── adapter-macos/
-│   ├── safari/
-│   │   ├── mod.rs      Public Safari facade + re-exports
-│   │   ├── types.rs    Shared Safari result types
-│   │   ├── script.rs   Shared AppleScript / JavaScript builders
-│   │   ├── core.rs     Tabs, open/close, read/exec, scroll / scroll-and-read
-│   │   ├── history.rs  Safari History.db capture
-│   │   ├── social/     Threads / X feed extractors
-│   │   └── ai/         Gemini / ChatGPT / Grok provider modules
-│   ├── bookmarks.rs    Safari bookmarks CRUD
-│   ├── safari_guard.rs Shared Safari rate limit + file lock guard
-│   ├── notes.rs        Apple Notes automation
-│   ├── reminders.rs    Apple Reminders read / write
-│   ├── calendar.rs     Apple Calendar read / write
-│   ├── screenshot.rs   Screenshot capture
-│   ├── clipboard.rs    Clipboard read / write
-│   └── ocr.rs          Vision OCR
+│   ├── applescript.rs      Shared AppleScript helpers
+│   ├── bookmarks/          Safari bookmarks CRUD + plist tree operations
+│   ├── calendar.rs         Apple Calendar CRUD + AppleScript fallback
+│   ├── calendar_eventkit.rs EventKit-backed calendar reads
+│   ├── clipboard.rs        Clipboard read / write
+│   ├── doctor/             Full Disk Access / Automation diagnostics
+│   ├── messages.rs         iMessage capture
+│   ├── notes/              Apple Notes CRUD, capture, DB reads, attachments
+│   ├── ocr.rs              Vision OCR
+│   ├── plan.rs             Reminder creation shortcut command
+│   ├── quick_notes.rs      Quick Notes workflows
+│   ├── reddit/             Reddit JSON API reads and scan-state integration
+│   ├── reminders.rs        Apple Reminders read / write + AppleScript fallback
+│   ├── reminders/eventkit.rs EventKit-backed reminder reads
+│   ├── safari/             Tabs, history, AI providers, social feeds
+│   ├── safari_guard.rs     Shared Safari rate limit + file lock guard
+│   ├── scan_state.rs       Shared polling / target state tracking
+│   ├── screenshot/         Screen/window capture + OCR integration
+│   ├── shortcuts/          Shortcuts DB compiler, installer, and tests
+│   ├── stickies/           Stickies CRUD, geometry, color, state
+│   └── voice_memos.rs      Voice Memos metadata reads
 └── adapter-windows/    Reserved for future cross-platform support
 ```
 
 - **Core Engine + Adapter Pattern**: Platform-specific code is isolated in adapters. Core logic is platform-agnostic.
-- **Native First**: Direct SQLite reads, AppleScript, and Vision Framework. No web scraping, no browser automation.
+- **Native First**: Direct SQLite reads, AppleScript, EventKit, and Vision Framework. No cloud APIs and no browser-driving frameworks in the normal data path.
 - **Privacy**: All data extraction happens locally. Nothing leaves your machine.
 
 ## Data Storage
 
 ```
 ~/.cueward/
-├── inbox/        Captured cues awaiting triage
-├── processed/    Triaged cues (moved from inbox)
-├── index/        Tantivy BM25 search index
+├── inbox/            Captured cues awaiting triage
+├── processed/        Triaged cues moved out of inbox
+├── index/            Tantivy BM25 search index and lock files
 ├── cache/
-│   ├── ocr/          OCR result cache (by SHA256)
+│   ├── ocr/          OCR result cache keyed by SHA256
 │   ├── screenshots/  Screenshot captures
 │   └── clipboard/    Clipboard image captures
-├── state.json    High watermark timestamps per source
-└── tags.toml     Auto-tagging keyword rules (user-created)
+├── state.json        High watermark timestamps and scan target state
+├── tags.toml         Auto-tagging keyword rules
+└── lock.json         Safari automation lock / rate-limit coordination
 ```
+
+Additional app- or tool-specific scratch directories may appear under `~/.cueward/` over time, but the paths above are the stable managed data layout that Cueward itself depends on.
 
 ## License
 
