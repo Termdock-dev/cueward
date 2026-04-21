@@ -4,6 +4,9 @@ use serde::Serialize;
 use crate::MacosError;
 use crate::applescript::{applescript_date_block, escape, escape_body, run, run_capture};
 
+#[path = "calendar_eventkit.rs"]
+mod eventkit;
+
 const EVENT_SEPARATOR: &str = "---EVENT_SEP---";
 
 #[derive(Serialize)]
@@ -77,6 +80,10 @@ pub fn list_events(
     to: DateTime<Local>,
     calendar_filter: Option<&str>,
 ) -> Result<Vec<CalendarEvent>, MacosError> {
+    if let Some(events) = eventkit::list_events(from, to, calendar_filter)? {
+        return Ok(events);
+    }
+
     let from_block = applescript_date_block("fromDate", &from);
     let to_block = applescript_date_block("toDate", &to);
 
@@ -256,7 +263,10 @@ fn build_update_script(
 
     let mut actions = Vec::new();
     if let Some(new_title) = new_title {
-        actions.push(format!(r#"set summary of targetEvt to "{}""#, escape(new_title)));
+        actions.push(format!(
+            r#"set summary of targetEvt to "{}""#,
+            escape(new_title)
+        ));
     }
     match (new_start.is_some(), new_end.is_some()) {
         (true, true) => {
@@ -264,9 +274,13 @@ fn build_update_script(
             actions.push("set end date of targetEvt to newEndDate".to_string());
         }
         (true, false) => {
-            actions.push("set originalDuration to (end date of targetEvt) - (start date of targetEvt)".to_string());
+            actions.push(
+                "set originalDuration to (end date of targetEvt) - (start date of targetEvt)"
+                    .to_string(),
+            );
             actions.push("set start date of targetEvt to newStartDate".to_string());
-            actions.push("set end date of targetEvt to newStartDate + originalDuration".to_string());
+            actions
+                .push("set end date of targetEvt to newStartDate + originalDuration".to_string());
         }
         (false, true) => {
             actions.push("set end date of targetEvt to newEndDate".to_string());
@@ -274,10 +288,16 @@ fn build_update_script(
         (false, false) => {}
     }
     if let Some(notes) = notes {
-        actions.push(format!("set description of targetEvt to {}", escape_body(notes)));
+        actions.push(format!(
+            "set description of targetEvt to {}",
+            escape_body(notes)
+        ));
     }
     if let Some(location) = location {
-        actions.push(format!("set location of targetEvt to {}", escape_body(location)));
+        actions.push(format!(
+            "set location of targetEvt to {}",
+            escape_body(location)
+        ));
     }
 
     format!(
@@ -395,8 +415,12 @@ mod tests {
         );
 
         assert!(script.contains(r#"set targetCals to (calendars whose name is "Work")"#));
-        assert!(script.contains(r#"repeat with evt in (events of aCal whose summary is "顧問會議")"#));
-        assert!(script.contains("set originalDuration to (end date of targetEvt) - (start date of targetEvt)"));
+        assert!(
+            script.contains(r#"repeat with evt in (events of aCal whose summary is "顧問會議")"#)
+        );
+        assert!(script.contains(
+            "set originalDuration to (end date of targetEvt) - (start date of targetEvt)"
+        ));
         assert!(script.contains("set start date of targetEvt to newStartDate"));
         assert!(script.contains("set end date of targetEvt to newStartDate + originalDuration"));
         assert!(script.contains(r#"set summary of targetEvt to "顧問會議（改期）""#));
