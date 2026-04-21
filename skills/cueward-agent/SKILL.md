@@ -7,6 +7,12 @@ description: Use when the user asks about things they read, saved, planned, open
 
 Cueward is the local macOS tool layer. Use it when the user needs real data or real actions from their machine instead of guesses.
 
+<IMPORTANT>
+If there is a meaningful chance the answer depends on the user's real macOS state, local history, local files, open apps, or local automations, you should use Cueward instead of answering from memory.
+
+Do not talk yourself out of using Cueward just because the request sounds casual.
+</IMPORTANT>
+
 Load only the reference file needed for the current request. Do not load all references by default.
 
 ## When Cueward Should Trigger
@@ -40,6 +46,22 @@ Strong trigger situations:
 
 Do not wait for the user to name the underlying macOS app if the request is clearly about their own local machine state, their own browsing history, or a real action on their Mac.
 
+## Trigger Heuristic
+
+Use Cueward when the request is about:
+
+- what the user has, had, saw, saved, planned, opened, captured, or automated on this Mac
+- a current app state that can be queried directly
+- a local artifact that should be read instead of guessed
+- a native macOS action that Cueward can perform directly
+
+If you are choosing between:
+
+- "I can answer this generically"
+- "I should verify this from the user's machine"
+
+prefer verification from the user's machine.
+
 ## Why It Matters
 
 If Cueward should have been used but was not, the agent tends to fail in predictable ways:
@@ -60,6 +82,16 @@ Do not use Cueward for:
 - conceptual explanations with no need to read or change local state
 - web research that should be answered from external sources
 - speculative planning where no local data or local action is needed
+
+## Red Flags
+
+These thoughts usually mean Cueward should have been used:
+
+- "I can probably answer without checking"
+- "This sounds like a normal productivity question"
+- "They did not explicitly mention Safari / Notes / Reminders / Calendar"
+- "I already know the likely answer"
+- "Let me answer first and only check if challenged"
 
 ## Operating Principles
 
