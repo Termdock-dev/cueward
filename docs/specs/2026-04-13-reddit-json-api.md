@@ -79,7 +79,7 @@ cueward reddit search <query> [--subreddit r/rust] [--limit 10]
 
 所有 request 都帶固定 `User-Agent`，例如：
 
-- `cueward/0.2.x (+https://github.com/HCYT/cueward)`
+- `cueward/0.2.x (+https://github.com/Termdock-dev/cueward)`
 
 endpoint：
 

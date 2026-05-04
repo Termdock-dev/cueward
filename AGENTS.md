@@ -77,4 +77,4 @@ chore: 雜務
 
 - [decisions.md](docs/decisions.md) — 架構決策
 - [lessons.md](docs/lessons.md) — 踩坑紀錄
-- [#66](https://github.com/HCYT/cueward/issues/66) — safari.rs 重構計畫
+- [#66](https://github.com/Termdock-dev/cueward/issues/66) — safari.rs 重構計畫

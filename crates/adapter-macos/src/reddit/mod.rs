@@ -13,7 +13,7 @@ const REDDIT_MAX_RETRIES: usize = 3;
 const REDDIT_UA: &str = concat!(
     "cueward/",
     env!("CARGO_PKG_VERSION"),
-    " (+https://github.com/HCYT/cueward)"
+    " (+https://github.com/Termdock-dev/cueward)"
 );
 
 mod scan;

@@ -31,7 +31,7 @@ cargo install cueward-cli --locked
 To build from the local repo instead:
 
 ```bash
-git clone https://github.com/HCYT/cueward.git
+git clone https://github.com/Termdock-dev/cueward.git
 cd cueward
 cargo install --path crates/cli
 ```
