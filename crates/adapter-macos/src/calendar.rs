@@ -74,6 +74,14 @@ fn parse_events_output(stdout: &str) -> Vec<CalendarEvent> {
         .collect()
 }
 
+fn calendar_date_format_prelude() -> &'static str {
+    ""
+}
+
+fn calendar_date_assignment(output_var: &str, date_expression: &str) -> String {
+    format!("set {output_var} to ({date_expression}) as «class isot» as string")
+}
+
 /// List calendar events in the given time range, optionally filtered by calendar name.
 pub fn list_events(
     from: DateTime<Local>,
@@ -99,9 +107,12 @@ pub fn list_events(
         }
         None => "set targetCals to calendars".to_string(),
     };
+    let evt_start_assignment = calendar_date_assignment("evtStart", "start date of evt");
+    let evt_end_assignment = calendar_date_assignment("evtEnd", "end date of evt");
 
     let script = format!(
         r#"
+        {date_format_prelude}
         on replace_text(find_text, replace_text, source_text)
             set previous_delimiters to AppleScript's text item delimiters
             set AppleScript's text item delimiters to find_text
@@ -134,8 +145,8 @@ pub fn list_events(
                 set evts to (events of aCal whose (start date < toDate) and (end date > fromDate))
                 repeat with evt in evts
                     set evtTitle to my encode_field(summary of evt)
-                    set evtStart to (start date of evt) as «class isot» as string
-                    set evtEnd to (end date of evt) as «class isot» as string
+                    {evt_start_assignment}
+                    {evt_end_assignment}
                     if location of evt is missing value then
                         set evtLoc to ""
                     else
@@ -152,7 +163,8 @@ pub fn list_events(
             end repeat
             return output
         end tell
-        "#
+        "#,
+        date_format_prelude = calendar_date_format_prelude(),
     );
 
     let stdout = run_capture(&script, "list_events")?;
@@ -362,7 +374,35 @@ pub fn update_event(
 mod tests {
     use chrono::{Local, TimeZone};
 
-    use super::{build_update_script, parse_event_line, parse_events_output};
+    use super::{
+        build_update_script, calendar_date_assignment, calendar_date_format_prelude,
+        parse_event_line, parse_events_output,
+    };
+
+    #[test]
+    fn calendar_fallback_formats_dates_with_osascript() {
+        let formatter_script = format!(
+            r#"
+            {prelude}
+            script CalendarDateFixture
+                property «class year» : 2026
+                property «class mnth» : 8
+                property «class day » : 9
+                property «class hour» : 7
+                property «class min » : 5
+                property «class scnd» : 3
+            end script
+            {assignment}
+            return formattedDate
+            "#,
+            prelude = calendar_date_format_prelude(),
+            assignment = calendar_date_assignment("formattedDate", "CalendarDateFixture"),
+        );
+        let formatted =
+            crate::applescript::run_capture(&formatter_script, "calendar_date_formatter_probe")
+                .expect("execute calendar date formatter");
+        assert_eq!(formatted.trim(), "2026-08-09T07:05:03");
+    }
 
     #[test]
     fn parse_event_line_unescapes_sanitized_fields() {
