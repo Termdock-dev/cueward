@@ -75,11 +75,31 @@ fn parse_events_output(stdout: &str) -> Vec<CalendarEvent> {
 }
 
 fn calendar_date_format_prelude() -> &'static str {
-    ""
+    r#"
+        on pad2(value_num)
+            set value_text to value_num as string
+            if value_num < 10 then
+                return "0" & value_text
+            end if
+            return value_text
+        end pad2
+
+        on format_calendar_date(calendar_date)
+            set y to year of calendar_date as integer
+            set m to month of calendar_date as integer
+            set d to day of calendar_date as integer
+            set hh to hours of calendar_date as integer
+            set mm to minutes of calendar_date as integer
+            set ss to seconds of calendar_date as integer
+            return (y as string) & "-" & my pad2(m) & "-" & my pad2(d) & "T" & my pad2(hh) & ":" & my pad2(mm) & ":" & my pad2(ss)
+        end format_calendar_date
+    "#
 }
 
 fn calendar_date_assignment(output_var: &str, date_expression: &str) -> String {
-    format!("set {output_var} to ({date_expression}) as «class isot» as string")
+    format!(
+        "set {output_var}Value to {date_expression}\n                    set {output_var} to my format_calendar_date({output_var}Value)"
+    )
 }
 
 /// List calendar events in the given time range, optionally filtered by calendar name.
