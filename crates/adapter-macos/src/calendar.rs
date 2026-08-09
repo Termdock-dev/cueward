@@ -74,6 +74,34 @@ fn parse_events_output(stdout: &str) -> Vec<CalendarEvent> {
         .collect()
 }
 
+fn calendar_date_format_prelude() -> &'static str {
+    r#"
+        on pad2(value_num)
+            set value_text to value_num as string
+            if value_num < 10 then
+                return "0" & value_text
+            end if
+            return value_text
+        end pad2
+
+        on format_calendar_date(calendar_date)
+            set y to year of calendar_date as integer
+            set m to month of calendar_date as integer
+            set d to day of calendar_date as integer
+            set hh to hours of calendar_date as integer
+            set mm to minutes of calendar_date as integer
+            set ss to seconds of calendar_date as integer
+            return (y as string) & "-" & my pad2(m) & "-" & my pad2(d) & "T" & my pad2(hh) & ":" & my pad2(mm) & ":" & my pad2(ss)
+        end format_calendar_date
+    "#
+}
+
+fn calendar_date_assignment(output_var: &str, date_expression: &str) -> String {
+    format!(
+        "set {output_var}Value to {date_expression}\n                    set {output_var} to my format_calendar_date({output_var}Value)"
+    )
+}
+
 /// List calendar events in the given time range, optionally filtered by calendar name.
 pub fn list_events(
     from: DateTime<Local>,
@@ -99,9 +127,12 @@ pub fn list_events(
         }
         None => "set targetCals to calendars".to_string(),
     };
+    let evt_start_assignment = calendar_date_assignment("evtStart", "start date of evt");
+    let evt_end_assignment = calendar_date_assignment("evtEnd", "end date of evt");
 
     let script = format!(
         r#"
+        {date_format_prelude}
         on replace_text(find_text, replace_text, source_text)
             set previous_delimiters to AppleScript's text item delimiters
             set AppleScript's text item delimiters to find_text
@@ -134,8 +165,8 @@ pub fn list_events(
                 set evts to (events of aCal whose (start date < toDate) and (end date > fromDate))
                 repeat with evt in evts
                     set evtTitle to my encode_field(summary of evt)
-                    set evtStart to (start date of evt) as «class isot» as string
-                    set evtEnd to (end date of evt) as «class isot» as string
+                    {evt_start_assignment}
+                    {evt_end_assignment}
                     if location of evt is missing value then
                         set evtLoc to ""
                     else
@@ -152,7 +183,8 @@ pub fn list_events(
             end repeat
             return output
         end tell
-        "#
+        "#,
+        date_format_prelude = calendar_date_format_prelude(),
     );
 
     let stdout = run_capture(&script, "list_events")?;
@@ -362,7 +394,35 @@ pub fn update_event(
 mod tests {
     use chrono::{Local, TimeZone};
 
-    use super::{build_update_script, parse_event_line, parse_events_output};
+    use super::{
+        build_update_script, calendar_date_assignment, calendar_date_format_prelude,
+        parse_event_line, parse_events_output,
+    };
+
+    #[test]
+    fn calendar_fallback_formats_dates_with_osascript() {
+        let formatter_script = format!(
+            r#"
+            {prelude}
+            script CalendarDateFixture
+                property «class year» : 2026
+                property «class mnth» : 8
+                property «class day » : 9
+                property «class hour» : 7
+                property «class min » : 5
+                property «class scnd» : 3
+            end script
+            {assignment}
+            return formattedDate
+            "#,
+            prelude = calendar_date_format_prelude(),
+            assignment = calendar_date_assignment("formattedDate", "CalendarDateFixture"),
+        );
+        let formatted =
+            crate::applescript::run_capture(&formatter_script, "calendar_date_formatter_probe")
+                .expect("execute calendar date formatter");
+        assert_eq!(formatted.trim(), "2026-08-09T07:05:03");
+    }
 
     #[test]
     fn parse_event_line_unescapes_sanitized_fields() {
