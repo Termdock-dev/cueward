@@ -16,11 +16,16 @@ mod core;
 mod core_tests;
 mod eval;
 mod history;
+mod inspect;
+mod interaction;
 mod script;
 #[cfg(test)]
 mod script_tests;
+mod scroll;
 mod social;
+mod target;
 mod types;
+mod wait;
 
 pub use ai::{
     GeminiMode, SafariAiImage, SafariAiImageResult, SafariAiReadyResult, SafariAiResponseResult,
@@ -33,17 +38,19 @@ pub use ai::{
 };
 pub(crate) use core::doctor_live_probe;
 pub use core::{
-    active, click, close, close_tabs, fill, focus_tab, open, read, scroll, scroll_and_read, source,
-    tabs, wait,
+    active, click, close, close_tabs, fill, focus_tab, open, read, source, tabs,
 };
 pub use eval::exec;
 pub use history::capture;
+pub use inspect::{batch, inspect};
+pub use scroll::{scroll, scroll_and_read};
 pub use social::{SocialFeedPost, threads_extract_feed, x_extract_feed, x_read_post, x_search};
 pub use types::{
     SafariClickResult, SafariCloseResult, SafariEvalResult, SafariFillResult, SafariReadResult,
     SafariScrollReadChunk, SafariScrollReadResult, SafariScrollResult, SafariSourceResult,
     SafariTab, SafariWaitResult,
 };
+pub use wait::{WaitCondition, wait_until};
 
 const SAFARI_OPERATION_DELAY: Duration = Duration::from_secs(1);
 const SAFARI_429_MAX_RETRIES: usize = 3;

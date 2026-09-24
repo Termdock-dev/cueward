@@ -5,13 +5,10 @@ use std::time::{Duration, Instant};
 use serde::Deserialize;
 
 use crate::MacosError;
-use crate::applescript::escape_body;
 use crate::safari_guard::with_safari_session;
 
-use super::core::active;
-use super::run_capture;
-use super::script::{decode_field, safari_script_prelude};
-use super::types::{SafariEvalResult, SafariTab};
+use super::target::{execute_js_in_tab, resolve_tab};
+use super::types::SafariEvalResult;
 
 static NEXT_EVAL_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -104,32 +101,6 @@ fn build_poll_js(token: &str) -> Result<String, MacosError> {
     ))
 }
 
-fn execute_in_tab(js_code: &str, tab: &SafariTab, context: &str) -> Result<String, MacosError> {
-    let js_expr = escape_body(js_code);
-    let script = format!(
-        r#"
-        {prelude}
-        tell application "Safari"
-          repeat with w in every window
-            if (id of w) is {window_id} then
-              if (count of tabs of w) < {tab_index} then error "target tab closed"
-              set jsCode to {js_expr}
-              set rawResult to do JavaScript jsCode in tab {tab_index} of w
-              if rawResult is missing value then error "JavaScript did not return a string"
-              return my encode_field(rawResult as string)
-            end if
-          end repeat
-          error "target window closed"
-        end tell
-        "#,
-        prelude = safari_script_prelude(),
-        window_id = tab.window_id,
-        tab_index = tab.index + 1,
-    );
-    let output = run_capture(&script, context)?;
-    Ok(decode_field(output.trim()))
-}
-
 fn decode_eval_wire(payload: &str) -> Result<Option<SafariEvalResult>, MacosError> {
     let wire: EvalWire = serde_json::from_str(payload)
         .map_err(|err| MacosError::Other(format!("invalid Safari evaluation response: {err}")))?;
@@ -161,17 +132,17 @@ fn decode_eval_wire(payload: &str) -> Result<Option<SafariEvalResult>, MacosErro
 pub fn exec(
     js_code: &str,
     profile_filter: Option<&str>,
+    tab_selector: Option<&str>,
     timeout_seconds: u64,
 ) -> Result<SafariEvalResult, MacosError> {
     with_safari_session(|| {
-        let tab = active(profile_filter)?
-            .ok_or_else(|| MacosError::Other("no Safari tab available".to_string()))?;
+        let tab = resolve_tab(tab_selector, profile_filter)?;
         let token = format!(
             "{}-{}",
             std::process::id(),
             NEXT_EVAL_ID.fetch_add(1, Ordering::Relaxed)
         );
-        let initial = execute_in_tab(&build_eval_js(js_code, &token)?, &tab, "safari_exec")?;
+        let initial = execute_js_in_tab(&build_eval_js(js_code, &token)?, &tab, "safari_exec")?;
         if let Some(result) = decode_eval_wire(&initial)? {
             return Ok(result);
         }
@@ -179,7 +150,7 @@ pub fn exec(
         let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
         while Instant::now() < deadline {
             thread::sleep(Duration::from_millis(250));
-            let payload = execute_in_tab(&poll_js, &tab, "safari_exec_poll")?;
+            let payload = execute_js_in_tab(&poll_js, &tab, "safari_exec_poll")?;
             if let Some(result) = decode_eval_wire(&payload)? {
                 return Ok(result);
             }

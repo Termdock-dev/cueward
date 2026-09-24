@@ -94,3 +94,56 @@ fn cli_parses_scroll_and_read() {
         _ => panic!("unexpected command"),
     }
 }
+
+#[test]
+fn cli_parses_safari_wait_for_absence_in_selected_tab() {
+    let cli = Cli::try_parse_from([
+        "cueward", "safari", "wait", "#loading", "--absent", "--tab", "Docs",
+    ])
+    .expect("parse wait for absence");
+
+    match cli.command {
+        Command::Safari {
+            action: SafariAction::Wait {
+                selector,
+                absent,
+                tab,
+                ..
+            },
+        } => {
+            assert_eq!(selector.as_deref(), Some("#loading"));
+            assert!(absent);
+            assert_eq!(tab.as_deref(), Some("Docs"));
+        }
+        _ => panic!("unexpected command"),
+    }
+}
+
+#[test]
+fn cli_parses_safari_inspect_and_batch() {
+    let inspect = Cli::try_parse_from([
+        "cueward", "safari", "inspect", "--tab", "Docs", "--limit", "50",
+    ])
+    .expect("parse inspect");
+    assert!(matches!(
+        inspect.command,
+        Command::Safari {
+            action: SafariAction::Inspect { limit: 50, .. }
+        }
+    ));
+
+    let batch = Cli::try_parse_from([
+        "cueward",
+        "safari",
+        "batch",
+        "--steps",
+        "[{\"action\":\"click\",\"ref\":\"1:2\"}]",
+    ])
+    .expect("parse batch");
+    assert!(matches!(
+        batch.command,
+        Command::Safari {
+            action: SafariAction::Batch { .. }
+        }
+    ));
+}

@@ -99,7 +99,9 @@ pub struct SafariFillResult {
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct SafariWaitResult {
     pub found: bool,
-    pub selector: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selector: Option<String>,
+    pub condition: String,
     pub timeout_seconds: u64,
 }
 

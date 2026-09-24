@@ -1,8 +1,9 @@
 use super::TAB_SEPARATOR;
+use super::interaction::{selector_click_js, selector_fill_js};
 use super::script::{
     build_active_tab_script, build_close_script, build_exec_script, build_open_script,
     build_tab_return_block, build_tabs_script, parse_tab_line, parse_tabs_output,
-    selector_click_js, selector_fill_js, selector_text_js,
+    selector_text_js,
 };
 use std::process::Command;
 
@@ -163,8 +164,4 @@ fn build_exec_script_supports_multiline_js() {
 #[test]
 fn selector_js_builders_include_selector_and_text() {
     assert!(selector_text_js(".item").contains("querySelector(\".item\")"));
-    assert!(selector_click_js("#submit").contains("querySelector(\"#submit\")"));
-    let fill = selector_fill_js("input[name=q]", "hello");
-    assert!(fill.contains("input[name=q]"));
-    assert!(fill.contains("hello"));
 }
