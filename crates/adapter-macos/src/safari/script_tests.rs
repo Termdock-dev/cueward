@@ -4,6 +4,76 @@ use super::script::{
     build_tab_return_block, build_tabs_script, parse_tab_line, parse_tabs_output,
     selector_click_js, selector_fill_js, selector_text_js,
 };
+use std::process::Command;
+
+fn run_browser_builder(setup: &str, action: &str, result: &str) -> Option<String> {
+    let script = format!(
+        "class PointerEvent extends Event {{ constructor(type, options) {{ super(type, options); }} }} \
+         class MouseEvent extends Event {{ constructor(type, options) {{ super(type, options); }} }} \
+         {setup}; {action}; process.stdout.write(String({result}));"
+    );
+    let output = match Command::new("node").arg("-e").arg(script).output() {
+        Ok(output) => output,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(error) => panic!("run browser action: {error}"),
+    };
+    assert!(
+        output.status.success(),
+        "browser action failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Some(String::from_utf8(output.stdout).expect("UTF-8 result"))
+}
+
+#[test]
+fn click_reaches_pointerdown_handlers() {
+    let setup = r#"
+      const button = new EventTarget();
+      let opened = false;
+      button.click = () => button.dispatchEvent(new MouseEvent('click'));
+      button.addEventListener('pointerdown', () => { opened = true; });
+      globalThis.document = { querySelector: () => button };
+    "#;
+    let result = run_browser_builder(setup, &selector_click_js("#trigger"), "opened");
+    if let Some(result) = result {
+        assert_eq!(result, "true");
+    }
+}
+
+#[test]
+fn fill_notifies_framework_value_tracker() {
+    let setup = r#"
+      class Input extends EventTarget {
+        constructor() {
+          super(); this.storedValue = ''; this.trackedValue = '';
+          Object.defineProperty(this, 'value', {
+            get() { return this.storedValue; },
+            set(value) { this.storedValue = value; this.trackedValue = value; }
+          });
+        }
+      }
+      Object.defineProperty(Input.prototype, 'value', {
+        get() { return this.storedValue; },
+        set(value) { this.storedValue = value; }
+      });
+      globalThis.HTMLInputElement = Input;
+      globalThis.HTMLTextAreaElement = class extends Input {};
+      const input = new Input();
+      let accepted = '';
+      input.addEventListener('input', () => {
+        if (input.value !== input.trackedValue) accepted = input.value;
+      });
+      globalThis.document = { querySelector: () => input };
+    "#;
+    let result = run_browser_builder(
+        setup,
+        &selector_fill_js("#field", "new value"),
+        "accepted",
+    );
+    if let Some(result) = result {
+        assert_eq!(result, "new value");
+    }
+}
 
 #[test]
 fn parse_tab_line_decodes_fields() {
