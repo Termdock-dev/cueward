@@ -12,7 +12,7 @@ The extension requests `webRequest` and `storage` access for `http://127.0.0.1/*
    python3 -m http.server 8765 --bind 127.0.0.1 --directory docs/pocs/safari-webrequest-extension/site
    ```
 
-2. In Safari, enable **Develop > Allow Unsigned Extensions**, then use **Develop > Add Temporary Extension** and select this directory (`docs/pocs/safari-webrequest-extension`). Grant the extension access to `127.0.0.1` if Safari asks.
+2. In Safari, open **Safari > Settings > Developer**. Select **Allow unsigned extensions**, then click **Add Temporary Extension…** and select this directory (`docs/pocs/safari-webrequest-extension`). Safari may ask you to authenticate the unsigned extension. Enable the extension in **Settings > Extensions** and grant it access to `127.0.0.1` if Safari asks.
 3. Open `http://127.0.0.1:8765/` in a test tab and click **Fetch sample JSON**.
 4. Open the extension's toolbar popup and click **Refresh**. The expected events include a page request and a completed `sample.json` request with status `200`.
 5. Remove the temporary extension in Safari Settings after the check. Safari also removes temporary extensions after 24 hours or when Safari quits.
