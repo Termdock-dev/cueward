@@ -66,6 +66,28 @@ fn cli_parses_safari_exec_body() {
 }
 
 #[test]
+fn cli_parses_safari_console_and_network_detail() {
+    let console = Cli::try_parse_from([
+        "cueward", "safari", "console", "--level", "error", "--tab", "example.com",
+    ])
+    .expect("parse Safari console");
+    assert!(matches!(
+        console.command,
+        Command::Safari { action: SafariAction::Console { level: Some(ref level), .. } }
+            if level == "error"
+    ));
+
+    let network = Cli::try_parse_from([
+        "cueward", "safari", "network", "get", "3", "--tab", "example.com",
+    ])
+    .expect("parse Safari network detail");
+    assert!(matches!(
+        network.command,
+        Command::Safari { action: SafariAction::Network { action: Some(_), .. } }
+    ));
+}
+
+#[test]
 fn cli_parses_safari_active_with_profile() {
     let cli = Cli::try_parse_from(["cueward", "safari", "active", "--profile", "Work"])
         .expect("parse safari active with profile");
