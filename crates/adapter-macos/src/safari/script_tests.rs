@@ -6,6 +6,15 @@ use super::script::{
 };
 use std::process::Command;
 
+#[test]
+fn node_runtime_is_available_for_browser_behavior_tests() {
+    let output = Command::new("node")
+        .arg("--version")
+        .output()
+        .expect("Node.js is required for Safari JavaScript behavior tests");
+    assert!(output.status.success(), "Node.js --version failed");
+}
+
 fn run_browser_builder(setup: &str, action: &str, result: &str) -> Option<String> {
     let script = format!(
         "class PointerEvent extends Event {{ constructor(type, options) {{ super(type, options); }} }} \

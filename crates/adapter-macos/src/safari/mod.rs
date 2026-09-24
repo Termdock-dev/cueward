@@ -7,7 +7,7 @@ use crate::safari_guard::safari_automation_state;
 #[cfg(test)]
 pub(crate) use crate::safari_guard::{
     SAFARI_LOCK_TTL_SECS, SafariAutomationSession, SafariLockFile, acquire_safari_lock,
-    read_safari_lock, release_safari_lock,
+    read_safari_lock, release_safari_lock, renew_safari_lock,
 };
 
 pub mod ai;
@@ -153,6 +153,7 @@ mod tests {
     use super::{
         SAFARI_LOCK_TTL_SECS, SAFARI_OPERATION_DELAY, SafariAutomationSession, SafariLockFile,
         acquire_safari_lock, compute_next_safari_operation, is_safari_rate_limited,
+        renew_safari_lock,
         read_safari_lock, release_safari_lock, safari_automation_state, safari_rate_limit_backoff,
     };
     use std::fs;
@@ -222,6 +223,20 @@ mod tests {
         let lock = read_safari_lock(&lock_path).expect("replacement lock");
         assert_eq!(lock.pid, 77);
         assert_eq!(lock.expires_at, now + SAFARI_LOCK_TTL_SECS);
+    }
+
+    #[test]
+    fn safari_lock_renewal_protects_a_long_running_session() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("lock.json");
+        let start = 1_700_000_000;
+        acquire_safari_lock(&path, start, 77).expect("acquire lock");
+
+        renew_safari_lock(&path, start + 1000, 77).expect("renew lock");
+        let renewed = read_safari_lock(&path).expect("renewed lock");
+        assert_eq!(renewed.acquired_at, start);
+        assert_eq!(renewed.expires_at, start + 1000 + SAFARI_LOCK_TTL_SECS);
+        assert!(acquire_safari_lock(&path, start + SAFARI_LOCK_TTL_SECS, 88).is_err());
     }
 
     #[test]
