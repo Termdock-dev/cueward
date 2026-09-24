@@ -177,7 +177,7 @@ mod tests {
 
     use super::{build_cleanup_js, build_eval_js, build_poll_js, decode_eval_wire};
 
-    fn evaluate_with_node(code: &str, body: bool) -> Option<super::SafariEvalResult> {
+    fn evaluate_with_node(code: &str, body: bool) -> super::SafariEvalResult {
         let initial = build_eval_js(code, "test-token", body).expect("build evaluation");
         let poll = build_poll_js("test-token").expect("build poll");
         let harness = format!(
@@ -187,22 +187,20 @@ mod tests {
                setImmediate(() => process.stdout.write({poll})); \
              }} else {{ process.stdout.write(initial); }}"
         );
-        let output = match Command::new("node").arg("-e").arg(harness).output() {
-            Ok(output) => output,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
-            Err(error) => panic!("run JavaScript bridge: {error}"),
-        };
+        let output = Command::new("node")
+            .arg("-e")
+            .arg(harness)
+            .output()
+            .expect("Node.js is required for Safari JavaScript behavior tests");
         assert!(
             output.status.success(),
             "JavaScript bridge failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
         let payload = String::from_utf8(output.stdout).expect("UTF-8 result");
-        Some(
-            decode_eval_wire(&payload)
-                .expect("decode JavaScript result")
-                .expect("completed JavaScript result"),
-        )
+        decode_eval_wire(&payload)
+            .expect("decode JavaScript result")
+            .expect("completed JavaScript result")
     }
 
     #[test]
@@ -214,18 +212,14 @@ mod tests {
             ("undefined", "undefined", serde_json::Value::Null),
             ("await Promise.resolve(42)", "number", serde_json::json!(42)),
         ] {
-            let Some(result) = evaluate_with_node(code, false) else {
-                return;
-            };
+            let result = evaluate_with_node(code, false);
             assert_eq!(result.value_type, expected_type, "source: {code}");
             assert_eq!(result.result, expected_value, "source: {code}");
         }
-        let Some(body_result) = evaluate_with_node(
+        let body_result = evaluate_with_node(
             "const value = await Promise.resolve(7); return value + 1;",
             true,
-        ) else {
-            return;
-        };
+        );
         assert_eq!(body_result.result, serde_json::json!(8));
     }
 
@@ -240,11 +234,11 @@ mod tests {
              finish(1); setImmediate(() => process.stdout.write( \
                String(Object.hasOwn(window.__cuewardEvalPending, 'cancelled'))));"
         );
-        let output = match Command::new("node").arg("-e").arg(script).output() {
-            Ok(output) => output,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
-            Err(error) => panic!("run cancellation check: {error}"),
-        };
+        let output = Command::new("node")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .expect("Node.js is required for Safari JavaScript behavior tests");
         assert!(
             output.status.success(),
             "{}",

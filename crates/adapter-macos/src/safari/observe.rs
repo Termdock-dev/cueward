@@ -128,7 +128,9 @@ fn read_observation(
 ) -> Result<Value, MacosError> {
     with_safari_session(|| {
         let tab = resolve_tab(tab_selector, profile_filter)?;
-        let script = format!("(() => {{ {BOOTSTRAP} const state = window.__cuewardObserve; return JSON.stringify({query}); }})()");
+        let script = format!(
+            "(() => {{ {BOOTSTRAP} const state = window.__cuewardObserve; return JSON.stringify({query}); }})()"
+        );
         let payload = execute_js_in_tab(&script, &tab, "safari_observe")?;
         serde_json::from_str(&payload)
             .map_err(|error| MacosError::Other(format!("invalid Safari observation: {error}")))
@@ -142,13 +144,17 @@ pub fn console_messages(
 ) -> Result<Value, MacosError> {
     if let Some(level) = level {
         if !["log", "info", "warn", "error", "debug"].contains(&level) {
-            return Err(MacosError::Other(format!("unsupported console level: {level}")));
+            return Err(MacosError::Other(format!(
+                "unsupported console level: {level}"
+            )));
         }
     }
     let filter = serde_json::to_string(&level)
         .map_err(|error| MacosError::Other(format!("invalid console level: {error}")))?;
     read_observation(
-        &format!("{{started_at: state.started_at, dropped: state.console_dropped, messages: state.console.filter(item => {filter} === null || item.level === {filter})}}"),
+        &format!(
+            "{{started_at: state.started_at, dropped: state.console_dropped, messages: state.console.filter(item => {filter} === null || item.level === {filter})}}"
+        ),
         profile_filter,
         tab_selector,
     )
@@ -198,11 +204,18 @@ mod tests {
             }}))));
             "#
         );
-        let Ok(output) = Command::new("node").arg("-e").arg(script).output() else {
-            return;
-        };
-        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-        let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("capture JSON");
+        let output = Command::new("node")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .expect("Node.js is required for Safari JavaScript behavior tests");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("capture JSON");
         assert_eq!(result["messages"].as_array().unwrap().len(), 1);
         assert_eq!(result["messages"][0]["level"], "error");
         assert_eq!(result["requests"][0]["status"], 201);

@@ -1,6 +1,7 @@
 use std::fs::{self, OpenOptions};
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use chrono::Utc;
@@ -11,6 +12,7 @@ use crate::MacosError;
 pub(crate) const SAFARI_LOCK_TTL_SECS: i64 = 1800;
 
 static SAFARI_AUTOMATION_STATE: OnceLock<Mutex<SafariAutomationState>> = OnceLock::new();
+static NEXT_RENEWAL_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Default)]
 pub(crate) struct SafariAutomationState {
@@ -184,6 +186,65 @@ pub(crate) fn release_safari_lock(path: &Path, pid: u32) -> Result<(), MacosErro
             path.display()
         ))),
     }
+}
+
+pub(crate) fn renew_safari_lock(path: &Path, now_ts: i64, pid: u32) -> Result<(), MacosError> {
+    let current = read_safari_lock(path).ok_or_else(|| {
+        MacosError::Other(format!(
+            "Safari lock {} is missing or unreadable",
+            path.display()
+        ))
+    })?;
+    if current.pid != pid || current.expires_at <= now_ts {
+        return Err(MacosError::Other(format!(
+            "Safari lock {} is no longer owned by pid {pid}",
+            path.display()
+        )));
+    }
+    if current.expires_at - now_ts > SAFARI_LOCK_TTL_SECS / 2 {
+        return Ok(());
+    }
+
+    let renewed = SafariLockFile {
+        pid,
+        acquired_at: current.acquired_at,
+        expires_at: now_ts + SAFARI_LOCK_TTL_SECS,
+    };
+    let temp = path.with_extension(format!(
+        "renew-{pid}-{}.tmp",
+        NEXT_RENEWAL_ID.fetch_add(1, Ordering::Relaxed)
+    ));
+    let bytes = serde_json::to_vec_pretty(&renewed)
+        .map_err(|error| MacosError::Other(format!("failed to encode Safari lock: {error}")))?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp)
+        .map_err(|error| {
+            MacosError::Other(format!("failed to create {}: {error}", temp.display()))
+        })?;
+    if let Err(error) = file.write_all(&bytes) {
+        let _ = fs::remove_file(&temp);
+        return Err(MacosError::Other(format!(
+            "failed to write {}: {error}",
+            temp.display()
+        )));
+    }
+    drop(file);
+    if read_safari_lock(path).as_ref() != Some(&current) {
+        let _ = fs::remove_file(&temp);
+        return Err(MacosError::Other(
+            "Safari lock changed during renewal".to_string(),
+        ));
+    }
+    if let Err(error) = fs::rename(&temp, path) {
+        let _ = fs::remove_file(&temp);
+        return Err(MacosError::Other(format!(
+            "failed to renew {}: {error}",
+            path.display()
+        )));
+    }
+    Ok(())
 }
 
 pub(crate) fn read_safari_lock(path: &Path) -> Option<SafariLockFile> {

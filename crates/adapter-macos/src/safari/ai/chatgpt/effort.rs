@@ -112,11 +112,18 @@ mod tests {
             (async () => {{ {code} }})().then(result => process.stdout.write(JSON.stringify(result)));
             "#
         );
-        let Ok(output) = Command::new("node").arg("-e").arg(script).output() else {
-            return;
-        };
-        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-        let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("effort JSON");
+        let output = Command::new("node")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .expect("Node.js is required for Safari JavaScript behavior tests");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("effort JSON");
         assert_eq!(result["level"], 4);
         assert_eq!(result["max"], 4);
     }

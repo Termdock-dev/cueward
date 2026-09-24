@@ -76,6 +76,11 @@ fn throttle_safari_operation() -> Result<(), MacosError> {
         let mut guard = state
             .lock()
             .map_err(|_| MacosError::Other("safari automation state poisoned".to_string()))?;
+        if guard.depth > 0 {
+            if let (Some(path), Some(pid)) = (guard.lock_path.as_ref(), guard.lock_owner_pid) {
+                crate::safari_guard::renew_safari_lock(path, chrono::Utc::now().timestamp(), pid)?;
+            }
+        }
         let now = Instant::now();
         let (delay, next_allowed) = compute_next_safari_operation(now, guard.last_operation_at);
         guard.last_operation_at = Some(next_allowed);
@@ -232,11 +237,18 @@ mod tests {
         let start = 1_700_000_000;
         acquire_safari_lock(&path, start, 77).expect("acquire lock");
 
+        renew_safari_lock(&path, start + 100, 77).expect("early renewal is a no-op");
+        assert_eq!(
+            read_safari_lock(&path).expect("original lock").expires_at,
+            start + SAFARI_LOCK_TTL_SECS
+        );
         renew_safari_lock(&path, start + 1000, 77).expect("renew lock");
         let renewed = read_safari_lock(&path).expect("renewed lock");
         assert_eq!(renewed.acquired_at, start);
         assert_eq!(renewed.expires_at, start + 1000 + SAFARI_LOCK_TTL_SECS);
         assert!(acquire_safari_lock(&path, start + SAFARI_LOCK_TTL_SECS, 88).is_err());
+        assert!(renew_safari_lock(&path, start + 1001, 88).is_err());
+        assert_eq!(read_safari_lock(&path), Some(renewed));
     }
 
     #[test]

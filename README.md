@@ -37,6 +37,7 @@ cargo install --path crates/cli
 ```
 
 Requires Rust 1.85+ (edition 2024).
+Running the Safari JavaScript behavior tests also requires Node.js on `PATH`.
 
 ## What's New in 0.3.0
 

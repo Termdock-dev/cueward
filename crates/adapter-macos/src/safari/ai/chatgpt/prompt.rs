@@ -165,18 +165,18 @@ mod tests {
             "#,
             script = chatgpt_response_extract_js()
         );
-        let output = match Command::new("node").arg("-e").arg(script).output() {
-            Ok(output) => output,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
-            Err(error) => panic!("run response extractor: {error}"),
-        };
+        let output = Command::new("node")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .expect("Node.js is required for Safari JavaScript behavior tests");
         assert!(
             output.status.success(),
             "response extractor failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
-        let payload: serde_json::Value = serde_json::from_slice(&output.stdout)
-            .expect("parse response payload");
+        let payload: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("parse response payload");
         assert_eq!(payload["status"], "running");
     }
 }

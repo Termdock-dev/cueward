@@ -15,23 +15,23 @@ fn node_runtime_is_available_for_browser_behavior_tests() {
     assert!(output.status.success(), "Node.js --version failed");
 }
 
-fn run_browser_builder(setup: &str, action: &str, result: &str) -> Option<String> {
+fn run_browser_builder(setup: &str, action: &str, result: &str) -> String {
     let script = format!(
         "class PointerEvent extends Event {{ constructor(type, options) {{ super(type, options); }} }} \
          class MouseEvent extends Event {{ constructor(type, options) {{ super(type, options); }} }} \
          {setup}; {action}; process.stdout.write(String({result}));"
     );
-    let output = match Command::new("node").arg("-e").arg(script).output() {
-        Ok(output) => output,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
-        Err(error) => panic!("run browser action: {error}"),
-    };
+    let output = Command::new("node")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .expect("Node.js is required for Safari JavaScript behavior tests");
     assert!(
         output.status.success(),
         "browser action failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    Some(String::from_utf8(output.stdout).expect("UTF-8 result"))
+    String::from_utf8(output.stdout).expect("UTF-8 result")
 }
 
 #[test]
@@ -44,9 +44,7 @@ fn click_reaches_pointerdown_handlers() {
       globalThis.document = { querySelector: () => button };
     "#;
     let result = run_browser_builder(setup, &selector_click_js("#trigger"), "opened");
-    if let Some(result) = result {
-        assert_eq!(result, "true");
-    }
+    assert_eq!(result, "true");
 }
 
 #[test]
@@ -75,9 +73,7 @@ fn fill_notifies_framework_value_tracker() {
       globalThis.document = { querySelector: () => input };
     "#;
     let result = run_browser_builder(setup, &selector_fill_js("#field", "new value"), "accepted");
-    if let Some(result) = result {
-        assert_eq!(result, "new value");
-    }
+    assert_eq!(result, "new value");
 }
 
 #[test]
@@ -113,11 +109,11 @@ fn iframe_form_controls_use_their_own_dom_realm() {
         }}));
         "#
     );
-    let output = match Command::new("node").arg("-e").arg(script).output() {
-        Ok(output) => output,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
-        Err(error) => panic!("run iframe action: {error}"),
-    };
+    let output = Command::new("node")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .expect("Node.js is required for Safari JavaScript behavior tests");
     assert!(
         output.status.success(),
         "{}",
