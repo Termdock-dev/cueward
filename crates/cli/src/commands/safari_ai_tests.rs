@@ -68,6 +68,26 @@ fn cli_parses_gemini_prompt_with_mode() {
 }
 
 #[test]
+fn cli_parses_chatgpt_prompt_effort() {
+    let cli = Cli::try_parse_from([
+        "cueward", "safari", "ai", "--provider", "chatgpt", "prompt",
+        "--prompt", "hello", "--effort", "pro",
+    ])
+    .expect("parse ChatGPT effort");
+
+    assert!(matches!(
+        cli.command,
+        Command::Safari {
+            action: SafariAction::Ai {
+                provider: SafariAiProvider::Chatgpt,
+                action: SafariAiAction::Prompt { effort: Some(ref value), .. },
+                ..
+            }
+        } if value == "pro"
+    ));
+}
+
+#[test]
 fn cli_parses_gemini_prompt_only() {
     let cli = Cli::try_parse_from([
         "cueward",
