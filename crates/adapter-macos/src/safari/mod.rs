@@ -211,6 +211,19 @@ mod tests {
     }
 
     #[test]
+    fn safari_profile_timeout_uses_captured_window_and_tab_index() {
+        let error = crate::MacosError::Other(
+            "safari_chatgpt_prompt_fill: CUEWARD_JS_APPLE_EVENT_TIMEOUT|42|1 (-1712)"
+                .to_string(),
+        );
+        let mapped = map_js_timeout(error, "current Safari tab");
+        let message = mapped.to_string();
+
+        assert!(message.contains("window 42 tab index 1"));
+        assert!(!message.contains("current Safari tab"));
+    }
+
+    #[test]
     fn safari_js_timeout_does_not_relabel_other_errors() {
         let error = crate::MacosError::Other("safari_exec: JavaScript syntax error".to_string());
         let mapped = map_js_timeout(error, "window 42 tab 1");
