@@ -14,7 +14,8 @@ pub struct SafariTab {
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct SafariEvalResult {
-    pub result: String,
+    pub result: serde_json::Value,
+    pub value_type: String,
 }
 
 #[cfg(test)]

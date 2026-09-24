@@ -1,7 +1,7 @@
 use clap::Parser;
 
-use super::{Cli, Command};
 use super::safari::SafariAction;
+use super::{Cli, Command};
 
 #[test]
 fn cli_parses_safari_exec_with_profile() {
@@ -10,13 +10,37 @@ fn cli_parses_safari_exec_with_profile() {
 
     match cli.command {
         Command::Safari {
-            action:
-                SafariAction::Exec {
-                    js_code, profile, ..
-                },
+            action: SafariAction::Exec {
+                js_code, profile, ..
+            },
         } => {
             assert_eq!(js_code, "1+1");
             assert_eq!(profile.as_deref(), Some("Work"));
+        }
+        _ => panic!("unexpected command"),
+    }
+}
+
+#[test]
+fn cli_parses_safari_exec_timeout() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "safari",
+        "exec",
+        "--timeout",
+        "45",
+        "await Promise.resolve([1, 2])",
+    ])
+    .expect("parse Safari exec timeout");
+
+    match cli.command {
+        Command::Safari {
+            action: SafariAction::Exec {
+                js_code, timeout, ..
+            },
+        } => {
+            assert_eq!(js_code, "await Promise.resolve([1, 2])");
+            assert_eq!(timeout, 45);
         }
         _ => panic!("unexpected command"),
     }

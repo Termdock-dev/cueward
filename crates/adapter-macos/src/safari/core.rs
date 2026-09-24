@@ -11,7 +11,7 @@ use super::script::{
     parse_tabs_output, selector_click_js, selector_exists_js, selector_fill_js, selector_text_js,
 };
 use super::types::{
-    SafariClickResult, SafariCloseResult, SafariEvalResult, SafariFillResult, SafariReadResult,
+    SafariClickResult, SafariCloseResult, SafariFillResult, SafariReadResult,
     SafariScrollReadChunk, SafariScrollReadResult, SafariScrollReadSnapshot, SafariScrollResult,
     SafariSourceResult, SafariTab, SafariWaitResult,
 };
@@ -196,13 +196,6 @@ pub fn read(
             selector: selector.map(ToOwned::to_owned),
             content,
         })
-    })
-}
-
-pub fn exec(js_code: &str, profile_filter: Option<&str>) -> Result<SafariEvalResult, MacosError> {
-    with_safari_session(|| {
-        let result = execute_js_for_profile(js_code, profile_filter, "safari_exec")?;
-        Ok(SafariEvalResult { result })
     })
 }
 

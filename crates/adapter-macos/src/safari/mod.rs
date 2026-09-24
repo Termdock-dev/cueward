@@ -14,6 +14,7 @@ pub mod ai;
 mod core;
 #[cfg(test)]
 mod core_tests;
+mod eval;
 mod history;
 mod script;
 #[cfg(test)]
@@ -30,11 +31,12 @@ pub use ai::{
     send_chatgpt_image_prompt, send_chatgpt_prompt, send_gemini_prompt, send_grok_prompt,
     start_gemini_deep_research,
 };
-pub use core::{
-    active, click, close, close_tabs, exec, fill, focus_tab, open, read, scroll, scroll_and_read,
-    source, tabs, wait,
-};
 pub(crate) use core::doctor_live_probe;
+pub use core::{
+    active, click, close, close_tabs, fill, focus_tab, open, read, scroll, scroll_and_read, source,
+    tabs, wait,
+};
+pub use eval::exec;
 pub use history::capture;
 pub use social::{SocialFeedPost, threads_extract_feed, x_extract_feed, x_read_post, x_search};
 pub use types::{

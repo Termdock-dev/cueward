@@ -106,6 +106,9 @@ pub(crate) enum SafariAction {
         /// Target a specific tab by index or URL/title substring
         #[arg(long)]
         tab: Option<String>,
+        /// Maximum time to wait for a Promise result, in seconds
+        #[arg(long, default_value = "30")]
+        timeout: u64,
     },
     /// Click an element in the current active tab
     Click {
@@ -309,14 +312,14 @@ pub(crate) fn dispatch(action: SafariAction) {
                 }
             }
         }
-        SafariAction::Exec { js_code, profile, tab } => {
+        SafariAction::Exec { js_code, profile, tab, timeout } => {
             if let Some(ref t) = tab {
                 if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
                     eprintln!("error: {e}");
                     process::exit(1);
                 }
             }
-            match cueward_adapter_macos::safari::exec(&js_code, profile.as_deref()) {
+            match cueward_adapter_macos::safari::exec(&js_code, profile.as_deref(), timeout) {
                 Ok(result) => {
                     print_external("safari/exec", &serde_json::to_string_pretty(&result).unwrap());
                     eprintln!("executed javascript");
