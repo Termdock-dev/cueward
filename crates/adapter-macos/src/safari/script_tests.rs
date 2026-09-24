@@ -1,5 +1,5 @@
 use super::TAB_SEPARATOR;
-use super::interaction::{selector_click_js, selector_fill_js};
+use super::interaction::{RUNTIME, selector_click_js, selector_fill_js};
 use super::script::{
     build_active_tab_script, build_close_script, build_exec_script, build_open_script,
     build_tab_return_block, build_tabs_script, parse_tab_line, parse_tabs_output,
@@ -74,6 +74,45 @@ fn fill_notifies_framework_value_tracker() {
     if let Some(result) = result {
         assert_eq!(result, "new value");
     }
+}
+
+#[test]
+fn iframe_form_controls_use_their_own_dom_realm() {
+    let script = format!(
+        r#"
+        globalThis.window = globalThis;
+        globalThis.HTMLInputElement = class {{}};
+        globalThis.HTMLTextAreaElement = class {{}};
+        globalThis.HTMLSelectElement = class {{}};
+        class FrameInput extends EventTarget {{ constructor(type = 'text') {{ super(); this.type = type; this.stored = ''; this.marked = false; }} }}
+        Object.defineProperty(FrameInput.prototype, 'value', {{get() {{ return this.stored; }}, set(v) {{ this.stored = v; }}}});
+        Object.defineProperty(FrameInput.prototype, 'checked', {{get() {{ return this.marked; }}, set(v) {{ this.marked = v; }}}});
+        class FrameTextarea extends FrameInput {{}}
+        class FrameSelect extends EventTarget {{ constructor() {{ super(); this.value = 'a'; }} }}
+        const frame = {{HTMLInputElement: FrameInput, HTMLTextAreaElement: FrameTextarea,
+          HTMLSelectElement: FrameSelect, Event}};
+        const selection = {{removeAllRanges() {{}}, addRange() {{}}}};
+        const frameDoc = {{defaultView: frame, getSelection: () => selection,
+          createRange: () => ({{selectNodeContents() {{}}}}),
+          execCommand: () => true}};
+        const input = new FrameInput(); input.ownerDocument = frameDoc;
+        const select = new FrameSelect(); select.ownerDocument = frameDoc;
+        const check = new FrameInput('checkbox'); check.ownerDocument = frameDoc;
+        const editable = {{isContentEditable: true, ownerDocument: frameDoc, focus() {{}}}};
+        {RUNTIME}
+        const run = fn => {{ try {{ fn(); return true; }} catch (_) {{ return false; }} }};
+        process.stdout.write(JSON.stringify({{
+          fill: run(() => cuewardFill(input, 'new')) && input.value === 'new',
+          select: run(() => cuewardSelect(select, 'b')) && select.value === 'b',
+          check: run(() => cuewardCheck(check, true)) && check.checked === true,
+          editable: run(() => cuewardFill(editable, 'text'))
+        }}));
+        "#
+    );
+    let output = Command::new("node").arg("-e").arg(script).output().expect("Node");
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("result");
+    assert_eq!(result, serde_json::json!({"fill":true,"select":true,"check":true,"editable":true}));
 }
 
 #[test]

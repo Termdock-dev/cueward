@@ -220,6 +220,21 @@ mod tests {
     }
 
     #[test]
+    fn cancelled_evaluation_does_not_restore_late_result() {
+        let initial = build_eval_js("window.pending", "cancelled", false).expect("evaluation");
+        let script = format!(
+            "globalThis.window = globalThis; let finish; \
+             window.pending = new Promise(resolve => {{ finish = resolve; }}); \
+             {initial}; delete window.__cuewardEvalPending.cancelled; \
+             finish(1); setImmediate(() => process.stdout.write( \
+               String(Object.hasOwn(window.__cuewardEvalPending, 'cancelled'))));"
+        );
+        let output = Command::new("node").arg("-e").arg(script).output().expect("Node");
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert_eq!(output.stdout, b"false");
+    }
+
+    #[test]
     fn decodes_typed_values() {
         let array =
             decode_eval_wire(r#"{"status":"complete","value_type":"array","result_json":"[1,2]"}"#)
