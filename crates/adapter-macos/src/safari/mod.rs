@@ -18,6 +18,7 @@ mod eval;
 mod history;
 mod inspect;
 mod interaction;
+mod observe;
 mod script;
 #[cfg(test)]
 mod script_tests;
@@ -34,15 +35,14 @@ pub use ai::{
     gemini_read_conversation, gemini_save_images, gemini_save_media, grok_list_conversations,
     grok_read_conversation, poll_gemini_deep_research, prepare_gemini_mode,
     send_chatgpt_image_prompt, send_chatgpt_prompt, send_gemini_prompt, send_grok_prompt,
-    start_gemini_deep_research,
+    set_chatgpt_effort, start_gemini_deep_research,
 };
 pub(crate) use core::doctor_live_probe;
-pub use core::{
-    active, click, close, close_tabs, fill, focus_tab, open, read, source, tabs,
-};
+pub use core::{active, click, close, close_tabs, fill, focus_tab, open, read, source, tabs};
 pub use eval::exec;
 pub use history::capture;
 pub use inspect::{batch, inspect};
+pub use observe::{console_messages, network_requests};
 pub use scroll::{scroll, scroll_and_read};
 pub use social::{SocialFeedPost, threads_extract_feed, x_extract_feed, x_read_post, x_search};
 pub use types::{

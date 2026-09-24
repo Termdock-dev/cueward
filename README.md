@@ -211,14 +211,26 @@ cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" --pro
 
 Click and key events sent through JavaScript have `isTrusted: false`. They can reach page event handlers but cannot replace a trusted user gesture or native keyboard editing. Use a following `assert` or `wait` condition to verify the page changed as expected.
 
+### Safari diagnostics
+
+```bash
+# The first call starts capture in that tab; repeat it after reproducing the issue
+cueward safari console --tab "example.com" --level error
+cueward safari network --tab "example.com"
+cueward safari network get 2 --tab "example.com"
+```
+
+Console capture includes `log`, `info`, `warn`, `error`, and `debug`. Network capture covers `fetch` and `XMLHttpRequest`; summaries include URL, method, status, and duration. `network get` adds headers and up to 16 KiB of text response. Capture starts when either diagnostics command first runs in a page and ends when that page navigates or closes. Earlier console messages, requests, and browser-level traffic are unavailable. Each buffer keeps the latest 300 entries.
+
 ### Safari AI
 
-Control web-based AI providers (Gemini, ChatGPT) via Safari automation. Uses URL navigation and `execCommand` — no fragile DOM clicking, no focus stealing.
+Control web-based AI providers (Gemini, ChatGPT) via Safari automation. The ChatGPT effort option uses the composer's slider before sending a prompt.
 
 ```bash
 # Send a prompt (general chat)
 cueward safari ai --provider gemini prompt --prompt "explain quantum computing"
 cueward safari ai --provider chatgpt prompt --prompt "explain quantum computing" --timeout 900
+cueward safari ai --provider chatgpt prompt --prompt "explain quantum computing" --effort pro
 
 # Switch to a specific mode first
 cueward safari ai --provider gemini prompt --prompt "a cat on a keyboard" --mode image
@@ -249,6 +261,8 @@ cueward safari ai --provider gemini --profile Work list
 ```
 
 Supported Gemini modes: `deep-research`, `image`, `video`, `music`.
+
+ChatGPT `--effort` accepts a number within the slider's current ARIA range or `pro` for its maximum. It applies to normal prompts and checks the slider value before sending.
 
 ### Reddit
 

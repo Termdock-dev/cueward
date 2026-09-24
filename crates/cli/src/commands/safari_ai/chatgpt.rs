@@ -12,14 +12,32 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
             mode,
             auto_confirm,
             timeout,
+            effort,
         } => {
             if auto_confirm {
                 eprintln!("error: ChatGPT prompt does not support --auto-confirm");
                 process::exit(1);
             }
+            if effort.is_some() && mode.is_some() {
+                eprintln!("error: ChatGPT prompt --effort cannot be combined with --mode");
+                process::exit(1);
+            }
+            if effort
+                .as_deref()
+                .is_some_and(|value| value != "pro" && value.parse::<u32>().is_err())
+            {
+                eprintln!("error: ChatGPT --effort must be a slider number or 'pro'");
+                process::exit(1);
+            }
             if let Err(e) = cueward_adapter_macos::safari::ensure_chatgpt_home(profile) {
                 eprintln!("error: {e}");
                 process::exit(1);
+            }
+            if let Some(value) = effort.as_deref() {
+                if let Err(e) = cueward_adapter_macos::safari::set_chatgpt_effort(value, profile) {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
             }
             match mode {
                 None => {
@@ -46,8 +64,7 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
                         &prompt,
                         timeout.unwrap_or(180),
                         profile,
-                    )
-                    {
+                    ) {
                         Ok(r) => {
                             print_external(
                                 "safari/ai/chatgpt/image",

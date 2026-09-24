@@ -4,7 +4,7 @@ use crate::commands::helpers::print_external;
 use crate::commands::safari_ai::dispatch as dispatch_ai;
 use crate::commands::safari_bookmarks::dispatch as dispatch_bookmarks;
 
-use super::{SafariAction, build_wait_condition};
+use super::{SafariAction, SafariNetworkAction, build_wait_condition};
 
 pub(crate) fn dispatch(action: SafariAction) {
     match action {
@@ -318,6 +318,23 @@ pub(crate) fn dispatch(action: SafariAction) {
                     eprintln!("error: {error}");
                     process::exit(1);
                 }
+            }
+        }
+        SafariAction::Console { level, profile, tab } => {
+            match cueward_adapter_macos::safari::console_messages(
+                level.as_deref(), profile.as_deref(), tab.as_deref(),
+            ) {
+                Ok(result) => print_external("safari/console", &serde_json::to_string_pretty(&result).unwrap()),
+                Err(error) => { eprintln!("error: {error}"); process::exit(1); }
+            }
+        }
+        SafariAction::Network { profile, tab, action } => {
+            let id = match action { Some(SafariNetworkAction::Get { id }) => Some(id), None => None };
+            match cueward_adapter_macos::safari::network_requests(
+                id, profile.as_deref(), tab.as_deref(),
+            ) {
+                Ok(result) => print_external("safari/network", &serde_json::to_string_pretty(&result).unwrap()),
+                Err(error) => { eprintln!("error: {error}"); process::exit(1); }
             }
         }
         SafariAction::Bookmarks { action } => dispatch_bookmarks(action),

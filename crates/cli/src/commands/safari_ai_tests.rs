@@ -1,8 +1,10 @@
 use clap::Parser;
 
-use super::{Cli, Command};
 use super::safari::SafariAction;
-use super::safari_ai::{GeminiAiAction, GeminiMode, SafariAiAction, SafariAiProvider, build_gemini_ai_action};
+use super::safari_ai::{
+    GeminiAiAction, GeminiMode, SafariAiAction, SafariAiProvider, build_gemini_ai_action,
+};
+use super::{Cli, Command};
 
 #[test]
 fn build_gemini_ai_action_rejects_invalid_auto_confirm_usage() {
@@ -70,8 +72,16 @@ fn cli_parses_gemini_prompt_with_mode() {
 #[test]
 fn cli_parses_chatgpt_prompt_effort() {
     let cli = Cli::try_parse_from([
-        "cueward", "safari", "ai", "--provider", "chatgpt", "prompt",
-        "--prompt", "hello", "--effort", "pro",
+        "cueward",
+        "safari",
+        "ai",
+        "--provider",
+        "chatgpt",
+        "prompt",
+        "--prompt",
+        "hello",
+        "--effort",
+        "pro",
     ])
     .expect("parse ChatGPT effort");
 
@@ -172,11 +182,12 @@ fn cli_parses_chatgpt_prompt_timeout() {
 
     match cli.command {
         Command::Safari {
-            action: SafariAction::Ai {
-                provider: SafariAiProvider::Chatgpt,
-                action: SafariAiAction::Prompt { timeout, .. },
-                ..
-            },
+            action:
+                SafariAction::Ai {
+                    provider: SafariAiProvider::Chatgpt,
+                    action: SafariAiAction::Prompt { timeout, .. },
+                    ..
+                },
         } => assert_eq!(timeout, Some(900)),
         _ => panic!("unexpected command"),
     }
@@ -243,10 +254,7 @@ fn cli_parses_gemini_auto_confirm() {
         Command::Safari {
             action:
                 SafariAction::Ai {
-                    action:
-                        SafariAiAction::Prompt {
-                            auto_confirm, ..
-                        },
+                    action: SafariAiAction::Prompt { auto_confirm, .. },
                     ..
                 },
         } => assert!(auto_confirm),

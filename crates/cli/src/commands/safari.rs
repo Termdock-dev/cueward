@@ -188,6 +188,25 @@ pub(crate) enum SafariAction {
         #[arg(long)]
         tab: Option<String>,
     },
+    /// Capture and read console messages from this page onward
+    Console {
+        /// Filter by log, info, warn, error, or debug
+        #[arg(long)]
+        level: Option<String>,
+        #[arg(long)]
+        profile: Option<String>,
+        #[arg(long)]
+        tab: Option<String>,
+    },
+    /// Capture and read fetch and XMLHttpRequest activity from this page onward
+    Network {
+        #[arg(long, global = true)]
+        profile: Option<String>,
+        #[arg(long, global = true)]
+        tab: Option<String>,
+        #[command(subcommand)]
+        action: Option<SafariNetworkAction>,
+    },
     /// Safari bookmarks workflows
     Bookmarks {
         #[command(subcommand)]
@@ -204,6 +223,12 @@ pub(crate) enum SafariAction {
         #[command(subcommand)]
         action: SafariAiAction,
     },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum SafariNetworkAction {
+    /// Show one captured request with headers and response preview
+    Get { id: u64 },
 }
 
 fn build_wait_condition(

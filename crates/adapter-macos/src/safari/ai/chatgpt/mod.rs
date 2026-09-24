@@ -9,10 +9,12 @@ use super::super::script::escape_js_string;
 use super::{SafariAiImage, SafariAiImageResult, SafariConversation};
 
 mod conversations;
+mod effort;
 mod images;
 mod prompt;
 
 pub use conversations::chatgpt_list_conversations;
+pub use effort::set_chatgpt_effort;
 pub use images::chatgpt_save_images;
 pub use prompt::{ensure_chatgpt_home, send_chatgpt_image_prompt, send_chatgpt_prompt};
 

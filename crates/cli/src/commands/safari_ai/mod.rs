@@ -39,6 +39,9 @@ pub(crate) enum SafariAiAction {
         /// Maximum time to wait for a ChatGPT response, in seconds
         #[arg(long)]
         timeout: Option<u64>,
+        /// ChatGPT reasoning level (a slider number, or pro for its maximum)
+        #[arg(long)]
+        effort: Option<String>,
     },
     /// Switch to a specific mode without sending a prompt
     Mode {
@@ -91,9 +94,10 @@ pub(crate) fn build_gemini_ai_action(
     }
 
     match (mode, prompt) {
-        (Some(GeminiMode::DeepResearch), Some(prompt)) => {
-            Ok(GeminiAiAction::DeepResearchPlan(prompt.to_string(), auto_confirm))
-        }
+        (Some(GeminiMode::DeepResearch), Some(prompt)) => Ok(GeminiAiAction::DeepResearchPlan(
+            prompt.to_string(),
+            auto_confirm,
+        )),
         (Some(mode), Some(prompt)) => Ok(GeminiAiAction::ModeThenPrompt(mode, prompt.to_string())),
         (Some(mode), None) => Ok(GeminiAiAction::ModeOnly(mode)),
         (None, Some(prompt)) => Ok(GeminiAiAction::PromptOnly(prompt.to_string())),
@@ -101,11 +105,31 @@ pub(crate) fn build_gemini_ai_action(
     }
 }
 
-pub(crate) fn dispatch(provider: SafariAiProvider, profile: Option<String>, action: SafariAiAction) {
-    if matches!(&action, SafariAiAction::Prompt { timeout: Some(_), .. })
-        && provider != SafariAiProvider::Chatgpt
+pub(crate) fn dispatch(
+    provider: SafariAiProvider,
+    profile: Option<String>,
+    action: SafariAiAction,
+) {
+    if matches!(
+        &action,
+        SafariAiAction::Prompt {
+            timeout: Some(_),
+            ..
+        }
+    ) && provider != SafariAiProvider::Chatgpt
     {
         eprintln!("error: prompt --timeout is currently supported only for ChatGPT");
+        std::process::exit(1);
+    }
+    if matches!(
+        &action,
+        SafariAiAction::Prompt {
+            effort: Some(_),
+            ..
+        }
+    ) && provider != SafariAiProvider::Chatgpt
+    {
+        eprintln!("error: prompt --effort is currently supported only for ChatGPT");
         std::process::exit(1);
     }
     let p = profile.as_deref();

@@ -13,7 +13,7 @@ mod grok;
 
 pub use chatgpt::{
     chatgpt_list_conversations, chatgpt_save_images, ensure_chatgpt_home,
-    send_chatgpt_image_prompt, send_chatgpt_prompt,
+    send_chatgpt_image_prompt, send_chatgpt_prompt, set_chatgpt_effort,
 };
 pub use gemini::{
     ensure_gemini_home, gemini_list_conversations, gemini_read_conversation, gemini_save_images,
