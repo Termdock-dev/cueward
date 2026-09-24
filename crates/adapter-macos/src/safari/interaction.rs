@@ -56,40 +56,46 @@ pub(super) const RUNTIME: &str = r#"
   };
   const cuewardClick = (el) => {
     cuewardEnabled(el);
+    const realm = el.ownerDocument?.defaultView || globalThis;
+    const Pointer = realm.PointerEvent || PointerEvent;
+    const Mouse = realm.MouseEvent || MouseEvent;
     const pointer = {bubbles: true, cancelable: true, composed: true,
       pointerType: 'mouse', button: 0, buttons: 1, isPrimary: true};
     const mouse = {bubbles: true, cancelable: true, composed: true,
       button: 0, buttons: 1};
-    el.dispatchEvent(new PointerEvent('pointerover', pointer));
-    el.dispatchEvent(new PointerEvent('pointerenter', {...pointer, bubbles: false}));
-    el.dispatchEvent(new MouseEvent('mouseover', mouse));
-    el.dispatchEvent(new MouseEvent('mouseenter', {...mouse, bubbles: false}));
-    el.dispatchEvent(new PointerEvent('pointerdown', pointer));
-    el.dispatchEvent(new MouseEvent('mousedown', mouse));
-    el.dispatchEvent(new PointerEvent('pointerup', {...pointer, buttons: 0}));
-    el.dispatchEvent(new MouseEvent('mouseup', {...mouse, buttons: 0}));
+    el.dispatchEvent(new Pointer('pointerover', pointer));
+    el.dispatchEvent(new Pointer('pointerenter', {...pointer, bubbles: false}));
+    el.dispatchEvent(new Mouse('mouseover', mouse));
+    el.dispatchEvent(new Mouse('mouseenter', {...mouse, bubbles: false}));
+    el.dispatchEvent(new Pointer('pointerdown', pointer));
+    el.dispatchEvent(new Mouse('mousedown', mouse));
+    el.dispatchEvent(new Pointer('pointerup', {...pointer, buttons: 0}));
+    el.dispatchEvent(new Mouse('mouseup', {...mouse, buttons: 0}));
     if (typeof el.click === 'function') el.click();
-    else el.dispatchEvent(new MouseEvent('click', mouse));
+    else el.dispatchEvent(new Mouse('click', mouse));
   };
   const cuewardFill = (el, text) => {
     cuewardEnabled(el);
-    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-      const proto = el instanceof HTMLTextAreaElement
-        ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const doc = el.ownerDocument || document;
+    const realm = doc.defaultView || globalThis;
+    if (el instanceof realm.HTMLInputElement || el instanceof realm.HTMLTextAreaElement) {
+      const proto = el instanceof realm.HTMLTextAreaElement
+        ? realm.HTMLTextAreaElement.prototype : realm.HTMLInputElement.prototype;
       const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
       if (!setter) throw new Error('native value setter unavailable');
       setter.call(el, text);
-      el.dispatchEvent(new Event('input', {bubbles: true, composed: true}));
-      el.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
+      el.dispatchEvent(new realm.Event('input', {bubbles: true, composed: true}));
+      el.dispatchEvent(new realm.Event('change', {bubbles: true, composed: true}));
       if (el.value !== text) throw new Error('input value did not persist');
     } else if (el.isContentEditable) {
       el.focus();
-      const selection = window.getSelection();
-      const range = document.createRange();
+      const selection = doc.getSelection?.() || realm.getSelection?.();
+      if (!selection) throw new Error('contenteditable selection unavailable');
+      const range = doc.createRange();
       range.selectNodeContents(el);
       selection.removeAllRanges();
       selection.addRange(range);
-      if (!document.execCommand('insertText', false, text)) {
+      if (!doc.execCommand('insertText', false, text)) {
         throw new Error('contenteditable insertText failed');
       }
     } else {
@@ -98,31 +104,34 @@ pub(super) const RUNTIME: &str = r#"
   };
   const cuewardKey = (el, key, options = {}) => {
     cuewardEnabled(el);
+    const realm = el.ownerDocument?.defaultView || globalThis;
     el.focus?.();
     const init = {key, code: options.code || key, bubbles: true,
       cancelable: true, composed: true, ctrlKey: !!options.ctrl,
       altKey: !!options.alt, metaKey: !!options.meta, shiftKey: !!options.shift};
-    el.dispatchEvent(new KeyboardEvent('keydown', init));
-    el.dispatchEvent(new KeyboardEvent('keyup', init));
+    el.dispatchEvent(new realm.KeyboardEvent('keydown', init));
+    el.dispatchEvent(new realm.KeyboardEvent('keyup', init));
   };
   const cuewardSelect = (el, value) => {
     cuewardEnabled(el);
-    if (!(el instanceof HTMLSelectElement)) throw new Error('select requires a select element');
+    const realm = el.ownerDocument?.defaultView || globalThis;
+    if (!(el instanceof realm.HTMLSelectElement)) throw new Error('select requires a select element');
     el.value = value;
     if (el.value !== value) throw new Error('select option not found');
-    el.dispatchEvent(new Event('input', {bubbles: true, composed: true}));
-    el.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
+    el.dispatchEvent(new realm.Event('input', {bubbles: true, composed: true}));
+    el.dispatchEvent(new realm.Event('change', {bubbles: true, composed: true}));
   };
   const cuewardCheck = (el, checked) => {
     cuewardEnabled(el);
-    if (!(el instanceof HTMLInputElement) || !['checkbox', 'radio'].includes(el.type)) {
+    const realm = el.ownerDocument?.defaultView || globalThis;
+    if (!(el instanceof realm.HTMLInputElement) || !['checkbox', 'radio'].includes(el.type)) {
       throw new Error('check requires a checkbox or radio input');
     }
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked')?.set;
+    const setter = Object.getOwnPropertyDescriptor(realm.HTMLInputElement.prototype, 'checked')?.set;
     if (!setter) throw new Error('native checked setter unavailable');
     setter.call(el, checked);
-    el.dispatchEvent(new Event('input', {bubbles: true, composed: true}));
-    el.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
+    el.dispatchEvent(new realm.Event('input', {bubbles: true, composed: true}));
+    el.dispatchEvent(new realm.Event('change', {bubbles: true, composed: true}));
     if (el.checked !== checked) throw new Error('checked state did not persist');
   };
   const cuewardScrollIntoView = (el) => {

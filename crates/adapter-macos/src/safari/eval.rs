@@ -68,9 +68,11 @@ fn build_eval_js(code: &str, token: &str, body: bool) -> Result<String, MacosErr
           if (result && typeof result.then === 'function') {
             store[token] = JSON.stringify({status: 'running'});
             Promise.resolve(result).then(
-              value => { try { store[token] = success(value); }
-                         catch (error) { store[token] = failure(error); } },
-              error => { store[token] = failure(error); }
+              value => { if (Object.hasOwn(store, token)) {
+                try { store[token] = success(value); }
+                catch (error) { store[token] = failure(error); }
+              } },
+              error => { if (Object.hasOwn(store, token)) store[token] = failure(error); }
             );
             return store[token];
           }
@@ -93,6 +95,14 @@ fn build_poll_js(token: &str) -> Result<String, MacosError> {
           if (JSON.parse(result).status !== 'running') delete store[{token}];
           return result;
         }})()"#
+    ))
+}
+
+fn build_cleanup_js(token: &str) -> Result<String, MacosError> {
+    let token = serde_json::to_string(token)
+        .map_err(|err| MacosError::Other(format!("invalid evaluation token: {err}")))?;
+    Ok(format!(
+        "(() => {{ const store = window.__cuewardEvalPending; if (store) delete store[{token}]; return 'true'; }})()"
     ))
 }
 
@@ -138,7 +148,8 @@ pub fn exec(
             std::process::id(),
             NEXT_EVAL_ID.fetch_add(1, Ordering::Relaxed)
         );
-        let initial = execute_js_in_tab(&build_eval_js(js_code, &token, body)?, &tab, "safari_exec")?;
+        let initial =
+            execute_js_in_tab(&build_eval_js(js_code, &token, body)?, &tab, "safari_exec")?;
         if let Some(result) = decode_eval_wire(&initial)? {
             return Ok(result);
         }
@@ -151,6 +162,9 @@ pub fn exec(
                 return Ok(result);
             }
         }
+        if let Ok(cleanup) = build_cleanup_js(&token) {
+            let _ = execute_js_in_tab(&cleanup, &tab, "safari_exec_cleanup");
+        }
         Err(MacosError::Other(format!(
             "timeout waiting for JavaScript result after {timeout_seconds} seconds"
         )))
@@ -161,7 +175,7 @@ pub fn exec(
 mod tests {
     use std::process::Command;
 
-    use super::{build_eval_js, build_poll_js, decode_eval_wire};
+    use super::{build_cleanup_js, build_eval_js, build_poll_js, decode_eval_wire};
 
     fn evaluate_with_node(code: &str, body: bool) -> Option<super::SafariEvalResult> {
         let initial = build_eval_js(code, "test-token", body).expect("build evaluation");
@@ -198,11 +212,7 @@ mod tests {
             ("({a:1})", "object", serde_json::json!({"a": 1})),
             ("null", "null", serde_json::Value::Null),
             ("undefined", "undefined", serde_json::Value::Null),
-            (
-                "await Promise.resolve(42)",
-                "number",
-                serde_json::json!(42),
-            ),
+            ("await Promise.resolve(42)", "number", serde_json::json!(42)),
         ] {
             let Some(result) = evaluate_with_node(code, false) else {
                 return;
@@ -222,15 +232,24 @@ mod tests {
     #[test]
     fn cancelled_evaluation_does_not_restore_late_result() {
         let initial = build_eval_js("window.pending", "cancelled", false).expect("evaluation");
+        let cleanup = build_cleanup_js("cancelled").expect("cleanup");
         let script = format!(
             "globalThis.window = globalThis; let finish; \
              window.pending = new Promise(resolve => {{ finish = resolve; }}); \
-             {initial}; delete window.__cuewardEvalPending.cancelled; \
+             {initial}; {cleanup}; \
              finish(1); setImmediate(() => process.stdout.write( \
                String(Object.hasOwn(window.__cuewardEvalPending, 'cancelled'))));"
         );
-        let output = Command::new("node").arg("-e").arg(script).output().expect("Node");
-        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        let output = match Command::new("node").arg("-e").arg(script).output() {
+            Ok(output) => output,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+            Err(error) => panic!("run cancellation check: {error}"),
+        };
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         assert_eq!(output.stdout, b"false");
     }
 

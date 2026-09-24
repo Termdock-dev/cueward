@@ -2,8 +2,7 @@ use super::TAB_SEPARATOR;
 use super::interaction::{RUNTIME, selector_click_js, selector_fill_js};
 use super::script::{
     build_active_tab_script, build_close_script, build_exec_script, build_open_script,
-    build_tab_return_block, build_tabs_script, parse_tab_line, parse_tabs_output,
-    selector_text_js,
+    build_tab_return_block, build_tabs_script, parse_tab_line, parse_tabs_output, selector_text_js,
 };
 use std::process::Command;
 
@@ -66,11 +65,7 @@ fn fill_notifies_framework_value_tracker() {
       });
       globalThis.document = { querySelector: () => input };
     "#;
-    let result = run_browser_builder(
-        setup,
-        &selector_fill_js("#field", "new value"),
-        "accepted",
-    );
+    let result = run_browser_builder(setup, &selector_fill_js("#field", "new value"), "accepted");
     if let Some(result) = result {
         assert_eq!(result, "new value");
     }
@@ -109,10 +104,21 @@ fn iframe_form_controls_use_their_own_dom_realm() {
         }}));
         "#
     );
-    let output = Command::new("node").arg("-e").arg(script).output().expect("Node");
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let output = match Command::new("node").arg("-e").arg(script).output() {
+        Ok(output) => output,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+        Err(error) => panic!("run iframe action: {error}"),
+    };
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("result");
-    assert_eq!(result, serde_json::json!({"fill":true,"select":true,"check":true,"editable":true}));
+    assert_eq!(
+        result,
+        serde_json::json!({"fill":true,"select":true,"check":true,"editable":true})
+    );
 }
 
 #[test]
