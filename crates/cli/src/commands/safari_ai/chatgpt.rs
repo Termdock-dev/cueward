@@ -11,6 +11,7 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
             prompt,
             mode,
             auto_confirm,
+            timeout,
         } => {
             if auto_confirm {
                 eprintln!("error: ChatGPT prompt does not support --auto-confirm");
@@ -22,7 +23,11 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
             }
             match mode {
                 None => {
-                    match cueward_adapter_macos::safari::send_chatgpt_prompt(&prompt, profile) {
+                    match cueward_adapter_macos::safari::send_chatgpt_prompt(
+                        &prompt,
+                        timeout.unwrap_or(900),
+                        profile,
+                    ) {
                         Ok(r) => {
                             print_external(
                                 "safari/ai/chatgpt",
@@ -37,7 +42,11 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
                     }
                 }
                 Some(GeminiMode::Image) => {
-                    match cueward_adapter_macos::safari::send_chatgpt_image_prompt(&prompt, profile)
+                    match cueward_adapter_macos::safari::send_chatgpt_image_prompt(
+                        &prompt,
+                        timeout.unwrap_or(180),
+                        profile,
+                    )
                     {
                         Ok(r) => {
                             print_external(

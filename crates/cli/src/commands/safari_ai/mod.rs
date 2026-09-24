@@ -36,6 +36,9 @@ pub(crate) enum SafariAiAction {
         /// Automatically confirm (e.g. Deep Research plan)
         #[arg(long, default_value_t = false)]
         auto_confirm: bool,
+        /// Maximum time to wait for a ChatGPT response, in seconds
+        #[arg(long)]
+        timeout: Option<u64>,
     },
     /// Switch to a specific mode without sending a prompt
     Mode {
@@ -99,6 +102,12 @@ pub(crate) fn build_gemini_ai_action(
 }
 
 pub(crate) fn dispatch(provider: SafariAiProvider, profile: Option<String>, action: SafariAiAction) {
+    if matches!(&action, SafariAiAction::Prompt { timeout: Some(_), .. })
+        && provider != SafariAiProvider::Chatgpt
+    {
+        eprintln!("error: prompt --timeout is currently supported only for ChatGPT");
+        std::process::exit(1);
+    }
     let p = profile.as_deref();
     match provider {
         SafariAiProvider::Gemini => gemini::dispatch(action, p),

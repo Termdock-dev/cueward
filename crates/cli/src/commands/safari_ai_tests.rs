@@ -53,6 +53,7 @@ fn cli_parses_gemini_prompt_with_mode() {
                             prompt,
                             mode,
                             auto_confirm,
+                            ..
                         },
                     ..
                 },
@@ -119,6 +120,7 @@ fn cli_parses_chatgpt_prompt_only() {
                             prompt,
                             mode,
                             auto_confirm,
+                            ..
                         },
                     ..
                 },
@@ -148,16 +150,16 @@ fn cli_parses_chatgpt_prompt_timeout() {
     ])
     .expect("parse ChatGPT prompt timeout");
 
-    assert!(matches!(
-        cli.command,
+    match cli.command {
         Command::Safari {
             action: SafariAction::Ai {
                 provider: SafariAiProvider::Chatgpt,
-                action: SafariAiAction::Prompt { .. },
+                action: SafariAiAction::Prompt { timeout, .. },
                 ..
-            }
-        }
-    ));
+            },
+        } => assert_eq!(timeout, Some(900)),
+        _ => panic!("unexpected command"),
+    }
 }
 
 #[test]
@@ -186,6 +188,7 @@ fn cli_parses_chatgpt_prompt_with_image_mode() {
                             prompt,
                             mode,
                             auto_confirm,
+                            ..
                         },
                     ..
                 },
@@ -353,6 +356,7 @@ fn cli_parses_grok_prompt_only() {
                             prompt,
                             mode,
                             auto_confirm,
+                            ..
                         },
                     ..
                 },

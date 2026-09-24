@@ -10,6 +10,7 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
             prompt,
             mode,
             auto_confirm,
+            ..
         } => {
             if auto_confirm {
                 eprintln!("error: Grok prompt does not support --auto-confirm");
