@@ -1,12 +1,13 @@
 use crate::MacosError;
 use crate::safari_guard::with_safari_session;
 
-use super::run_capture;
 use super::interaction::{selector_click_js, selector_fill_js};
+use super::map_js_timeout;
+use super::run_capture;
 use super::script::{
     build_active_tab_script, build_close_script, build_exec_script_for_profile, build_open_script,
-    build_tabs_script, decode_field, extract_profile, parse_tab_line,
-    parse_tabs_output, selector_text_js,
+    build_tabs_script, decode_field, extract_profile, parse_tab_line, parse_tabs_output,
+    selector_text_js,
 };
 use super::target::{execute_js_in_tab, resolve_tab};
 use super::types::{
@@ -26,7 +27,8 @@ pub(super) fn execute_js_for_profile(
     let stdout = run_capture(
         &build_exec_script_for_profile(js_code, profile_filter),
         context,
-    )?;
+    )
+    .map_err(|error| map_js_timeout(error, "current Safari tab"))?;
     Ok(decode_field(stdout.trim()))
 }
 
@@ -175,7 +177,8 @@ pub fn source(
 ) -> Result<SafariSourceResult, MacosError> {
     with_safari_session(|| {
         let tab = resolve_tab(tab_selector, profile_filter)?;
-        let result = execute_js_in_tab("document.documentElement.outerHTML", &tab, "safari_source")?;
+        let result =
+            execute_js_in_tab("document.documentElement.outerHTML", &tab, "safari_source")?;
         Ok(SafariSourceResult { html: result })
     })
 }

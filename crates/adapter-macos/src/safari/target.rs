@@ -2,8 +2,9 @@ use crate::MacosError;
 use crate::applescript::escape_body;
 
 use super::core::{active, tabs};
+use super::map_js_timeout;
 use super::run_capture;
-use super::script::{decode_field, safari_script_prelude};
+use super::script::{decode_field, js_apple_event_command, safari_script_prelude};
 use super::types::SafariTab;
 
 pub(super) fn resolve_tab(
@@ -32,6 +33,7 @@ pub(super) fn execute_js_in_tab(
     context: &str,
 ) -> Result<String, MacosError> {
     let js_expr = escape_body(js_code);
+    let js_command = js_apple_event_command(&format!("tab {} of w", tab.index + 1), None);
     let script = format!(
         r#"
         {prelude}
@@ -40,7 +42,7 @@ pub(super) fn execute_js_in_tab(
             if (id of w) is {window_id} then
               if (count of tabs of w) < {tab_index} then error "target tab closed"
               set jsCode to {js_expr}
-              set rawResult to do JavaScript jsCode in tab {tab_index} of w
+              {js_command}
               if rawResult is missing value then error "JavaScript did not return a string"
               return my encode_field(rawResult as string)
             end if
@@ -51,7 +53,13 @@ pub(super) fn execute_js_in_tab(
         prelude = safari_script_prelude(),
         window_id = tab.window_id,
         tab_index = tab.index + 1,
+        js_command = js_command,
     );
-    let output = run_capture(&script, context)?;
+    let output = run_capture(&script, context).map_err(|error| {
+        map_js_timeout(
+            error,
+            &format!("window {} tab index {}", tab.window_id, tab.index),
+        )
+    })?;
     Ok(decode_field(output.trim()))
 }

@@ -54,8 +54,42 @@ pub use wait::{WaitCondition, wait_until};
 
 const SAFARI_OPERATION_DELAY: Duration = Duration::from_secs(1);
 const SAFARI_429_MAX_RETRIES: usize = 3;
+const JS_APPLE_EVENT_TIMEOUT_SECONDS: u64 = 15;
+const JS_APPLE_EVENT_TIMEOUT_MARKER: &str = "CUEWARD_JS_APPLE_EVENT_TIMEOUT";
 const TAB_SEPARATOR: &str = "---TAB_SEP---";
 const FIELD_SEPARATOR: &str = "<<<FIELD_SEP>>>";
+
+fn map_js_timeout(error: MacosError, target: &str) -> MacosError {
+    let is_js_timeout = matches!(
+        &error,
+        MacosError::Other(message)
+            if message.contains(JS_APPLE_EVENT_TIMEOUT_MARKER) && message.contains("(-1712)")
+    );
+    if is_js_timeout {
+        let target = match &error {
+            MacosError::Other(message) => {
+                js_timeout_target(message).unwrap_or_else(|| target.into())
+            }
+            _ => target.into(),
+        };
+        MacosError::Other(format!(
+            "Safari JavaScript did not respond within {JS_APPLE_EVENT_TIMEOUT_SECONDS} seconds for {target}; a browser dialog may be open. The action outcome is unknown; inspect the tab before retrying."
+        ))
+    } else {
+        error
+    }
+}
+
+fn js_timeout_target(message: &str) -> Option<String> {
+    let details = message
+        .split_once(JS_APPLE_EVENT_TIMEOUT_MARKER)?
+        .1
+        .strip_prefix('|')?;
+    let (window_id, tab_index) = details.split_once('|')?;
+    let window_id = window_id.parse::<i64>().ok()?;
+    let tab_index = tab_index.split_whitespace().next()?.parse::<usize>().ok()?;
+    Some(format!("window {window_id} tab index {tab_index}"))
+}
 
 fn compute_next_safari_operation(
     now: Instant,
@@ -157,9 +191,9 @@ fn run_capture(script: &str, context: &str) -> Result<String, MacosError> {
 mod tests {
     use super::{
         SAFARI_LOCK_TTL_SECS, SAFARI_OPERATION_DELAY, SafariAutomationSession, SafariLockFile,
-        acquire_safari_lock, compute_next_safari_operation, is_safari_rate_limited,
-        renew_safari_lock,
-        read_safari_lock, release_safari_lock, safari_automation_state, safari_rate_limit_backoff,
+        acquire_safari_lock, compute_next_safari_operation, is_safari_rate_limited, map_js_timeout,
+        read_safari_lock, release_safari_lock, renew_safari_lock, safari_automation_state,
+        safari_rate_limit_backoff,
     };
     use std::fs;
     use std::time::Duration;
@@ -177,6 +211,43 @@ mod tests {
             "this article explains how rate limits work"
         ));
         assert!(!is_safari_rate_limited("all good"));
+    }
+
+    #[test]
+    fn safari_js_timeout_identifies_tab_and_preserves_unknown_outcome() {
+        let error = crate::MacosError::Other(
+            "safari_exec: CUEWARD_JS_APPLE_EVENT_TIMEOUT (-1712)".to_string(),
+        );
+        let mapped = map_js_timeout(error, "window 42 tab 1");
+        let message = mapped.to_string();
+
+        assert!(message.contains("window 42 tab 1"));
+        assert!(message.contains("15 seconds"));
+        assert!(message.contains("browser dialog"));
+        assert!(message.contains("outcome is unknown"));
+    }
+
+    #[test]
+    fn safari_profile_timeout_uses_captured_window_and_tab_index() {
+        let error = crate::MacosError::Other(
+            "safari_chatgpt_prompt_fill: CUEWARD_JS_APPLE_EVENT_TIMEOUT|42|1 (-1712)".to_string(),
+        );
+        let mapped = map_js_timeout(error, "current Safari tab");
+        let message = mapped.to_string();
+
+        assert!(message.contains("window 42 tab index 1"));
+        assert!(!message.contains("current Safari tab"));
+    }
+
+    #[test]
+    fn safari_js_timeout_does_not_relabel_other_errors() {
+        let error = crate::MacosError::Other("safari_exec: JavaScript syntax error".to_string());
+        let mapped = map_js_timeout(error, "window 42 tab 1");
+        assert_eq!(mapped.to_string(), "safari_exec: JavaScript syntax error");
+
+        let unrelated_timeout = crate::MacosError::Other("metadata request (-1712)".to_string());
+        let mapped = map_js_timeout(unrelated_timeout, "window 42 tab 1");
+        assert_eq!(mapped.to_string(), "metadata request (-1712)");
     }
 
     #[test]

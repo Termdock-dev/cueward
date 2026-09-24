@@ -1,8 +1,9 @@
 use super::TAB_SEPARATOR;
 use super::interaction::{RUNTIME, selector_click_js, selector_fill_js};
 use super::script::{
-    build_active_tab_script, build_close_script, build_exec_script, build_open_script,
-    build_tab_return_block, build_tabs_script, parse_tab_line, parse_tabs_output, selector_text_js,
+    build_active_tab_script, build_close_script, build_exec_script, build_exec_script_for_profile,
+    build_open_script, build_tab_return_block, build_tabs_script, js_apple_event_command,
+    parse_tab_line, parse_tabs_output, selector_text_js,
 };
 use std::process::Command;
 
@@ -209,6 +210,27 @@ fn build_exec_script_supports_multiline_js() {
     assert!(script.contains("on error errMsg"));
     assert!(script.contains("& linefeed &"));
     assert!(script.contains("if rawResult is missing value then"));
+}
+
+#[test]
+fn javascript_apple_event_has_a_scoped_timeout() {
+    let script = js_apple_event_command("tab 2 of w", None);
+
+    assert!(script.contains("with timeout of 15 seconds"));
+    assert!(script.contains("do JavaScript jsCode in tab 2 of w"));
+    assert!(script.contains("CUEWARD_JS_APPLE_EVENT_TIMEOUT"));
+    assert!(script.contains("if errNum is -1712"));
+}
+
+#[test]
+fn profile_javascript_timeout_carries_the_selected_tab_identity() {
+    let script = build_exec_script_for_profile("1 + 1", Some("Work"));
+
+    assert!(script.contains("set targetTab to current tab of w"));
+    assert!(script.contains("set targetWindowId to (id of w) as text"));
+    assert!(script.contains("set targetTabIndex to ((index of targetTab) - 1) as text"));
+    assert!(script.contains("do JavaScript jsCode in targetTab"));
+    assert!(script.contains("targetWindowId & \"|\" & targetTabIndex"));
 }
 
 #[test]
