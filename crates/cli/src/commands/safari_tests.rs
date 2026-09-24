@@ -47,6 +47,25 @@ fn cli_parses_safari_exec_timeout() {
 }
 
 #[test]
+fn cli_parses_safari_exec_body() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "safari",
+        "exec",
+        "--body",
+        "const value = await Promise.resolve(2); return value * 2;",
+    ])
+    .expect("parse Safari exec body");
+
+    assert!(matches!(
+        cli.command,
+        Command::Safari {
+            action: SafariAction::Exec { body: true, .. }
+        }
+    ));
+}
+
+#[test]
 fn cli_parses_safari_active_with_profile() {
     let cli = Cli::try_parse_from(["cueward", "safari", "active", "--profile", "Work"])
         .expect("parse safari active with profile");

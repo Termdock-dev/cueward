@@ -61,8 +61,7 @@ impl WaitCondition {
                 literal(text)?
             ),
             Self::JavaScript(code) => format!(
-                "(() => {{ const value = (0, eval)({}); if (value?.then) throw new Error('wait --js requires a synchronous condition'); return Boolean(value); }})()",
-                literal(code)?
+                "(() => {{ const value = ({code}); if (value?.then) throw new Error('wait --js requires a synchronous condition'); return Boolean(value); }})()",
             ),
             Self::UrlContains(url) => {
                 format!("location.href.includes({})", literal(url)?)

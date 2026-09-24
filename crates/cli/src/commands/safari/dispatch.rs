@@ -174,12 +174,14 @@ pub(crate) fn dispatch(action: SafariAction) {
             profile,
             tab,
             timeout,
+            body,
         } => {
             match cueward_adapter_macos::safari::exec(
                 &js_code,
                 profile.as_deref(),
                 tab.as_deref(),
                 timeout,
+                body,
             ) {
                 Ok(result) => {
                     print_external(

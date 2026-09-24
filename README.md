@@ -149,6 +149,7 @@ cueward safari source
 # Execute JavaScript and keep JSON result types
 cueward safari exec "document.title"
 cueward safari exec "await Promise.resolve([1, 2])" --timeout 30
+cueward safari exec --body "const x = await Promise.resolve(2); return x * 2;"
 cueward safari click "#submit"
 cueward safari fill "textarea" "hello from cueward"
 cueward safari wait ".result" --timeout 30
@@ -204,7 +205,7 @@ cueward safari bookmarks add --title "Claude" --url "https://claude.ai" --profil
 cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" --profile Work --folder "Projects/AI Tools"
 ```
 
-`exec` returns a JSON `result` and a `value_type`; `undefined` has a null result with type `undefined`. An `await` expression is supported. For multi-statement asynchronous code, use an explicit `return` for the value.
+`exec` evaluates one JavaScript expression and returns a JSON `result` with a `value_type`; `undefined` has a null result with type `undefined`. Expressions may use `await`. Use `--body` and an explicit `return` for multiple statements. `wait --js` and batch `assert.js` accept synchronous expressions.
 
 `inspect` refs remain valid until the next `inspect`, page navigation, or element removal. `batch` accepts up to 100 steps. Each action targets one `ref`, CSS `selector`, or visible `text`. Actions are `click`, `fill` (`value`), `key` (`key`, optional `ctrl`/`alt`/`meta`/`shift`), `select` (`value`), `check` (`checked`), `scroll_into_view`, and `assert` (`js` or a target). A failed step reports its index and exits with an error. Open shadow roots and same-origin iframes are searched; closed shadow roots and cross-origin iframes cannot be accessed through page JavaScript.
 

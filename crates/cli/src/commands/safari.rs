@@ -107,6 +107,9 @@ pub(crate) enum SafariAction {
         /// Maximum time to wait for a Promise result, in seconds
         #[arg(long, default_value = "30")]
         timeout: u64,
+        /// Treat the source as an async function body; use return for its result
+        #[arg(long)]
+        body: bool,
     },
     /// Click an element in the current active tab
     Click {

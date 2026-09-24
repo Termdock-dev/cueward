@@ -85,21 +85,39 @@ pub fn inspect(
 }
 
 fn batch_js(steps: &Value) -> Result<String, MacosError> {
+    let mut assertion_cases = String::new();
+    if let Some(items) = steps.as_array() {
+        for (index, step) in items.iter().enumerate() {
+            if step.get("action").and_then(Value::as_str) != Some("assert") {
+                continue;
+            }
+            if let Some(js) = step.get("js") {
+                let code = js.as_str().ok_or_else(|| {
+                    MacosError::Other(format!("batch assert step {index} js must be a string"))
+                })?;
+                assertion_cases.push_str(&format!("case {index}: return ({code});\n"));
+            }
+        }
+    }
     let steps = serde_json::to_string(steps)
         .map_err(|error| MacosError::Other(format!("invalid batch steps: {error}")))?;
     Ok(format!(
         r#"(() => {{
           {RUNTIME}
           const steps = {steps};
+          const cuewardAssert = (index) => {{
+            switch (index) {{
+              {assertion_cases}
+              default: throw new Error('assertion source missing');
+            }}
+          }};
           const completed = [];
           for (let index = 0; index < steps.length; index++) {{
             const step = steps[index];
             try {{
               if (step.action === 'assert') {{
-                if (step.js != null && typeof step.js !== 'string')
-                  throw new Error('assert js must be a string');
                 const observed = step.js != null
-                  ? (0, eval)(step.js) : cuewardResolve(step);
+                  ? cuewardAssert(index) : cuewardResolve(step);
                 if (observed?.then) throw new Error('assert requires a synchronous condition');
                 const passes = Boolean(observed);
                 if (!passes) throw new Error('assertion failed');

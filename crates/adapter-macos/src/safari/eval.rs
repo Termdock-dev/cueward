@@ -23,18 +23,21 @@ struct EvalWire {
     error: Option<String>,
 }
 
-fn build_eval_js(code: &str, token: &str) -> Result<String, MacosError> {
-    let code = serde_json::to_string(code)
-        .map_err(|err| MacosError::Other(format!("invalid JavaScript source: {err}")))?;
+fn build_eval_js(code: &str, token: &str, body: bool) -> Result<String, MacosError> {
+    let source = if body {
+        format!("(async () => {{\n{code}\n}})()")
+    } else {
+        format!("(async () => (\n{code}\n))()")
+    };
     let token = serde_json::to_string(token)
         .map_err(|err| MacosError::Other(format!("invalid evaluation token: {err}")))?;
     Ok(
         r#"(() => {
-          const code = __CODE__;
           const token = __TOKEN__;
           const store = window.__cuewardEvalPending ||= Object.create(null);
           const failure = (error) => JSON.stringify({
-            status: 'error', error: String(error?.stack || error?.message || error)
+            status: 'error', error: String(error?.name || 'Error') + ': ' +
+              String(error?.message || error)
           });
           const success = (value) => {
             let valueType = value === null ? 'null' :
@@ -58,17 +61,9 @@ fn build_eval_js(code: &str, token: &str) -> Result<String, MacosError> {
           };
           let result;
           try {
-            result = (0, eval)(code);
+            result = __SOURCE__;
           } catch (error) {
-            if (!(error instanceof SyntaxError) || !/\bawait\b/.test(code)) return failure(error);
-            const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
-            try {
-              result = new AsyncFunction('return (' + code + ')')();
-            } catch (expressionError) {
-              if (!(expressionError instanceof SyntaxError)) return failure(expressionError);
-              try { result = new AsyncFunction(code)(); }
-              catch (bodyError) { return failure(bodyError); }
-            }
+            return failure(error);
           }
           if (result && typeof result.then === 'function') {
             store[token] = JSON.stringify({status: 'running'});
@@ -82,8 +77,8 @@ fn build_eval_js(code: &str, token: &str) -> Result<String, MacosError> {
           try { return success(result); }
           catch (error) { return failure(error); }
         })()"#
-            .replace("__CODE__", &code)
-            .replace("__TOKEN__", &token),
+            .replace("__TOKEN__", &token)
+            .replace("__SOURCE__", &source),
     )
 }
 
@@ -134,6 +129,7 @@ pub fn exec(
     profile_filter: Option<&str>,
     tab_selector: Option<&str>,
     timeout_seconds: u64,
+    body: bool,
 ) -> Result<SafariEvalResult, MacosError> {
     with_safari_session(|| {
         let tab = resolve_tab(tab_selector, profile_filter)?;
@@ -142,7 +138,7 @@ pub fn exec(
             std::process::id(),
             NEXT_EVAL_ID.fetch_add(1, Ordering::Relaxed)
         );
-        let initial = execute_js_in_tab(&build_eval_js(js_code, &token)?, &tab, "safari_exec")?;
+        let initial = execute_js_in_tab(&build_eval_js(js_code, &token, body)?, &tab, "safari_exec")?;
         if let Some(result) = decode_eval_wire(&initial)? {
             return Ok(result);
         }
@@ -167,11 +163,12 @@ mod tests {
 
     use super::{build_eval_js, build_poll_js, decode_eval_wire};
 
-    fn evaluate_with_node(code: &str) -> Option<super::SafariEvalResult> {
-        let initial = build_eval_js(code, "test-token").expect("build evaluation");
+    fn evaluate_with_node(code: &str, body: bool) -> Option<super::SafariEvalResult> {
+        let initial = build_eval_js(code, "test-token", body).expect("build evaluation");
         let poll = build_poll_js("test-token").expect("build poll");
         let harness = format!(
-            "globalThis.window = globalThis; const initial = {initial}; \
+            "globalThis.window = globalThis; globalThis.eval = () => {{throw Error('eval is blocked')}}; \
+             const initial = {initial}; \
              if (JSON.parse(initial).status === 'running') {{ \
                setImmediate(() => process.stdout.write({poll})); \
              }} else {{ process.stdout.write(initial); }}"
@@ -207,12 +204,19 @@ mod tests {
                 serde_json::json!(42),
             ),
         ] {
-            let Some(result) = evaluate_with_node(code) else {
+            let Some(result) = evaluate_with_node(code, false) else {
                 return;
             };
             assert_eq!(result.value_type, expected_type, "source: {code}");
             assert_eq!(result.result, expected_value, "source: {code}");
         }
+        let Some(body_result) = evaluate_with_node(
+            "const value = await Promise.resolve(7); return value + 1;",
+            true,
+        ) else {
+            return;
+        };
+        assert_eq!(body_result.result, serde_json::json!(8));
     }
 
     #[test]
