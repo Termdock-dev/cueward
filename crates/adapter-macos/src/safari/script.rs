@@ -345,10 +345,29 @@ pub(super) fn selector_click_js(selector: &str) -> String {
     let selector = escape_js_string(selector);
     format!(
         r#"(() => {{
+          try {{
             const el = document.querySelector("{selector}");
             if (!el) throw new Error("selector not found");
+            if (el.matches?.(':disabled') || el.getAttribute?.('aria-disabled') === 'true') {{
+                throw new Error("element is disabled");
+            }}
+            const pointer = {{bubbles: true, cancelable: true, composed: true,
+                pointerType: 'mouse', button: 0, buttons: 1, isPrimary: true}};
+            const mouse = {{bubbles: true, cancelable: true, composed: true,
+                button: 0, buttons: 1}};
+            el.dispatchEvent(new PointerEvent('pointerover', pointer));
+            el.dispatchEvent(new PointerEvent('pointerenter', {{...pointer, bubbles: false}}));
+            el.dispatchEvent(new MouseEvent('mouseover', mouse));
+            el.dispatchEvent(new MouseEvent('mouseenter', {{...mouse, bubbles: false}}));
+            el.dispatchEvent(new PointerEvent('pointerdown', pointer));
+            el.dispatchEvent(new MouseEvent('mousedown', mouse));
+            el.dispatchEvent(new PointerEvent('pointerup', {{...pointer, buttons: 0}}));
+            el.dispatchEvent(new MouseEvent('mouseup', {{...mouse, buttons: 0}}));
             el.click();
             return "true";
+          }} catch (error) {{
+            return String(error?.message || error);
+          }}
         }})()"#
     )
 }
@@ -358,16 +377,39 @@ pub(super) fn selector_fill_js(selector: &str, text: &str) -> String {
     let text = escape_js_string(text);
     format!(
         r#"(() => {{
+          try {{
             const el = document.querySelector("{selector}");
             if (!el) throw new Error("selector not found");
-            if ("value" in el) {{
-                el.value = "{text}";
-            }} else {{
-                el.textContent = "{text}";
+            const text = "{text}";
+            if (el.matches?.(':disabled') || el.getAttribute?.('aria-disabled') === 'true') {{
+                throw new Error("element is disabled");
             }}
-            el.dispatchEvent(new Event("input", {{ bubbles: true }}));
-            el.dispatchEvent(new Event("change", {{ bubbles: true }}));
+            if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {{
+                const proto = el instanceof HTMLTextAreaElement
+                  ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+                const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+                if (!setter) throw new Error('native value setter unavailable');
+                setter.call(el, text);
+                el.dispatchEvent(new Event('input', {{bubbles: true, composed: true}}));
+                el.dispatchEvent(new Event('change', {{bubbles: true, composed: true}}));
+                if (el.value !== text) throw new Error('input value did not persist');
+            }} else if (el.isContentEditable) {{
+                el.focus();
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                if (!document.execCommand('insertText', false, text)) {{
+                    throw new Error('contenteditable insertText failed');
+                }}
+            }} else {{
+                throw new Error('fill requires input, textarea, or contenteditable');
+            }}
             return "true";
+          }} catch (error) {{
+            return String(error?.message || error);
+          }}
         }})()"#
     )
 }
