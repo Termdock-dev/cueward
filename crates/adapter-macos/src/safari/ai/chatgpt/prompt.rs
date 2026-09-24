@@ -131,3 +131,40 @@ pub fn send_chatgpt_image_prompt(
         poll_chatgpt_images(180, 3, profile_filter)
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+
+    use super::chatgpt_response_extract_js;
+
+    #[test]
+    fn chinese_stop_response_keeps_prompt_running() {
+        let script = format!(
+            r#"
+            globalThis.window = {{location: {{href: 'https://chatgpt.com/c/test'}}}};
+            const stop = {{getAttribute: name => name === 'aria-label' ? '停止回應' : null,
+                           innerText: '', textContent: ''}};
+            const assistant = {{innerText: 'Pro 思考', textContent: 'Pro 思考'}};
+            globalThis.document = {{querySelectorAll: selector =>
+              selector === '[data-message-author-role="assistant"]' ? [assistant] :
+              selector === 'button,[role="button"]' ? [stop] : []}};
+            process.stdout.write({script});
+            "#,
+            script = chatgpt_response_extract_js()
+        );
+        let output = match Command::new("node").arg("-e").arg(script).output() {
+            Ok(output) => output,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+            Err(error) => panic!("run response extractor: {error}"),
+        };
+        assert!(
+            output.status.success(),
+            "response extractor failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let payload: serde_json::Value = serde_json::from_slice(&output.stdout)
+            .expect("parse response payload");
+        assert_eq!(payload["status"], "running");
+    }
+}

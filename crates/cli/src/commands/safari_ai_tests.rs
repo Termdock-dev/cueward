@@ -133,6 +133,34 @@ fn cli_parses_chatgpt_prompt_only() {
 }
 
 #[test]
+fn cli_parses_chatgpt_prompt_timeout() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "safari",
+        "ai",
+        "--provider",
+        "chatgpt",
+        "prompt",
+        "--prompt",
+        "long answer",
+        "--timeout",
+        "900",
+    ])
+    .expect("parse ChatGPT prompt timeout");
+
+    assert!(matches!(
+        cli.command,
+        Command::Safari {
+            action: SafariAction::Ai {
+                provider: SafariAiProvider::Chatgpt,
+                action: SafariAiAction::Prompt { .. },
+                ..
+            }
+        }
+    ));
+}
+
+#[test]
 fn cli_parses_chatgpt_prompt_with_image_mode() {
     let cli = Cli::try_parse_from([
         "cueward",
