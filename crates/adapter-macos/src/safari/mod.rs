@@ -66,12 +66,29 @@ fn map_js_timeout(error: MacosError, target: &str) -> MacosError {
             if message.contains(JS_APPLE_EVENT_TIMEOUT_MARKER) && message.contains("(-1712)")
     );
     if is_js_timeout {
+        let target = match &error {
+            MacosError::Other(message) => {
+                js_timeout_target(message).unwrap_or_else(|| target.into())
+            }
+            _ => target.into(),
+        };
         MacosError::Other(format!(
             "Safari JavaScript did not respond within {JS_APPLE_EVENT_TIMEOUT_SECONDS} seconds for {target}; a browser dialog may be open. The action outcome is unknown; inspect the tab before retrying."
         ))
     } else {
         error
     }
+}
+
+fn js_timeout_target(message: &str) -> Option<String> {
+    let details = message
+        .split_once(JS_APPLE_EVENT_TIMEOUT_MARKER)?
+        .1
+        .strip_prefix('|')?;
+    let (window_id, tab_index) = details.split_once('|')?;
+    let window_id = window_id.parse::<i64>().ok()?;
+    let tab_index = tab_index.split_whitespace().next()?.parse::<usize>().ok()?;
+    Some(format!("window {window_id} tab index {tab_index}"))
 }
 
 fn compute_next_safari_operation(
@@ -213,8 +230,7 @@ mod tests {
     #[test]
     fn safari_profile_timeout_uses_captured_window_and_tab_index() {
         let error = crate::MacosError::Other(
-            "safari_chatgpt_prompt_fill: CUEWARD_JS_APPLE_EVENT_TIMEOUT|42|1 (-1712)"
-                .to_string(),
+            "safari_chatgpt_prompt_fill: CUEWARD_JS_APPLE_EVENT_TIMEOUT|42|1 (-1712)".to_string(),
         );
         let mapped = map_js_timeout(error, "current Safari tab");
         let message = mapped.to_string();

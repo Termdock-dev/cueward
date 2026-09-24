@@ -33,7 +33,7 @@ pub(super) fn execute_js_in_tab(
     context: &str,
 ) -> Result<String, MacosError> {
     let js_expr = escape_body(js_code);
-    let js_command = js_apple_event_command(&format!("tab {} of w", tab.index + 1));
+    let js_command = js_apple_event_command(&format!("tab {} of w", tab.index + 1), None);
     let script = format!(
         r#"
         {prelude}

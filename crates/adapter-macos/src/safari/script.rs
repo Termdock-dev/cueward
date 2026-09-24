@@ -5,14 +5,18 @@ use super::{
     FIELD_SEPARATOR, JS_APPLE_EVENT_TIMEOUT_MARKER, JS_APPLE_EVENT_TIMEOUT_SECONDS, TAB_SEPARATOR,
 };
 
-pub(super) fn js_apple_event_command(target: &str) -> String {
+pub(super) fn js_apple_event_command(target: &str, timeout_identity: Option<&str>) -> String {
+    let timeout_message = match timeout_identity {
+        Some(identity) => format!("\"{JS_APPLE_EVENT_TIMEOUT_MARKER}|\" & {identity}"),
+        None => format!("\"{JS_APPLE_EVENT_TIMEOUT_MARKER}\""),
+    };
     format!(
         r#"try
                 with timeout of {JS_APPLE_EVENT_TIMEOUT_SECONDS} seconds
                     set rawResult to do JavaScript jsCode in {target}
                 end timeout
             on error errMsg number errNum
-                if errNum is -1712 then error "{JS_APPLE_EVENT_TIMEOUT_MARKER}" number -1712
+                if errNum is -1712 then error {timeout_message} number -1712
                 error errMsg number errNum
             end try"#
     )
@@ -224,7 +228,8 @@ pub(super) fn build_active_tab_script(profile_filter: Option<&str>) -> String {
 
 pub(super) fn build_exec_script_for_profile(js_code: &str, profile_filter: Option<&str>) -> String {
     let js_expr = escape_body(js_code);
-    let js_command = js_apple_event_command("current tab of w");
+    let js_command =
+        js_apple_event_command("targetTab", Some("targetWindowId & \"|\" & targetTabIndex"));
     let target_window = target_window_block(profile_filter);
     format!(
         r#"
@@ -234,6 +239,9 @@ pub(super) fn build_exec_script_for_profile(js_code: &str, profile_filter: Optio
                 return ""
             end if
             {target_window}
+            set targetTab to current tab of w
+            set targetWindowId to (id of w) as text
+            set targetTabIndex to ((index of targetTab) - 1) as text
             set jsCode to {js_expr}
             set rawResult to missing value
             {js_command}
@@ -312,7 +320,7 @@ pub(super) fn build_close_script(index: Option<usize>) -> String {
 #[allow(dead_code)]
 pub(super) fn build_exec_script(js_code: &str) -> String {
     let js_expr = escape_body(js_code);
-    let js_command = js_apple_event_command("current tab of front window");
+    let js_command = js_apple_event_command("current tab of front window", None);
     format!(
         r#"
         {prelude}
