@@ -54,8 +54,25 @@ pub use wait::{WaitCondition, wait_until};
 
 const SAFARI_OPERATION_DELAY: Duration = Duration::from_secs(1);
 const SAFARI_429_MAX_RETRIES: usize = 3;
+const JS_APPLE_EVENT_TIMEOUT_SECONDS: u64 = 15;
+const JS_APPLE_EVENT_TIMEOUT_MARKER: &str = "CUEWARD_JS_APPLE_EVENT_TIMEOUT";
 const TAB_SEPARATOR: &str = "---TAB_SEP---";
 const FIELD_SEPARATOR: &str = "<<<FIELD_SEP>>>";
+
+fn map_js_timeout(error: MacosError, target: &str) -> MacosError {
+    let is_js_timeout = matches!(
+        &error,
+        MacosError::Other(message)
+            if message.contains(JS_APPLE_EVENT_TIMEOUT_MARKER) && message.contains("(-1712)")
+    );
+    if is_js_timeout {
+        MacosError::Other(format!(
+            "Safari JavaScript did not respond within {JS_APPLE_EVENT_TIMEOUT_SECONDS} seconds for {target}; a browser dialog may be open. The action outcome is unknown; inspect the tab before retrying."
+        ))
+    } else {
+        error
+    }
+}
 
 fn compute_next_safari_operation(
     now: Instant,
@@ -158,8 +175,8 @@ mod tests {
     use super::{
         SAFARI_LOCK_TTL_SECS, SAFARI_OPERATION_DELAY, SafariAutomationSession, SafariLockFile,
         acquire_safari_lock, compute_next_safari_operation, is_safari_rate_limited, map_js_timeout,
-        renew_safari_lock,
-        read_safari_lock, release_safari_lock, safari_automation_state, safari_rate_limit_backoff,
+        read_safari_lock, release_safari_lock, renew_safari_lock, safari_automation_state,
+        safari_rate_limit_backoff,
     };
     use std::fs;
     use std::time::Duration;

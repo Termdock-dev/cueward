@@ -1,7 +1,22 @@
 use crate::applescript::{escape, escape_body};
 
 use super::types::SafariTab;
-use super::{FIELD_SEPARATOR, TAB_SEPARATOR};
+use super::{
+    FIELD_SEPARATOR, JS_APPLE_EVENT_TIMEOUT_MARKER, JS_APPLE_EVENT_TIMEOUT_SECONDS, TAB_SEPARATOR,
+};
+
+pub(super) fn js_apple_event_command(target: &str) -> String {
+    format!(
+        r#"try
+                with timeout of {JS_APPLE_EVENT_TIMEOUT_SECONDS} seconds
+                    set rawResult to do JavaScript jsCode in {target}
+                end timeout
+            on error errMsg number errNum
+                if errNum is -1712 then error "{JS_APPLE_EVENT_TIMEOUT_MARKER}" number -1712
+                error errMsg number errNum
+            end try"#
+    )
+}
 
 pub(super) fn decode_field(value: &str) -> String {
     let mut decoded = String::with_capacity(value.len());
@@ -209,6 +224,7 @@ pub(super) fn build_active_tab_script(profile_filter: Option<&str>) -> String {
 
 pub(super) fn build_exec_script_for_profile(js_code: &str, profile_filter: Option<&str>) -> String {
     let js_expr = escape_body(js_code);
+    let js_command = js_apple_event_command("current tab of w");
     let target_window = target_window_block(profile_filter);
     format!(
         r#"
@@ -220,11 +236,7 @@ pub(super) fn build_exec_script_for_profile(js_code: &str, profile_filter: Optio
             {target_window}
             set jsCode to {js_expr}
             set rawResult to missing value
-            try
-                set rawResult to do JavaScript jsCode in current tab of w
-            on error errMsg number errNum
-                error errMsg number errNum
-            end try
+            {js_command}
             if rawResult is missing value then
                 return ""
             end if
@@ -235,6 +247,7 @@ pub(super) fn build_exec_script_for_profile(js_code: &str, profile_filter: Optio
         prelude = safari_script_prelude(),
         target_window = target_window,
         js_expr = js_expr,
+        js_command = js_command,
     )
 }
 
@@ -299,6 +312,7 @@ pub(super) fn build_close_script(index: Option<usize>) -> String {
 #[allow(dead_code)]
 pub(super) fn build_exec_script(js_code: &str) -> String {
     let js_expr = escape_body(js_code);
+    let js_command = js_apple_event_command("current tab of front window");
     format!(
         r#"
         {prelude}
@@ -308,11 +322,7 @@ pub(super) fn build_exec_script(js_code: &str) -> String {
             end if
             set jsCode to {js_expr}
             set rawResult to missing value
-            try
-                set rawResult to do JavaScript jsCode in current tab of front window
-            on error errMsg number errNum
-                error errMsg number errNum
-            end try
+            {js_command}
             if rawResult is missing value then
                 return ""
             end if
@@ -322,6 +332,7 @@ pub(super) fn build_exec_script(js_code: &str) -> String {
     "#,
         prelude = safari_script_prelude(),
         js_expr = js_expr,
+        js_command = js_command,
     )
 }
 
