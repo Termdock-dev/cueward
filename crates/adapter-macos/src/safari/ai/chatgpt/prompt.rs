@@ -28,6 +28,7 @@ pub fn ensure_chatgpt_home(profile_filter: Option<&str>) -> Result<(), MacosErro
 
 pub fn send_chatgpt_prompt(
     prompt: &str,
+    timeout_seconds: u64,
     profile_filter: Option<&str>,
 ) -> Result<SafariAiResponseResult, MacosError> {
     with_safari_session(|| {
@@ -48,10 +49,12 @@ pub fn send_chatgpt_prompt(
             "safari_chatgpt_wait_send",
         )?;
 
-        let deadline = Instant::now() + Duration::from_secs(120);
+        let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
         let response_js = chatgpt_response_extract_js();
         let mut last_response = String::new();
         let mut last_conversation_url: Option<String> = None;
+        let mut completion_candidate: Option<String> = None;
+        let mut matching_completion_polls = 0;
 
         while Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(750));
@@ -84,15 +87,23 @@ pub fn send_chatgpt_prompt(
                 last_response = response.to_string();
             }
 
-            if status == "complete" {
+            if status == "complete" && !should_skip {
+                if completion_candidate.as_deref() == Some(response) {
+                    matching_completion_polls += 1;
+                } else {
+                    completion_candidate = Some(response.to_string());
+                    matching_completion_polls = 1;
+                }
+            } else {
+                completion_candidate = None;
+                matching_completion_polls = 0;
+            }
+
+            if matching_completion_polls >= 2 {
                 return Ok(SafariAiResponseResult {
                     provider: "chatgpt".to_string(),
                     status: "complete".to_string(),
-                    response: if should_skip {
-                        last_response.clone()
-                    } else {
-                        response.to_string()
-                    },
+                    response: response.to_string(),
                     conversation_url: conversation_url.or_else(|| last_conversation_url.clone()),
                 });
             }
@@ -109,6 +120,7 @@ pub fn send_chatgpt_prompt(
 
 pub fn send_chatgpt_image_prompt(
     prompt: &str,
+    timeout_seconds: u64,
     profile_filter: Option<&str>,
 ) -> Result<SafariAiImageResult, MacosError> {
     with_safari_session(|| {
@@ -128,6 +140,43 @@ pub fn send_chatgpt_image_prompt(
             profile_filter,
             "safari_chatgpt_wait_send",
         )?;
-        poll_chatgpt_images(180, 3, profile_filter)
+        poll_chatgpt_images(timeout_seconds, 3, profile_filter)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+
+    use super::chatgpt_response_extract_js;
+
+    #[test]
+    fn chinese_stop_response_keeps_prompt_running() {
+        let script = format!(
+            r#"
+            globalThis.window = {{location: {{href: 'https://chatgpt.com/c/test'}}}};
+            const stop = {{getAttribute: name => name === 'aria-label' ? '停止回應' : null,
+                           innerText: '', textContent: ''}};
+            const assistant = {{innerText: 'Pro 思考', textContent: 'Pro 思考'}};
+            globalThis.document = {{querySelectorAll: selector =>
+              selector === '[data-message-author-role="assistant"]' ? [assistant] :
+              selector === 'button,[role="button"]' ? [stop] : []}};
+            process.stdout.write({script});
+            "#,
+            script = chatgpt_response_extract_js()
+        );
+        let output = Command::new("node")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .expect("Node.js is required for Safari JavaScript behavior tests");
+        assert!(
+            output.status.success(),
+            "response extractor failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let payload: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("parse response payload");
+        assert_eq!(payload["status"], "running");
+    }
 }

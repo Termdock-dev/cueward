@@ -13,7 +13,7 @@ mod grok;
 
 pub use chatgpt::{
     chatgpt_list_conversations, chatgpt_save_images, ensure_chatgpt_home,
-    send_chatgpt_image_prompt, send_chatgpt_prompt,
+    send_chatgpt_image_prompt, send_chatgpt_prompt, set_chatgpt_effort,
 };
 pub use gemini::{
     ensure_gemini_home, gemini_list_conversations, gemini_read_conversation, gemini_save_images,
@@ -92,7 +92,9 @@ pub(super) fn should_skip_gemini_response(trimmed: &str, prompt: &str) -> bool {
 }
 
 pub(super) fn should_skip_chatgpt_response(trimmed: &str, prompt: &str) -> bool {
-    trimmed.is_empty() || trimmed == prompt.trim()
+    trimmed.is_empty()
+        || trimmed == prompt.trim()
+        || matches!(trimmed, "Pro 思考" | "思考中" | "Thinking" | "Thinking...")
 }
 
 pub(super) fn should_skip_grok_response(trimmed: &str, prompt: &str) -> bool {
@@ -132,6 +134,7 @@ mod tests {
     #[test]
     fn should_skip_chatgpt_response_trims_prompt_whitespace() {
         assert!(should_skip_chatgpt_response("hello", "  hello  "));
+        assert!(should_skip_chatgpt_response("Pro 思考", "hello"));
         assert!(!should_skip_chatgpt_response("world", "  hello  "));
     }
 

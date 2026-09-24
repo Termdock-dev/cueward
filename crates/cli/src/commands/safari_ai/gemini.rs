@@ -11,6 +11,7 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
             prompt,
             mode,
             auto_confirm,
+            ..
         } => {
             let gemini_action =
                 match super::build_gemini_ai_action(mode, Some(&prompt), auto_confirm) {

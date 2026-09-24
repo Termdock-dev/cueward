@@ -1,7 +1,7 @@
 use clap::Parser;
 
-use super::{Cli, Command};
 use super::safari::SafariAction;
+use super::{Cli, Command};
 
 #[test]
 fn cli_parses_safari_exec_with_profile() {
@@ -10,16 +10,81 @@ fn cli_parses_safari_exec_with_profile() {
 
     match cli.command {
         Command::Safari {
-            action:
-                SafariAction::Exec {
-                    js_code, profile, ..
-                },
+            action: SafariAction::Exec {
+                js_code, profile, ..
+            },
         } => {
             assert_eq!(js_code, "1+1");
             assert_eq!(profile.as_deref(), Some("Work"));
         }
         _ => panic!("unexpected command"),
     }
+}
+
+#[test]
+fn cli_parses_safari_exec_timeout() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "safari",
+        "exec",
+        "--timeout",
+        "45",
+        "await Promise.resolve([1, 2])",
+    ])
+    .expect("parse Safari exec timeout");
+
+    match cli.command {
+        Command::Safari {
+            action: SafariAction::Exec {
+                js_code, timeout, ..
+            },
+        } => {
+            assert_eq!(js_code, "await Promise.resolve([1, 2])");
+            assert_eq!(timeout, 45);
+        }
+        _ => panic!("unexpected command"),
+    }
+}
+
+#[test]
+fn cli_parses_safari_exec_body() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "safari",
+        "exec",
+        "--body",
+        "const value = await Promise.resolve(2); return value * 2;",
+    ])
+    .expect("parse Safari exec body");
+
+    assert!(matches!(
+        cli.command,
+        Command::Safari {
+            action: SafariAction::Exec { body: true, .. }
+        }
+    ));
+}
+
+#[test]
+fn cli_parses_safari_console_and_network_detail() {
+    let console = Cli::try_parse_from([
+        "cueward", "safari", "console", "--level", "error", "--tab", "example.com",
+    ])
+    .expect("parse Safari console");
+    assert!(matches!(
+        console.command,
+        Command::Safari { action: SafariAction::Console { level: Some(ref level), .. } }
+            if level == "error"
+    ));
+
+    let network = Cli::try_parse_from([
+        "cueward", "safari", "network", "get", "3", "--tab", "example.com",
+    ])
+    .expect("parse Safari network detail");
+    assert!(matches!(
+        network.command,
+        Command::Safari { action: SafariAction::Network { action: Some(_), .. } }
+    ));
 }
 
 #[test]
@@ -69,4 +134,57 @@ fn cli_parses_scroll_and_read() {
         }
         _ => panic!("unexpected command"),
     }
+}
+
+#[test]
+fn cli_parses_safari_wait_for_absence_in_selected_tab() {
+    let cli = Cli::try_parse_from([
+        "cueward", "safari", "wait", "#loading", "--absent", "--tab", "Docs",
+    ])
+    .expect("parse wait for absence");
+
+    match cli.command {
+        Command::Safari {
+            action: SafariAction::Wait {
+                selector,
+                absent,
+                tab,
+                ..
+            },
+        } => {
+            assert_eq!(selector.as_deref(), Some("#loading"));
+            assert!(absent);
+            assert_eq!(tab.as_deref(), Some("Docs"));
+        }
+        _ => panic!("unexpected command"),
+    }
+}
+
+#[test]
+fn cli_parses_safari_inspect_and_batch() {
+    let inspect = Cli::try_parse_from([
+        "cueward", "safari", "inspect", "--tab", "Docs", "--limit", "50",
+    ])
+    .expect("parse inspect");
+    assert!(matches!(
+        inspect.command,
+        Command::Safari {
+            action: SafariAction::Inspect { limit: 50, .. }
+        }
+    ));
+
+    let batch = Cli::try_parse_from([
+        "cueward",
+        "safari",
+        "batch",
+        "--steps",
+        "[{\"action\":\"click\",\"ref\":\"1:2\"}]",
+    ])
+    .expect("parse batch");
+    assert!(matches!(
+        batch.command,
+        Command::Safari {
+            action: SafariAction::Batch { .. }
+        }
+    ));
 }

@@ -1,4 +1,4 @@
-use super::core::{
+use super::scroll::{
     scroll_read_detects_new_content, scroll_read_new_content_blocks, scroll_read_poll_js,
     scroll_read_snapshot_blocks,
 };

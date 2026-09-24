@@ -1,9 +1,130 @@
 use super::TAB_SEPARATOR;
+use super::interaction::{RUNTIME, selector_click_js, selector_fill_js};
 use super::script::{
     build_active_tab_script, build_close_script, build_exec_script, build_open_script,
-    build_tab_return_block, build_tabs_script, parse_tab_line, parse_tabs_output,
-    selector_click_js, selector_fill_js, selector_text_js,
+    build_tab_return_block, build_tabs_script, parse_tab_line, parse_tabs_output, selector_text_js,
 };
+use std::process::Command;
+
+#[test]
+fn node_runtime_is_available_for_browser_behavior_tests() {
+    let output = Command::new("node")
+        .arg("--version")
+        .output()
+        .expect("Node.js is required for Safari JavaScript behavior tests");
+    assert!(output.status.success(), "Node.js --version failed");
+}
+
+fn run_browser_builder(setup: &str, action: &str, result: &str) -> String {
+    let script = format!(
+        "class PointerEvent extends Event {{ constructor(type, options) {{ super(type, options); }} }} \
+         class MouseEvent extends Event {{ constructor(type, options) {{ super(type, options); }} }} \
+         {setup}; {action}; process.stdout.write(String({result}));"
+    );
+    let output = Command::new("node")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .expect("Node.js is required for Safari JavaScript behavior tests");
+    assert!(
+        output.status.success(),
+        "browser action failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).expect("UTF-8 result")
+}
+
+#[test]
+fn click_reaches_pointerdown_handlers() {
+    let setup = r#"
+      const button = new EventTarget();
+      let opened = false;
+      button.click = () => button.dispatchEvent(new MouseEvent('click'));
+      button.addEventListener('pointerdown', () => { opened = true; });
+      globalThis.document = { querySelector: () => button };
+    "#;
+    let result = run_browser_builder(setup, &selector_click_js("#trigger"), "opened");
+    assert_eq!(result, "true");
+}
+
+#[test]
+fn fill_notifies_framework_value_tracker() {
+    let setup = r#"
+      class Input extends EventTarget {
+        constructor() {
+          super(); this.storedValue = ''; this.trackedValue = '';
+          Object.defineProperty(this, 'value', {
+            get() { return this.storedValue; },
+            set(value) { this.storedValue = value; this.trackedValue = value; }
+          });
+        }
+      }
+      Object.defineProperty(Input.prototype, 'value', {
+        get() { return this.storedValue; },
+        set(value) { this.storedValue = value; }
+      });
+      globalThis.HTMLInputElement = Input;
+      globalThis.HTMLTextAreaElement = class extends Input {};
+      const input = new Input();
+      let accepted = '';
+      input.addEventListener('input', () => {
+        if (input.value !== input.trackedValue) accepted = input.value;
+      });
+      globalThis.document = { querySelector: () => input };
+    "#;
+    let result = run_browser_builder(setup, &selector_fill_js("#field", "new value"), "accepted");
+    assert_eq!(result, "new value");
+}
+
+#[test]
+fn iframe_form_controls_use_their_own_dom_realm() {
+    let script = format!(
+        r#"
+        globalThis.window = globalThis;
+        globalThis.HTMLInputElement = class {{}};
+        globalThis.HTMLTextAreaElement = class {{}};
+        globalThis.HTMLSelectElement = class {{}};
+        class FrameInput extends EventTarget {{ constructor(type = 'text') {{ super(); this.type = type; this.stored = ''; this.marked = false; }} }}
+        Object.defineProperty(FrameInput.prototype, 'value', {{get() {{ return this.stored; }}, set(v) {{ this.stored = v; }}}});
+        Object.defineProperty(FrameInput.prototype, 'checked', {{get() {{ return this.marked; }}, set(v) {{ this.marked = v; }}}});
+        class FrameTextarea extends FrameInput {{}}
+        class FrameSelect extends EventTarget {{ constructor() {{ super(); this.value = 'a'; }} }}
+        const frame = {{HTMLInputElement: FrameInput, HTMLTextAreaElement: FrameTextarea,
+          HTMLSelectElement: FrameSelect, Event}};
+        const selection = {{removeAllRanges() {{}}, addRange() {{}}}};
+        const frameDoc = {{defaultView: frame, getSelection: () => selection,
+          createRange: () => ({{selectNodeContents() {{}}}}),
+          execCommand: () => true}};
+        const input = new FrameInput(); input.ownerDocument = frameDoc;
+        const select = new FrameSelect(); select.ownerDocument = frameDoc;
+        const check = new FrameInput('checkbox'); check.ownerDocument = frameDoc;
+        const editable = {{isContentEditable: true, ownerDocument: frameDoc, focus() {{}}}};
+        {RUNTIME}
+        const run = fn => {{ try {{ fn(); return true; }} catch (_) {{ return false; }} }};
+        process.stdout.write(JSON.stringify({{
+          fill: run(() => cuewardFill(input, 'new')) && input.value === 'new',
+          select: run(() => cuewardSelect(select, 'b')) && select.value === 'b',
+          check: run(() => cuewardCheck(check, true)) && check.checked === true,
+          editable: run(() => cuewardFill(editable, 'text'))
+        }}));
+        "#
+    );
+    let output = Command::new("node")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .expect("Node.js is required for Safari JavaScript behavior tests");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("result");
+    assert_eq!(
+        result,
+        serde_json::json!({"fill":true,"select":true,"check":true,"editable":true})
+    );
+}
 
 #[test]
 fn parse_tab_line_decodes_fields() {
@@ -93,8 +214,4 @@ fn build_exec_script_supports_multiline_js() {
 #[test]
 fn selector_js_builders_include_selector_and_text() {
     assert!(selector_text_js(".item").contains("querySelector(\".item\")"));
-    assert!(selector_click_js("#submit").contains("querySelector(\"#submit\")"));
-    let fill = selector_fill_js("input[name=q]", "hello");
-    assert!(fill.contains("input[name=q]"));
-    assert!(fill.contains("hello"));
 }

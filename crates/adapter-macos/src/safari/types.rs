@@ -14,7 +14,40 @@ pub struct SafariTab {
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct SafariEvalResult {
-    pub result: String,
+    pub result: serde_json::Value,
+    pub value_type: String,
+}
+
+#[cfg(test)]
+mod eval_result_tests {
+    use super::SafariEvalResult;
+
+    #[test]
+    fn exec_result_preserves_array_type() {
+        let result = SafariEvalResult {
+            result: serde_json::json!([1, 2]),
+            value_type: "array".to_string(),
+        };
+        let output = serde_json::to_value(result).expect("serialize result");
+        assert_eq!(output["result"], serde_json::json!([1, 2]));
+        assert_eq!(output["value_type"], "array");
+    }
+
+    #[test]
+    fn exec_result_distinguishes_null_from_undefined() {
+        let null = SafariEvalResult {
+            result: serde_json::Value::Null,
+            value_type: "null".to_string(),
+        };
+        let undefined = SafariEvalResult {
+            result: serde_json::Value::Null,
+            value_type: "undefined".to_string(),
+        };
+        assert_ne!(
+            serde_json::to_value(null).expect("null result"),
+            serde_json::to_value(undefined).expect("undefined result")
+        );
+    }
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -66,7 +99,9 @@ pub struct SafariFillResult {
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct SafariWaitResult {
     pub found: bool,
-    pub selector: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selector: Option<String>,
+    pub condition: String,
     pub timeout_seconds: u64,
 }
 

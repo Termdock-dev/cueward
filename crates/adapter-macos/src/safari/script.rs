@@ -335,39 +335,3 @@ pub(super) fn selector_text_js(selector: &str) -> String {
         }})()"#
     )
 }
-
-pub(super) fn selector_exists_js(selector: &str) -> String {
-    let selector = escape_js_string(selector);
-    format!(r#"(() => document.querySelector("{selector}") ? "true" : "false")()"#)
-}
-
-pub(super) fn selector_click_js(selector: &str) -> String {
-    let selector = escape_js_string(selector);
-    format!(
-        r#"(() => {{
-            const el = document.querySelector("{selector}");
-            if (!el) throw new Error("selector not found");
-            el.click();
-            return "true";
-        }})()"#
-    )
-}
-
-pub(super) fn selector_fill_js(selector: &str, text: &str) -> String {
-    let selector = escape_js_string(selector);
-    let text = escape_js_string(text);
-    format!(
-        r#"(() => {{
-            const el = document.querySelector("{selector}");
-            if (!el) throw new Error("selector not found");
-            if ("value" in el) {{
-                el.value = "{text}";
-            }} else {{
-                el.textContent = "{text}";
-            }}
-            el.dispatchEvent(new Event("input", {{ bubbles: true }}));
-            el.dispatchEvent(new Event("change", {{ bubbles: true }}));
-            return "true";
-        }})()"#
-    )
-}

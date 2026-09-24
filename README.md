@@ -37,6 +37,7 @@ cargo install --path crates/cli
 ```
 
 Requires Rust 1.85+ (edition 2024).
+Running the Safari JavaScript behavior tests also requires Node.js on `PATH`.
 
 ## What's New in 0.3.0
 
@@ -146,16 +147,31 @@ cueward safari read --selector ".article-body"
 # Read full HTML source
 cueward safari source
 
-# Execute JavaScript / DOM actions in the active tab
+# Execute JavaScript and keep JSON result types
 cueward safari exec "document.title"
+cueward safari exec "await Promise.resolve([1, 2])" --timeout 30
+cueward safari exec --body "const x = await Promise.resolve(2); return x * 2;"
 cueward safari click "#submit"
 cueward safari fill "textarea" "hello from cueward"
 cueward safari wait ".result" --timeout 30
+cueward safari wait "#loading" --absent
+cueward safari wait --text "Saved"
+cueward safari wait --js "document.querySelector('#status')?.dataset.ready === 'true'"
+cueward safari wait --url "/complete"
+cueward safari wait --navigation
 
-# Target a specific tab by index or URL/title match
+# Target a tab by index or URL/title match without changing the active tab
 cueward safari read --tab "gemini.google.com" --profile Work
 cueward safari exec "document.title" --tab 2
 cueward safari source --tab "ChatGPT"
+cueward safari click "#submit" --tab "Docs"
+
+# Read visible elements, then use their refs in a batch
+cueward safari inspect --tab "Docs" --limit 200
+cueward safari batch --tab "Docs" --steps '[{"action":"click","ref":"<ref from inspect>"},{"action":"assert","js":"document.querySelector(\"#menu\").getAttribute(\"aria-expanded\") === \"true\""}]'
+
+# A batch also accepts selector or visible text targets
+cueward safari batch --steps '[{"action":"fill","selector":"#query","value":"hello"},{"action":"key","selector":"#query","key":"Enter"}]'
 
 # Scroll the page
 cueward safari scroll down
@@ -190,13 +206,32 @@ cueward safari bookmarks add --title "Claude" --url "https://claude.ai" --profil
 cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" --profile Work --folder "Projects/AI Tools"
 ```
 
+`exec` evaluates one JavaScript expression and returns a JSON `result` with a `value_type`; `undefined` has a null result with type `undefined`. Expressions may use `await`. Use `--body` and an explicit `return` for multiple statements. `wait --js` and batch `assert.js` accept synchronous expressions.
+
+`inspect` refs remain valid until the next `inspect`, page navigation, or element removal. `batch` accepts up to 100 steps. Each action targets one `ref`, CSS `selector`, or visible `text`. Actions are `click`, `fill` (`value`), `key` (`key`, optional `ctrl`/`alt`/`meta`/`shift`), `select` (`value`), `check` (`checked`), `scroll_into_view`, and `assert` (`js` or a target). A failed step reports its index and exits with an error. Open shadow roots and same-origin iframes are searched; closed shadow roots and cross-origin iframes cannot be accessed through page JavaScript.
+
+Click and key events sent through JavaScript have `isTrusted: false`. They can reach page event handlers but cannot replace a trusted user gesture or native keyboard editing. Use a following `assert` or `wait` condition to verify the page changed as expected.
+
+### Safari diagnostics
+
+```bash
+# The first call starts capture in that tab; repeat it after reproducing the issue
+cueward safari console --tab "example.com" --level error
+cueward safari network --tab "example.com"
+cueward safari network get 2 --tab "example.com"
+```
+
+Console capture includes `log`, `info`, `warn`, `error`, and `debug`. Network capture covers `fetch` and `XMLHttpRequest`; summaries include URL, method, status, and duration. `network get` adds headers and up to 16 KiB of text response. Capture starts when either diagnostics command first runs in a page and ends when that page navigates or closes. Earlier console messages, requests, and browser-level traffic are unavailable. Each buffer keeps the latest 300 entries.
+
 ### Safari AI
 
-Control web-based AI providers (Gemini, ChatGPT) via Safari automation. Uses URL navigation and `execCommand` — no fragile DOM clicking, no focus stealing.
+Control web-based AI providers (Gemini, ChatGPT) via Safari automation. The ChatGPT effort option uses the composer's slider before sending a prompt.
 
 ```bash
 # Send a prompt (general chat)
 cueward safari ai --provider gemini prompt --prompt "explain quantum computing"
+cueward safari ai --provider chatgpt prompt --prompt "explain quantum computing" --timeout 900
+cueward safari ai --provider chatgpt prompt --prompt "explain quantum computing" --effort pro
 
 # Switch to a specific mode first
 cueward safari ai --provider gemini prompt --prompt "a cat on a keyboard" --mode image
@@ -227,6 +262,8 @@ cueward safari ai --provider gemini --profile Work list
 ```
 
 Supported Gemini modes: `deep-research`, `image`, `video`, `music`.
+
+ChatGPT `--effort` accepts a number within the slider's current ARIA range or `pro` for its maximum. It applies to normal prompts and checks the slider value before sending.
 
 ### Reddit
 

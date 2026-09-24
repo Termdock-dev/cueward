@@ -7,19 +7,26 @@ use crate::safari_guard::safari_automation_state;
 #[cfg(test)]
 pub(crate) use crate::safari_guard::{
     SAFARI_LOCK_TTL_SECS, SafariAutomationSession, SafariLockFile, acquire_safari_lock,
-    read_safari_lock, release_safari_lock,
+    read_safari_lock, release_safari_lock, renew_safari_lock,
 };
 
 pub mod ai;
 mod core;
 #[cfg(test)]
 mod core_tests;
+mod eval;
 mod history;
+mod inspect;
+mod interaction;
+mod observe;
 mod script;
 #[cfg(test)]
 mod script_tests;
+mod scroll;
 mod social;
+mod target;
 mod types;
+mod wait;
 
 pub use ai::{
     GeminiMode, SafariAiImage, SafariAiImageResult, SafariAiReadyResult, SafariAiResponseResult,
@@ -28,20 +35,22 @@ pub use ai::{
     gemini_read_conversation, gemini_save_images, gemini_save_media, grok_list_conversations,
     grok_read_conversation, poll_gemini_deep_research, prepare_gemini_mode,
     send_chatgpt_image_prompt, send_chatgpt_prompt, send_gemini_prompt, send_grok_prompt,
-    start_gemini_deep_research,
-};
-pub use core::{
-    active, click, close, close_tabs, exec, fill, focus_tab, open, read, scroll, scroll_and_read,
-    source, tabs, wait,
+    set_chatgpt_effort, start_gemini_deep_research,
 };
 pub(crate) use core::doctor_live_probe;
+pub use core::{active, click, close, close_tabs, fill, focus_tab, open, read, source, tabs};
+pub use eval::exec;
 pub use history::capture;
+pub use inspect::{batch, inspect};
+pub use observe::{console_messages, network_requests};
+pub use scroll::{scroll, scroll_and_read};
 pub use social::{SocialFeedPost, threads_extract_feed, x_extract_feed, x_read_post, x_search};
 pub use types::{
     SafariClickResult, SafariCloseResult, SafariEvalResult, SafariFillResult, SafariReadResult,
     SafariScrollReadChunk, SafariScrollReadResult, SafariScrollResult, SafariSourceResult,
     SafariTab, SafariWaitResult,
 };
+pub use wait::{WaitCondition, wait_until};
 
 const SAFARI_OPERATION_DELAY: Duration = Duration::from_secs(1);
 const SAFARI_429_MAX_RETRIES: usize = 3;
@@ -67,6 +76,11 @@ fn throttle_safari_operation() -> Result<(), MacosError> {
         let mut guard = state
             .lock()
             .map_err(|_| MacosError::Other("safari automation state poisoned".to_string()))?;
+        if guard.depth > 0 {
+            if let (Some(path), Some(pid)) = (guard.lock_path.as_ref(), guard.lock_owner_pid) {
+                crate::safari_guard::renew_safari_lock(path, chrono::Utc::now().timestamp(), pid)?;
+            }
+        }
         let now = Instant::now();
         let (delay, next_allowed) = compute_next_safari_operation(now, guard.last_operation_at);
         guard.last_operation_at = Some(next_allowed);
@@ -144,6 +158,7 @@ mod tests {
     use super::{
         SAFARI_LOCK_TTL_SECS, SAFARI_OPERATION_DELAY, SafariAutomationSession, SafariLockFile,
         acquire_safari_lock, compute_next_safari_operation, is_safari_rate_limited,
+        renew_safari_lock,
         read_safari_lock, release_safari_lock, safari_automation_state, safari_rate_limit_backoff,
     };
     use std::fs;
@@ -213,6 +228,27 @@ mod tests {
         let lock = read_safari_lock(&lock_path).expect("replacement lock");
         assert_eq!(lock.pid, 77);
         assert_eq!(lock.expires_at, now + SAFARI_LOCK_TTL_SECS);
+    }
+
+    #[test]
+    fn safari_lock_renewal_protects_a_long_running_session() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("lock.json");
+        let start = 1_700_000_000;
+        acquire_safari_lock(&path, start, 77).expect("acquire lock");
+
+        renew_safari_lock(&path, start + 100, 77).expect("early renewal is a no-op");
+        assert_eq!(
+            read_safari_lock(&path).expect("original lock").expires_at,
+            start + SAFARI_LOCK_TTL_SECS
+        );
+        renew_safari_lock(&path, start + 1000, 77).expect("renew lock");
+        let renewed = read_safari_lock(&path).expect("renewed lock");
+        assert_eq!(renewed.acquired_at, start);
+        assert_eq!(renewed.expires_at, start + 1000 + SAFARI_LOCK_TTL_SECS);
+        assert!(acquire_safari_lock(&path, start + SAFARI_LOCK_TTL_SECS, 88).is_err());
+        assert!(renew_safari_lock(&path, start + 1001, 88).is_err());
+        assert_eq!(read_safari_lock(&path), Some(renewed));
     }
 
     #[test]

@@ -1,8 +1,10 @@
 use clap::Parser;
 
-use super::{Cli, Command};
 use super::safari::SafariAction;
-use super::safari_ai::{GeminiAiAction, GeminiMode, SafariAiAction, SafariAiProvider, build_gemini_ai_action};
+use super::safari_ai::{
+    GeminiAiAction, GeminiMode, SafariAiAction, SafariAiProvider, build_gemini_ai_action,
+};
+use super::{Cli, Command};
 
 #[test]
 fn build_gemini_ai_action_rejects_invalid_auto_confirm_usage() {
@@ -53,6 +55,7 @@ fn cli_parses_gemini_prompt_with_mode() {
                             prompt,
                             mode,
                             auto_confirm,
+                            ..
                         },
                     ..
                 },
@@ -96,82 +99,6 @@ fn cli_parses_gemini_prompt_only() {
 }
 
 #[test]
-fn cli_parses_chatgpt_prompt_only() {
-    let cli = Cli::try_parse_from([
-        "cueward",
-        "safari",
-        "ai",
-        "--provider",
-        "chatgpt",
-        "prompt",
-        "--prompt",
-        "哈囉 ChatGPT",
-    ])
-    .expect("parse");
-
-    match cli.command {
-        Command::Safari {
-            action:
-                SafariAction::Ai {
-                    provider,
-                    action:
-                        SafariAiAction::Prompt {
-                            prompt,
-                            mode,
-                            auto_confirm,
-                        },
-                    ..
-                },
-        } => {
-            assert_eq!(provider, SafariAiProvider::Chatgpt);
-            assert_eq!(prompt, "哈囉 ChatGPT");
-            assert_eq!(mode, None);
-            assert!(!auto_confirm);
-        }
-        _ => panic!("unexpected command"),
-    }
-}
-
-#[test]
-fn cli_parses_chatgpt_prompt_with_image_mode() {
-    let cli = Cli::try_parse_from([
-        "cueward",
-        "safari",
-        "ai",
-        "--provider",
-        "chatgpt",
-        "prompt",
-        "--prompt",
-        "畫一隻貓",
-        "--mode",
-        "image",
-    ])
-    .expect("parse");
-
-    match cli.command {
-        Command::Safari {
-            action:
-                SafariAction::Ai {
-                    provider,
-                    action:
-                        SafariAiAction::Prompt {
-                            prompt,
-                            mode,
-                            auto_confirm,
-                        },
-                    ..
-                },
-        } => {
-            assert_eq!(provider, SafariAiProvider::Chatgpt);
-            assert_eq!(prompt, "畫一隻貓");
-            assert_eq!(mode, Some(GeminiMode::Image));
-            assert!(!auto_confirm);
-        }
-        _ => panic!("unexpected command"),
-    }
-}
-
-#[test]
 fn cli_parses_gemini_auto_confirm() {
     let cli = Cli::try_parse_from([
         "cueward",
@@ -192,10 +119,7 @@ fn cli_parses_gemini_auto_confirm() {
         Command::Safari {
             action:
                 SafariAction::Ai {
-                    action:
-                        SafariAiAction::Prompt {
-                            auto_confirm, ..
-                        },
+                    action: SafariAiAction::Prompt { auto_confirm, .. },
                     ..
                 },
         } => assert!(auto_confirm),
@@ -325,6 +249,7 @@ fn cli_parses_grok_prompt_only() {
                             prompt,
                             mode,
                             auto_confirm,
+                            ..
                         },
                     ..
                 },
@@ -381,24 +306,6 @@ fn cli_parses_grok_read() {
             assert_eq!(provider, SafariAiProvider::Grok);
             assert_eq!(url, "https://grok.com/c/abc");
         }
-        _ => panic!("unexpected command"),
-    }
-}
-
-#[test]
-fn cli_parses_chatgpt_list() {
-    let cli = Cli::try_parse_from(["cueward", "safari", "ai", "--provider", "chatgpt", "list"])
-        .expect("parse");
-
-    match cli.command {
-        Command::Safari {
-            action:
-                SafariAction::Ai {
-                    provider,
-                    action: SafariAiAction::List,
-                    ..
-                },
-        } => assert_eq!(provider, SafariAiProvider::Chatgpt),
         _ => panic!("unexpected command"),
     }
 }

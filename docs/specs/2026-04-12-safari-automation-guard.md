@@ -22,5 +22,5 @@
 
 ## Notes
 
-- lock 採最小可行設計：以 TTL 作為 crash 後的自動恢復機制，不額外依賴 process liveness 檢查；TTL 需覆蓋最長 Safari 任務。
+- lock 以 TTL 作為 crash 後的自動恢復機制，不額外依賴 process liveness 檢查。長時間任務在每次 Safari 操作前檢查租約，剩餘時間至多一半時續租；續租以暫存檔與原子替換避免其他程序讀到不完整 JSON。
 - 429 偵測僅針對明確且短訊號，例如 `Too Many Requests`、`HTTP 429`、`"status":429` 等，避免過度誤判一般內容。

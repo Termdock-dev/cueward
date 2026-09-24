@@ -1,10 +1,8 @@
-use std::process;
-
 use clap::Subcommand;
 
-use super::safari_ai::{SafariAiAction, SafariAiProvider, dispatch as dispatch_ai};
-use super::safari_bookmarks::{SafariBookmarksAction, dispatch as dispatch_bookmarks};
-use super::helpers::print_external;
+use super::safari_ai::{SafariAiAction, SafariAiProvider};
+use super::safari_bookmarks::SafariBookmarksAction;
+use cueward_adapter_macos::safari::WaitCondition;
 
 #[derive(Subcommand)]
 pub(crate) enum SafariAction {
@@ -106,11 +104,23 @@ pub(crate) enum SafariAction {
         /// Target a specific tab by index or URL/title substring
         #[arg(long)]
         tab: Option<String>,
+        /// Maximum time to wait for a Promise result, in seconds
+        #[arg(long, default_value = "30")]
+        timeout: u64,
+        /// Treat the source as an async function body; use return for its result
+        #[arg(long)]
+        body: bool,
     },
     /// Click an element in the current active tab
     Click {
         /// CSS selector
         selector: String,
+        /// Restrict operations to a Safari profile
+        #[arg(long)]
+        profile: Option<String>,
+        /// Target a tab without changing the active tab
+        #[arg(long)]
+        tab: Option<String>,
     },
     /// Fill an element in the current active tab
     Fill {
@@ -118,14 +128,84 @@ pub(crate) enum SafariAction {
         selector: String,
         /// Text to fill
         text: String,
+        /// Restrict operations to a Safari profile
+        #[arg(long)]
+        profile: Option<String>,
+        /// Target a tab without changing the active tab
+        #[arg(long)]
+        tab: Option<String>,
     },
     /// Wait for an element to appear in the current active tab
     Wait {
-        /// CSS selector
-        selector: String,
+        /// CSS selector to appear
+        selector: Option<String>,
+        /// Wait for the selector to disappear
+        #[arg(long, requires = "selector")]
+        absent: bool,
+        /// Wait for visible page text
+        #[arg(long)]
+        text: Option<String>,
+        /// Wait for a JavaScript expression to become truthy
+        #[arg(long)]
+        js: Option<String>,
+        /// Wait until the page URL contains this text
+        #[arg(long)]
+        url: Option<String>,
+        /// Wait for the selected tab to navigate and finish loading
+        #[arg(long)]
+        navigation: bool,
         /// Timeout in seconds
         #[arg(long, default_value = "30")]
         timeout: u64,
+        /// Restrict operations to a Safari profile
+        #[arg(long)]
+        profile: Option<String>,
+        /// Target a tab without changing the active tab
+        #[arg(long)]
+        tab: Option<String>,
+    },
+    /// Read visible page elements and assign short-lived refs
+    Inspect {
+        /// Maximum number of nodes to return
+        #[arg(long, default_value = "200")]
+        limit: usize,
+        /// Restrict operations to a Safari profile
+        #[arg(long)]
+        profile: Option<String>,
+        /// Target a tab without changing the active tab
+        #[arg(long)]
+        tab: Option<String>,
+    },
+    /// Run a JSON array of page actions in one call
+    Batch {
+        /// JSON steps with action and one of ref, selector, or text
+        #[arg(long)]
+        steps: String,
+        /// Restrict operations to a Safari profile
+        #[arg(long)]
+        profile: Option<String>,
+        /// Target a tab without changing the active tab
+        #[arg(long)]
+        tab: Option<String>,
+    },
+    /// Capture and read console messages from this page onward
+    Console {
+        /// Filter by log, info, warn, error, or debug
+        #[arg(long)]
+        level: Option<String>,
+        #[arg(long)]
+        profile: Option<String>,
+        #[arg(long)]
+        tab: Option<String>,
+    },
+    /// Capture and read fetch and XMLHttpRequest activity from this page onward
+    Network {
+        #[arg(long, global = true)]
+        profile: Option<String>,
+        #[arg(long, global = true)]
+        tab: Option<String>,
+        #[command(subcommand)]
+        action: Option<SafariNetworkAction>,
     },
     /// Safari bookmarks workflows
     Bookmarks {
@@ -145,229 +225,46 @@ pub(crate) enum SafariAction {
     },
 }
 
-pub(crate) fn dispatch(action: SafariAction) {
-    match action {
-        SafariAction::Tabs { profile } => match cueward_adapter_macos::safari::tabs(profile.as_deref()) {
-            Ok(tabs) => {
-                println!("{}", serde_json::to_string_pretty(&tabs).unwrap());
-                eprintln!("{} tab(s)", tabs.len());
-            }
-            Err(e) => {
-                eprintln!("error: {e}");
-                process::exit(1);
-            }
-        },
-        SafariAction::Active { profile } => {
-            match cueward_adapter_macos::safari::active(profile.as_deref()) {
-                Ok(tab) => {
-                    println!("{}", serde_json::to_string_pretty(&tab).unwrap());
-                    if tab.is_some() {
-                        eprintln!("active tab");
-                    } else {
-                        eprintln!("no Safari window");
-                    }
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-        }
-        SafariAction::Open { url, profile } => {
-            match cueward_adapter_macos::safari::open(&url, profile.as_deref()) {
-                Ok(tab) => {
-                    println!("{}", serde_json::to_string_pretty(&tab).unwrap());
-                    if tab.is_some() {
-                        eprintln!("opened tab");
-                    } else {
-                        eprintln!("no Safari window");
-                    }
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-        }
-        SafariAction::Close { index } => match cueward_adapter_macos::safari::close(index) {
-            Ok(result) => {
-                println!("{}", serde_json::to_string_pretty(&result).unwrap());
-                if result.closed {
-                    eprintln!("tab closed");
-                } else {
-                    eprintln!("no Safari window");
-                }
-            }
-            Err(e) => {
-                eprintln!("error: {e}");
-                process::exit(1);
-            }
-        },
-        SafariAction::Scroll {
-            direction,
-            amount,
-            profile,
-            tab,
-        } => {
-            if let Some(ref t) = tab {
-                if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-            match cueward_adapter_macos::safari::scroll(&direction, amount, profile.as_deref()) {
-                Ok(result) => {
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
-                    eprintln!("scrolled {direction}");
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-        }
-        SafariAction::ScrollAndRead {
-            times,
-            amount,
-            profile,
-            tab,
-            selector,
-        } => {
-            if let Some(ref t) = tab {
-                if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-            match cueward_adapter_macos::safari::scroll_and_read(
-                times,
-                amount,
-                selector.as_deref(),
-                profile.as_deref(),
-            ) {
-                Ok(result) => {
-                    print_external(
-                        "safari/scroll-and-read",
-                        &serde_json::to_string_pretty(&result).unwrap(),
-                    );
-                    eprintln!("scroll/read pipeline complete");
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-        }
-        SafariAction::CloseTabs { profile, url } => {
-            match cueward_adapter_macos::safari::close_tabs(profile.as_deref(), url.as_deref()) {
-                Ok(count) => {
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&serde_json::json!({ "closed": count })).unwrap()
-                    );
-                    eprintln!("{count} tab(s) closed");
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-        }
-        SafariAction::Read { selector, profile, tab } => {
-            if let Some(ref t) = tab {
-                if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-            match cueward_adapter_macos::safari::read(selector.as_deref(), profile.as_deref()) {
-                Ok(result) => {
-                    print_external("safari/read", &serde_json::to_string_pretty(&result).unwrap());
-                    eprintln!("read page content");
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-        }
-        SafariAction::Source { profile, tab } => {
-            if let Some(ref t) = tab {
-                if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-            match cueward_adapter_macos::safari::source(profile.as_deref()) {
-                Ok(result) => {
-                    print_external("safari/source", &serde_json::to_string_pretty(&result).unwrap());
-                    eprintln!("read page source");
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-        }
-        SafariAction::Exec { js_code, profile, tab } => {
-            if let Some(ref t) = tab {
-                if let Err(e) = cueward_adapter_macos::safari::focus_tab(t, profile.as_deref()) {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-            match cueward_adapter_macos::safari::exec(&js_code, profile.as_deref()) {
-                Ok(result) => {
-                    print_external("safari/exec", &serde_json::to_string_pretty(&result).unwrap());
-                    eprintln!("executed javascript");
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-        }
-        SafariAction::Click { selector } => {
-            match cueward_adapter_macos::safari::click(&selector) {
-                Ok(result) => {
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
-                    eprintln!("clicked element");
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-        }
-        SafariAction::Fill { selector, text } => {
-            match cueward_adapter_macos::safari::fill(&selector, &text) {
-                Ok(result) => {
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
-                    eprintln!("filled element");
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-        }
-        SafariAction::Wait { selector, timeout } => {
-            match cueward_adapter_macos::safari::wait(&selector, timeout) {
-                Ok(result) => {
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
-                    eprintln!("selector found");
-                }
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    process::exit(1);
-                }
-            }
-        }
-        SafariAction::Bookmarks { action } => dispatch_bookmarks(action),
-        SafariAction::Ai {
-            provider,
-            profile,
-            action,
-        } => dispatch_ai(provider, profile, action),
-    }
+#[derive(Subcommand)]
+pub(crate) enum SafariNetworkAction {
+    /// Show one captured request with headers and response preview
+    Get { id: u64 },
 }
+
+fn build_wait_condition(
+    selector: Option<String>,
+    absent: bool,
+    text: Option<String>,
+    js: Option<String>,
+    url: Option<String>,
+    navigation: bool,
+) -> Result<WaitCondition, &'static str> {
+    let count = usize::from(selector.is_some())
+        + usize::from(text.is_some())
+        + usize::from(js.is_some())
+        + usize::from(url.is_some())
+        + usize::from(navigation);
+    if count != 1 {
+        return Err("specify exactly one selector, --text, --js, --url, or --navigation");
+    }
+    if let Some(selector) = selector {
+        return Ok(if absent {
+            WaitCondition::SelectorAbsent(selector)
+        } else {
+            WaitCondition::SelectorPresent(selector)
+        });
+    }
+    if let Some(text) = text {
+        return Ok(WaitCondition::Text(text));
+    }
+    if let Some(js) = js {
+        return Ok(WaitCondition::JavaScript(js));
+    }
+    if let Some(url) = url {
+        return Ok(WaitCondition::UrlContains(url));
+    }
+    Ok(WaitCondition::Navigation)
+}
+
+mod dispatch;
+pub(crate) use dispatch::dispatch;
