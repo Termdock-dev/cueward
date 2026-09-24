@@ -157,7 +157,7 @@ fn run_capture(script: &str, context: &str) -> Result<String, MacosError> {
 mod tests {
     use super::{
         SAFARI_LOCK_TTL_SECS, SAFARI_OPERATION_DELAY, SafariAutomationSession, SafariLockFile,
-        acquire_safari_lock, compute_next_safari_operation, is_safari_rate_limited,
+        acquire_safari_lock, compute_next_safari_operation, is_safari_rate_limited, map_js_timeout,
         renew_safari_lock,
         read_safari_lock, release_safari_lock, safari_automation_state, safari_rate_limit_backoff,
     };
@@ -177,6 +177,31 @@ mod tests {
             "this article explains how rate limits work"
         ));
         assert!(!is_safari_rate_limited("all good"));
+    }
+
+    #[test]
+    fn safari_js_timeout_identifies_tab_and_preserves_unknown_outcome() {
+        let error = crate::MacosError::Other(
+            "safari_exec: CUEWARD_JS_APPLE_EVENT_TIMEOUT (-1712)".to_string(),
+        );
+        let mapped = map_js_timeout(error, "window 42 tab 1");
+        let message = mapped.to_string();
+
+        assert!(message.contains("window 42 tab 1"));
+        assert!(message.contains("15 seconds"));
+        assert!(message.contains("browser dialog"));
+        assert!(message.contains("outcome is unknown"));
+    }
+
+    #[test]
+    fn safari_js_timeout_does_not_relabel_other_errors() {
+        let error = crate::MacosError::Other("safari_exec: JavaScript syntax error".to_string());
+        let mapped = map_js_timeout(error, "window 42 tab 1");
+        assert_eq!(mapped.to_string(), "safari_exec: JavaScript syntax error");
+
+        let unrelated_timeout = crate::MacosError::Other("metadata request (-1712)".to_string());
+        let mapped = map_js_timeout(unrelated_timeout, "window 42 tab 1");
+        assert_eq!(mapped.to_string(), "metadata request (-1712)");
     }
 
     #[test]
