@@ -560,6 +560,8 @@ Use `cueward window wait --target '<snapshot input_target>' --condition enabled 
 
 Use `cueward app list` to discover running apps. `cueward app launch --bundle org.example.Editor` requests a background launch or returns an existing instance without reopening it. Discover the resulting windows before sending input. See [application discovery](docs/app-discovery.md) for launch-result semantics and limitations.
 
+Use `cueward app inspect --pid 123` to discover an app's AX roots, including menus without a document window and exposed system dialogs. Inspect a returned root with `--root menu` or `--root w0`, then use `app press` or `app set-value` with a fresh node target. See [application interface exploration](docs/app-exploration.md) for process binding, background guards, and limitations.
+
 ### Existing macOS Spaces
 
 ```bash

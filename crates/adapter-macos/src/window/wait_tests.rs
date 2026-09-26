@@ -71,6 +71,7 @@ fn wait_classifies_window_lifecycle_from_consistent_catalog_observations() {
         &path,
         [
             include_str!("ax_elements.swift"),
+            include_str!("ax_shared.swift"),
             include_str!("ax_common.swift"),
             include_str!("wait_catalog_fixture.swift"),
             include_str!("wait_logic.swift"),

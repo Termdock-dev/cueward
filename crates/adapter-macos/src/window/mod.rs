@@ -14,6 +14,8 @@ mod spaces;
 mod target;
 mod wait;
 
+pub(crate) use bridge::AX_SUPPORT;
+
 pub use crate::screenshot::{WindowScope, list_windows};
 pub use actions::{ActionStatus, WindowActionResult, press, set_value};
 pub use input::{
@@ -82,7 +84,7 @@ pub struct AccessibilityNode {
     pub bounds: Option<AccessibilityBounds>,
     pub child_count: usize,
     #[serde(skip_serializing)]
-    fingerprint: String,
+    pub(crate) fingerprint: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
 }

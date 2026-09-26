@@ -15,7 +15,7 @@ Bundle lookup requires macOS 12 or later and examines every matching registered 
 
 For a new instance, Cueward requests launch with activation, recent-item additions, and system prompts disabled. It does not hide other applications, send global input, or request a new instance of an already running application. No arguments, environment overrides, document URLs, or executable shell commands are accepted by this interface.
 
-`launched` means the workspace launch callback returned a running application at the requested path. It does not establish that a window exists, loading has finished, or Accessibility inspection will work. Discover its windows and observe them before acting.
+`launched` means the workspace launch callback returned a running application at the requested path. It does not establish that a window exists, loading has finished, or Accessibility inspection will work. Discover its windows or use [App AX inspection](app-exploration.md) to explore its exposed roots before acting.
 
 The result reports the foreground PID before and after the request. Applications can activate themselves or open visible windows; the launch configuration does not prevent their own behavior. Endpoint observations cannot detect a transient foreground change, and the existing-instance check and launch request are not atomic. Background launch is not a separate desktop session or an input-isolation guarantee.
 

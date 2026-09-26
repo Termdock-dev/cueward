@@ -56,6 +56,21 @@ Use `window wait --target '<snapshot input_target>' --condition <condition>` aft
 
 Use `cueward app list` to discover running applications. If the user's task requires an unopened app, use `cueward app launch --bundle <bundle-id>` or `--path <absolute-app-path>`. Existing instances are returned without reopening. A launch result establishes only that the process exists; discover windows and inspect their current state before acting. An app may activate itself even though Cueward does not request activation. On timeout, list apps before deciding whether to retry.
 
+### Application roots and system panels
+
+```sh
+cueward app inspect --pid <app-pid>
+cueward app inspect --pid <app-pid> --root <observed-root-ref> --depth 3 --limit 100
+cueward app press --target '<fresh app node target>'
+cueward app set-value --target '<fresh app text target>' --value '<intended text>'
+```
+
+Use App inspection for apps without document windows or when the host app exposes a panel that cannot be bound to its capture window. The root catalog returns `w0`, `w1`, and `menu` as available; it does not issue targets. Explore a returned root or subtree to find eligible controls. Reinspect roots after a dialog opens or closes. Do not assume a window or menu path is stable.
+
+`receiver_pid` identifies the actual AX process, which may differ from the host. Both must remain in the background for App actions. Targets bind process instances, current window context, and observed ancestors; they expire after five minutes. Secure, disabled, or partially readable nodes have no target. `unavailable_attributes` means the corresponding value is unknown, not empty; inspect relevant descendants. App inspection requires an unlocked session and Accessibility permission.
+
+App targets belong only to `app press` and `app set-value`. Obtain a separate window observation for screenshots, raw input, or waits; do not substitute a service window for a host window based on appearance. Apply the same result checks and no-automatic-replay rules described above. Foreground endpoint checks do not guarantee continuous isolation from the user's work.
+
 ## Existing Spaces
 
 ```sh
