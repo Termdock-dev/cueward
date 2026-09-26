@@ -107,6 +107,103 @@ pub(super) fn execute_js_in_tab(
 mod tests {
     use super::{SafariTab, select_tab};
 
+    fn value_expression(value: Option<&str>) -> String {
+        match value {
+            None => "missing value".into(),
+            Some("") => "\"\"".into(),
+            Some(value) => format!(
+                "({})",
+                value
+                    .chars()
+                    .map(|ch| format!("(character id {})", ch as u32))
+                    .collect::<Vec<_>>()
+                    .join(" & ")
+            ),
+        }
+    }
+
+    fn metadata_matches(expected: SafariTab, url: Option<&str>, title: Option<&str>) -> bool {
+        // Execute the production comparison against a record; no Safari Apple Events are sent.
+        let script = format!(
+            "using terms from application \"Safari\"\nset targetTab to {{URL: {}, name: {}}}\n{}\nreturn \"accepted\"\nend using terms from",
+            value_expression(url),
+            value_expression(title),
+            super::tab_metadata_guard(&expected),
+        );
+        let output = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .expect("run metadata guard");
+        if output.status.success() {
+            assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "accepted");
+            true
+        } else {
+            let error = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                error.contains("target tab changed"),
+                "unexpected script error: {error}"
+            );
+            false
+        }
+    }
+
+    #[test]
+    fn metadata_guard_accepts_missing_url() {
+        assert!(metadata_matches(tab(0, "Title", ""), None, Some("Title")));
+    }
+
+    #[test]
+    fn metadata_guard_accepts_missing_title() {
+        assert!(metadata_matches(
+            tab(0, "", "https://example.test"),
+            Some("https://example.test"),
+            None
+        ));
+    }
+
+    #[test]
+    fn metadata_guard_accepts_both_fields_missing() {
+        assert!(metadata_matches(tab(0, "", ""), None, None));
+    }
+
+    #[test]
+    fn metadata_guard_accepts_control_characters_quotes_and_backslashes() {
+        for title in [
+            "",
+            "A\nB",
+            "A\rB",
+            "A\tB",
+            "A\r\nB",
+            "A \"quoted\" \\ value\nnext\ttab",
+        ] {
+            assert!(metadata_matches(
+                tab(0, title, "https://example.test"),
+                Some("https://example.test"),
+                Some(title)
+            ));
+        }
+    }
+
+    #[test]
+    fn metadata_guard_still_rejects_changes_including_case() {
+        assert!(!metadata_matches(
+            tab(0, "Title", "https://example.test/A"),
+            Some("https://example.test/a"),
+            Some("Title")
+        ));
+        assert!(!metadata_matches(
+            tab(0, "Title", "https://example.test"),
+            Some("https://example.test"),
+            Some("title")
+        ));
+        assert!(!metadata_matches(
+            tab(0, "Title", "https://example.test"),
+            None,
+            Some("Title")
+        ));
+    }
+
     fn tab(index: usize, title: &str, url: &str) -> SafariTab {
         SafariTab {
             window_id: 42,
