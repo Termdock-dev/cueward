@@ -168,3 +168,28 @@ fn background_input_stops_after_window_changes_and_releases_each_key() {
         result.events_sent
     );
 }
+
+#[test]
+#[ignore = "requires a logged-in macOS desktop, Accessibility and Screen Recording permissions"]
+fn background_keyboard_receives_input_when_ax_title_is_missing() {
+    let receiver = Receiver::with_source(include_str!("input_fixture.swift"), "ax-title-missing");
+    let wrong = receiver.snapshot(0);
+    assert!(type_text(&wrong.input_target, "WRONG").is_err());
+    let snapshot = receiver.snapshot(1);
+    assert!(
+        super::input_status(&snapshot.input_target)
+            .expect("status")
+            .keyboard
+            .dispatch_ready
+    );
+    let text = "Dialog identity 測試";
+    let result = type_text(&snapshot.input_target, text).expect("text to titleless AX window");
+    assert_eq!(result.status, InputDelivery::SentUnverified);
+    receiver.wait_for(|state| state["texts"][1] == text);
+    key(&snapshot.input_target, "a", &["command".into()]).expect("select all");
+    type_text(&snapshot.input_target, "Replaced").expect("replace");
+    let state = receiver.wait_for(|state| state["texts"][1] == "Replaced");
+    assert_eq!(state["active"], false);
+    assert_ne!(result.frontmost_pid_before, receiver.child.id() as i32);
+    assert_eq!(result.frontmost_pid_before, result.frontmost_pid_after);
+}

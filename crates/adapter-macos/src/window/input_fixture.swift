@@ -3,7 +3,13 @@ import Foundation
 
 // A disposable receiver. It uses ordinary AppKit controls and event dispatch.
 let stateURL = URL(fileURLWithPath: CommandLine.arguments[1])
-let interrupt = CommandLine.arguments.dropFirst(2).first == "interrupt"
+let mode = CommandLine.arguments.dropFirst(2).first
+let interrupt = mode == "interrupt"
+final class InputWindow: NSWindow {
+    override func accessibilityTitle() -> String? {
+        mode == "ax-title-missing" ? nil : super.accessibilityTitle()
+    }
+}
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 var windows: [NSWindow] = []
@@ -20,7 +26,7 @@ app.mainMenu = menu
 
 for index in 0..<2 {
     let frame = NSRect(x: 100 + index * 60, y: 120, width: 400, height: 280)
-    let window = NSWindow(contentRect: frame, styleMask: [.titled, .closable], backing: .buffered, defer: false)
+    let window = InputWindow(contentRect: frame, styleMask: [.titled, .closable], backing: .buffered, defer: false)
     window.title = "Cueward input fixture \(index)"
     window.isReleasedWhenClosed = false
     let scroll = NSScrollView(frame: NSRect(origin: .zero, size: frame.size))
