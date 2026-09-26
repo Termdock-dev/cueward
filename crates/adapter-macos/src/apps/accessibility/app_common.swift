@@ -36,17 +36,31 @@ func appNode(_ element: AXUIElement) -> [String: Any] {
         var value: CFTypeRef?
         let status = AXUIElementCopyAttributeValue(element, name as CFString, &value)
         switch status {
-        case .success: return value
-        case .attributeUnsupported, .noValue: return nil
-        // Preserve traversable containers with unavailable descriptive attributes.
-        // Missing roles and communication failures still stop the observation.
-        case .failure where name != kAXRoleAttribute: unavailable.append(name); return nil
+        case .success:
+            // Classify secure fields before describeElement can request AXValue.
+            if name == kAXRoleAttribute || name == kAXSubroleAttribute {
+                guard let role = value as? String, !role.isEmpty, role != "unknown" else {
+                    fail("AX node has no readable \(name == kAXRoleAttribute ? "role" : "subrole")")
+                }
+            }
+            return value
+        case .attributeUnsupported, .noValue:
+            guard name != kAXRoleAttribute else { fail("AX node has no readable role") }
+            return nil
+        // Other partial reads remain traversable; unreadable security metadata
+        // and communication failures stop before any field value is requested.
+        case .failure where name != kAXRoleAttribute && name != kAXSubroleAttribute:
+            unavailable.append(name); return nil
         default: fail("app AX node read failed for \(name) (\(status.rawValue)); inspect again")
         }
     }
     guard node["role"] as? String != "unknown" else { fail("AX node has no readable role") }
     if !unavailable.isEmpty {
         node["unavailable_attributes"] = unavailable.sorted()
+    }
+    // A missing description does not invalidate independently read capabilities.
+    // Keep its unavailable marker in the fingerprint so changed reads go stale.
+    if unavailable.contains(where: { $0 != kAXDescriptionAttribute }) {
         node["settable_value"] = false
         node["actions"] = [String]()
     }
