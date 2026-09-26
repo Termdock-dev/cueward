@@ -6,6 +6,34 @@ use support::Fixture;
 const FIELD: &str = "w0.0.0";
 
 #[test]
+fn app_dispatch_accepts_optional_description_failure_and_rechecks_availability() {
+    let fixture = Fixture::build();
+    let target = fixture.observe("unavailable-description", FIELD);
+    assert_eq!(
+        fixture
+            .accept("unavailable-description", &target, "press")
+            .status,
+        ActionStatus::SentUnverified
+    );
+    assert_eq!(
+        fixture
+            .accept("unavailable-description", &target, "set_value")
+            .status,
+        ActionStatus::Confirmed
+    );
+    for action in ["press", "set_value"] {
+        fixture.reject("valid", &target, action, "app element changed");
+        let valid = fixture.observe("valid", FIELD);
+        fixture.reject(
+            "unavailable-description",
+            &valid,
+            action,
+            "app element changed",
+        );
+    }
+}
+
+#[test]
 fn app_dispatch_rejects_stale_observations_without_sending_input() {
     let fixture = Fixture::build();
     let mutations: &[(&str, fn(&mut Target))] = &[
