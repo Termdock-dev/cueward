@@ -63,3 +63,58 @@ fn wait_matching_requires_exact_values_unique_nodes_and_complete_absence() {
     );
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "passed");
 }
+
+fn missing_window_target() -> String {
+    use crate::screenshot::{CapturableWindow, WindowBounds};
+    use crate::window::snapshot::SnapshotImage;
+    let window = CapturableWindow {
+        window_id: 999_999_999,
+        owner_pid: std::process::id() as i32,
+        app: "Wait Validation Fixture".into(),
+        title: "Missing fixture window".into(),
+        is_frontmost: false,
+        is_onscreen: false,
+        bounds: WindowBounds {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+        },
+    };
+    let image = SnapshotImage {
+        width: 100,
+        height: 100,
+        scale_x: 1.0,
+        scale_y: 1.0,
+        origin: "top-left",
+    };
+    InputTarget::issue(&window, &image).expect("fixture token")
+}
+
+#[test]
+#[ignore = "requires Accessibility and Screen Recording permissions; sends no input"]
+fn wait_rejects_unmatchable_names_before_observing_window() {
+    let target = missing_window_target();
+    for grapheme in ["a", "測", "e\u{301}"] {
+        let mut request = options(WaitCondition::ElementAbsent);
+        request.selector.as_mut().expect("selector").name = Some(grapheme.repeat(513));
+        let error = wait_for_window(&target, &request).expect_err("unmatchable name rejected");
+        assert!(error.to_string().contains("512"), "{error}");
+    }
+}
+
+#[test]
+#[ignore = "requires Accessibility and Screen Recording permissions; sends no input"]
+fn wait_name_limit_counts_graphemes_and_preserves_full_identifiers() {
+    let target = missing_window_target();
+    let mut request = options(WaitCondition::ElementAbsent);
+    let selector = request.selector.as_mut().expect("selector");
+    selector.name = Some("e\u{301}".repeat(512));
+    selector.identifier = Some("i".repeat(600));
+    assert_eq!(
+        wait_for_window(&target, &request)
+            .expect("valid selector reaches catalog")
+            .status,
+        WaitStatus::WindowGone
+    );
+}
