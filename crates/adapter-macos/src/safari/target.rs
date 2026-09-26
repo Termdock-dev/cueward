@@ -48,8 +48,10 @@ pub(super) fn tab_identity_guard(tab: &SafariTab) -> String {
     format!(
         r#"if (count of tabs of w) < {tab_index} then error "target tab closed"
               set targetTab to tab {tab_index} of w
-              if (URL of targetTab) is not "{url}" then error "target tab changed; list tabs and retry"
-              if (name of targetTab) is not "{title}" then error "target tab changed; list tabs and retry""#,
+              considering case
+                if (URL of targetTab) is not "{url}" then error "target tab changed; list tabs and retry"
+                if (name of targetTab) is not "{title}" then error "target tab changed; list tabs and retry"
+              end considering"#,
         tab_index = tab.index + 1,
         url = escape(&tab.url),
         title = escape(&tab.title),
@@ -143,13 +145,23 @@ mod tests {
     #[test]
     #[ignore = "requires an open Safari tab and JavaScript from Apple Events; read-only probe"]
     fn identity_guard_rejects_a_case_only_url_change() {
-        let mut selected = super::active(None).expect("read active tab").expect("open tab");
+        let mut selected = super::active(None)
+            .expect("read active tab")
+            .expect("open tab");
         let changed = selected.url.to_uppercase();
-        assert_ne!(selected.url, changed, "fixture URL must contain lowercase letters");
+        assert_ne!(
+            selected.url, changed,
+            "fixture URL must contain lowercase letters"
+        );
         selected.url = changed;
         let error = crate::safari_guard::with_safari_session(|| {
-            super::execute_js_in_tab("'cueward-read-only-probe'", &selected, "identity_guard_probe")
-        }).expect_err("a changed URL must be rejected before JavaScript executes");
+            super::execute_js_in_tab(
+                "'cueward-read-only-probe'",
+                &selected,
+                "identity_guard_probe",
+            )
+        })
+        .expect_err("a changed URL must be rejected before JavaScript executes");
         assert!(error.to_string().contains("target tab changed"), "{error}");
     }
 }
