@@ -137,6 +137,8 @@ pub fn set_app_value(token: &str, value: &str) -> Result<AppAXActionResult, Maco
 }
 
 #[cfg(test)]
+mod action_tests;
+#[cfg(test)]
 mod live_tests;
 #[cfg(test)]
 mod tests;
