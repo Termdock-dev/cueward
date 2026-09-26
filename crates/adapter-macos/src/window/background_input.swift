@@ -28,13 +28,29 @@ let frontBefore = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 
 var eventsSent = 0
 var interruption: String?
 
+// Optional native identity avoids relying on AX titles that dialogs may omit.
+typealias GetAXWindow = @convention(c) (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError
+let axWindowSymbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "_AXUIElementGetWindow")
+
 func focusedWindowMatches() -> Bool {
     // Inactive Spaces may omit AXWindows while still exposing AXFocusedWindow.
     guard let raw = attribute(application, kAXFocusedWindowAttribute),
           CFGetTypeID(raw) == AXUIElementGetTypeID() else { return false }
     let focused = raw as! AXUIElement
-    guard text(attribute(focused, kAXTitleAttribute)) == expectedTitle,
+    var owner: pid_t = 0
+    guard AXUIElementGetPid(focused, &owner) == .success, owner == pid,
           let frame = bounds(focused), sameBounds(frame, expectedBounds) else { return false }
+    if let symbol = axWindowSymbol {
+        var observedID: CGWindowID = 0
+        let lookup = unsafeBitCast(symbol, to: GetAXWindow.self)
+        // A failed or conflicting native identity must not fall back to a title match.
+        return lookup(focused, &observedID) == .success && observedID != 0 && observedID == windowID
+    }
+    return legacyKeyboardWindowMatches(focused, frame)
+}
+
+func legacyKeyboardWindowMatches(_ focused: AXUIElement, _ frame: CGRect) -> Bool {
+    guard text(attribute(focused, kAXTitleAttribute)) == expectedTitle else { return false }
     let rows = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
     let matches = rows.filter { row in
         guard (row[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid,

@@ -22,7 +22,9 @@ Window frames use the catalog's integer-point precision, truncating fractional c
 
 ## Keyboard routing
 
-Process-directed keyboard events go to the app's current keyboard window. Cueward reads `AXFocusedWindow` and checks that its title and bounds uniquely match the requested window in the system catalog. An ambiguous, unavailable, or different keyboard window is rejected. Cueward does not change the app's keyboard window to satisfy the request. The focused control inside that window determines where text goes; observe it before sending input.
+Process-directed keyboard events go to the app's current keyboard window. Cueward reads `AXFocusedWindow`, verifies its owning process and bounds, and uses an optional native AX window-ID lookup to match the requested capture window. This permits dialogs whose AX title is absent or differs from their system-catalog title. A failed lookup or conflicting ID is rejected. When the native lookup entry point is unavailable, Cueward requires the previous unique title-and-bounds match in the system catalog. Snapshot identity checks still require the catalog PID, title, and bounds to remain unchanged.
+
+Cueward does not change the app's keyboard window to satisfy the request. The focused control inside that window determines where text goes; observe it before sending input. A dialog binding successfully does not establish that its controls will accept background input or that a save/open operation has completed.
 
 `type-text` sends Unicode without replacing the clipboard. It accepts 1–1024 UTF-16 units, excluding control characters. Use `key` for Enter and Tab. Text goes through the app's event handling and may be rejected, transformed, or interpreted by the app.
 
