@@ -26,7 +26,11 @@ Secure text values are not read. Duplicate matches for a value or enabled check 
 
 Results report `matched`, `timed_out`, `window_gone`, `window_changed`, or `ambiguous`, along with poll count, elapsed time, observed match count, traversal completeness, and an optional current element ref. Text values are not echoed. `matched` establishes only the selected condition; it does not prove that a save, submission, or broader task succeeded.
 
+`complete` describes AX traversal only. It remains false for `window-gone`, whose match is established by the window catalog without an AX traversal.
+
 The snapshot target must be fresh at entry. Its window ID, PID, title, and integer frame remain bound throughout the wait. A renamed, resized, moved, or replaced window ends the wait with `window_changed`; take a fresh observation before continuing. A disappearing window returns `window_gone`, or `matched` when disappearance was requested.
+
+If the window disappears or changes during AX binding or traversal, that in-flight poll can return an AX error before reaching the next catalog check. This is an uncertain observation: rediscover the window before continuing. No input is sent by the failed wait.
 
 Timeout is 100–20000 ms, measured inside the helper after startup; poll interval is 50–1000 ms. An in-flight AX request can overrun the requested deadline. Helper startup and process timeout are separate bounds. The helper checks caller liveness between polls and stops when the caller exits.
 
