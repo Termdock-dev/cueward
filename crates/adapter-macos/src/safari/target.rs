@@ -63,3 +63,50 @@ pub(super) fn execute_js_in_tab(
     })?;
     Ok(decode_field(output.trim()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{select_tab, SafariTab};
+
+    fn tab(index: usize, title: &str, url: &str) -> SafariTab {
+        SafariTab {
+            window_id: 42,
+            window_name: "Work".to_string(),
+            profile: Some("Work".to_string()),
+            index,
+            title: title.to_string(),
+            url: url.to_string(),
+            active: index == 0,
+        }
+    }
+
+    #[test]
+    fn text_selector_rejects_multiple_matching_tabs() {
+        let tabs = vec![
+            tab(0, "Docs", "https://example.test/one"),
+            tab(1, "Docs", "https://example.test/two"),
+        ];
+        let error = select_tab(tabs, "Docs").expect_err("ambiguous title must fail");
+        assert!(error.to_string().contains("ambiguous"));
+    }
+
+    #[test]
+    fn text_selector_returns_its_only_match() {
+        let tabs = vec![
+            tab(0, "Docs", "https://example.test/one"),
+            tab(1, "Inbox", "https://example.test/two"),
+        ];
+        let selected = select_tab(tabs, "Inbox").expect("unique title");
+        assert_eq!(selected.index, 1);
+    }
+
+    #[test]
+    fn numeric_selector_chooses_explicit_list_index() {
+        let tabs = vec![
+            tab(0, "Docs", "https://example.test/one"),
+            tab(1, "Docs", "https://example.test/two"),
+        ];
+        let selected = select_tab(tabs, "1").expect("explicit index");
+        assert_eq!(selected.url, "https://example.test/two");
+    }
+}
