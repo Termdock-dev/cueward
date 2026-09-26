@@ -9,17 +9,19 @@ use super::process::run_with_timeout;
 use super::target::WindowIdentity;
 use crate::MacosError;
 
+pub(crate) const AX_SUPPORT: &str = concat!(
+    include_str!("ax_elements.swift"),
+    "\n",
+    include_str!("ax_shared.swift")
+);
+
 pub(super) fn run_ax<T: DeserializeOwned>(
     window: &WindowIdentity,
     body: &str,
     arguments: &[String],
     request: &Value,
 ) -> Result<T, MacosError> {
-    let source = format!(
-        "{}\n{}\n{body}",
-        include_str!("ax_elements.swift"),
-        include_str!("ax_common.swift")
-    );
+    let source = format!("{AX_SUPPORT}\n{}\n{body}", include_str!("ax_common.swift"));
     let mut script = tempfile::NamedTempFile::with_suffix(".swift")
         .map_err(|error| MacosError::Other(format!("failed to create AX script: {error}")))?;
     script

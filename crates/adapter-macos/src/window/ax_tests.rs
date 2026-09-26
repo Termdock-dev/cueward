@@ -7,8 +7,9 @@ fn executable_binding_checks_offscreen_fallbacks_ambiguity_and_menu_context() {
     let mut script = tempfile::NamedTempFile::with_suffix(".swift").expect("Swift fixture");
     write!(
         script,
-        "{}\n{}\n{}\n{}\ntestWindowBinding()\n",
+        "{}\n{}\n{}\n{}\n{}\ntestWindowBinding()\n",
         include_str!("ax_elements.swift"),
+        include_str!("ax_shared.swift"),
         include_str!("ax_common.swift"),
         include_str!("ax_catalog_tests.swift"),
         include_str!("ax_binding_tests.swift")
@@ -51,8 +52,9 @@ fn catalog_binding_matches_snapshot_precision_and_rejects_changed_frames() {
     let mut script = tempfile::NamedTempFile::with_suffix(".swift").expect("Swift fixture");
     write!(
         script,
-        "{}\n{}\n{}\ntestCatalogBounds()\n",
+        "{}\n{}\n{}\n{}\ntestCatalogBounds()\n",
         include_str!("ax_elements.swift"),
+        include_str!("ax_shared.swift"),
         include_str!("ax_common.swift"),
         include_str!("ax_catalog_tests.swift")
     )

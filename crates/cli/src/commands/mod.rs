@@ -83,7 +83,7 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
-    /// Discover and launch macOS applications without requesting activation.
+    /// Discover, launch, and explore macOS applications without requesting activation.
     App {
         #[command(subcommand)]
         action: AppAction,

@@ -1,4 +1,4 @@
-//! Generic running-application discovery and background launch requests.
+//! Generic application discovery, background launch, and Accessibility exploration.
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -9,6 +9,12 @@ use serde_json::{Value, json};
 
 use crate::MacosError;
 use crate::window::process::run_with_timeout;
+
+mod accessibility;
+pub use accessibility::{
+    AppAXActionResult, AppAccessibilityNode, AppAccessibilitySnapshot, AppInstance, inspect_app,
+    press_app_element, set_app_value,
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RunningApp {
@@ -38,9 +44,13 @@ pub struct LaunchResult {
 }
 
 fn run<T: DeserializeOwned>(request: Value) -> Result<T, MacosError> {
+    run_source(request, &helper_source())
+}
+
+fn run_source<T: DeserializeOwned>(request: Value, source: &str) -> Result<T, MacosError> {
     let directory = tempfile::tempdir().map_err(|e| MacosError::Other(e.to_string()))?;
     let script = directory.path().join("apps.swift");
-    fs::write(&script, helper_source()).map_err(|e| MacosError::Other(e.to_string()))?;
+    fs::write(&script, source).map_err(|e| MacosError::Other(e.to_string()))?;
     let payload = serde_json::to_vec(&request).map_err(|e| MacosError::Other(e.to_string()))?;
     let output = run_with_timeout(
         Command::new("swift").arg(script),
