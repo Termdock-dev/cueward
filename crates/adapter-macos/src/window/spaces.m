@@ -27,6 +27,7 @@ static void emit(id value) {
 static NSArray *displays(void) {
     NSArray *rows = CFBridgingRelease(displaySpaces(connection));
     if (!rows.count) fail(@"managed display Space catalog is unavailable");
+    if (!visibleSpaces(rows)) fail(@"current Space is unavailable for a display; observe before retrying");
     return rows;
 }
 static NSArray *membership(uint32_t windowID) {
