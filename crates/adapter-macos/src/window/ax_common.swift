@@ -80,8 +80,14 @@ func catalogWindowMatches(allowOffscreen: Bool = false, exactBounds: Bool = fals
         (allowOffscreen || window[kCGWindowIsOnscreen as String] as? Bool == true),
         let rawBounds = window[kCGWindowBounds as String] as? NSDictionary,
         let frame = CGRect(dictionaryRepresentation: rawBounds),
-        (exactBounds ? frame == expectedBounds : sameBounds(frame, expectedBounds)) else { return false }
+        (exactBounds ? catalogBounds(frame) == expectedBounds : sameBounds(frame, expectedBounds)) else { return false }
     return true
+}
+
+func catalogBounds(_ frame: CGRect) -> CGRect {
+    // Match window_catalog.swift's Int conversion, including negative origins.
+    return CGRect(x: frame.origin.x.rounded(.towardZero), y: frame.origin.y.rounded(.towardZero),
+                  width: frame.width.rounded(.towardZero), height: frame.height.rounded(.towardZero))
 }
 
 func validateCatalogWindow(allowOffscreen: Bool = false, exactBounds: Bool = false) {

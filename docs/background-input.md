@@ -13,6 +13,8 @@ cueward window scroll --target '<input_target>' --x 320 --y 240 --delta-y -240
 
 These commands require Accessibility and Screen Recording permissions and the Swift toolchain. Use the snapshot's `input_target`, not an AX node's `target`. Tokens expire after five minutes and bind the window ID, PID, title, frame, and image dimensions. They are observation references, not authorization credentials. A fresh token does not prove the contents or focus are unchanged.
 
+Window frames use the catalog's integer-point precision, truncating fractional coordinates toward zero. Identity checks use that same precision; a sub-point movement that preserves those integer values is not detected.
+
 ## Keyboard routing
 
 Process-directed keyboard events go to the app's current keyboard window. Cueward reads `AXFocusedWindow` and checks that its title and bounds uniquely match the requested window in the system catalog. An ambiguous, unavailable, or different keyboard window is rejected. Cueward does not change the app's keyboard window to satisfy the request. The focused control inside that window determines where text goes; observe it before sending input.
