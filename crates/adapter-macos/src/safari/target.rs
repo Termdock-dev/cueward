@@ -56,9 +56,13 @@ pub(super) fn tab_identity_guard(tab: &SafariTab) -> String {
 
 fn tab_metadata_guard(tab: &SafariTab) -> String {
     format!(
-        r#"considering case
-                if (URL of targetTab) is not "{url}" then error "target tab changed; list tabs and retry"
-                if (name of targetTab) is not "{title}" then error "target tab changed; list tabs and retry"
+        r#"set targetURL to URL of targetTab
+              if targetURL is missing value then set targetURL to ""
+              set targetTitle to name of targetTab
+              if targetTitle is missing value then set targetTitle to ""
+              considering case
+                if targetURL is not "{url}" then error "target tab changed; list tabs and retry"
+                if targetTitle is not "{title}" then error "target tab changed; list tabs and retry"
               end considering"#,
         url = escape(&tab.url),
         title = escape(&tab.title),
