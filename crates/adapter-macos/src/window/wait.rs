@@ -61,16 +61,25 @@ fn validate(options: &WaitOptions) -> Result<(), MacosError> {
             "wait timeout must be 100..=20000 ms and interval 50..=1000 ms".into(),
         ));
     }
-    if (options.condition == WaitCondition::WindowGone) != options.selector.is_none() {
+    if options.condition != WaitCondition::WindowGone
+        && options
+            .selector
+            .as_ref()
+            .is_none_or(|selector| selector.role.is_empty())
+    {
         return Err(MacosError::Other(
-            "element conditions require a selector; window-gone must omit it".into(),
+            "element conditions require --role".into(),
+        ));
+    }
+    if options.condition == WaitCondition::WindowGone && options.selector.is_some() {
+        return Err(MacosError::Other(
+            "window-gone must omit element selectors".into(),
         ));
     }
     if let Some(selector) = &options.selector {
         // The helper enforces the 512 Swift-character name limit before observing.
         // Keep this byte bound too; Rust scalar counts differ for combining characters.
-        if selector.role.is_empty()
-            || selector.role.len() > 128
+        if selector.role.len() > 128
             || selector.name.as_ref().is_some_and(|s| s.len() > 4096)
             || selector.identifier.as_ref().is_some_and(|s| s.len() > 4096)
         {

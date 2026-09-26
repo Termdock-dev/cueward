@@ -48,8 +48,8 @@ func windowState() -> String? {
     guard let rows = CGWindowListCopyWindowInfo([.optionIncludingWindow, .excludeDesktopElements], windowID) as? [[String: Any]] else {
         fail("window catalog is unavailable; absence is unproven")
     }
-    guard rows.contains(where: { ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID }) else { return "window_gone" }
-    return catalogWindowMatches(allowOffscreen: true, exactBounds: true) ? nil : "window_changed"
+    guard let row = rows.first(where: { ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID }) else { return "window_gone" }
+    return catalogWindowMatches(row, allowOffscreen: true, exactBounds: true) ? nil : "window_changed"
 }
 
 let input = FileHandle.standardInput.readDataToEndOfFile()

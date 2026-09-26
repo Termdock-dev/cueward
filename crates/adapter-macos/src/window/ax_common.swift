@@ -75,7 +75,13 @@ func catalogWindowMatches(allowOffscreen: Bool = false, exactBounds: Bool = fals
     let windows = CGWindowListCopyWindowInfo(options, windowID) as? [[String: Any]] ?? []
     guard let window = windows.first(where: {
         ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID
-    }), (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid,
+    }) else { return false }
+    return catalogWindowMatches(window, allowOffscreen: allowOffscreen, exactBounds: exactBounds)
+}
+
+func catalogWindowMatches(_ window: [String: Any], allowOffscreen: Bool = false, exactBounds: Bool = false) -> Bool {
+    guard (window[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID,
+        (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid,
         window[kCGWindowName as String] as? String == expectedTitle,
         (allowOffscreen || window[kCGWindowIsOnscreen as String] as? Bool == true),
         let rawBounds = window[kCGWindowBounds as String] as? NSDictionary,
