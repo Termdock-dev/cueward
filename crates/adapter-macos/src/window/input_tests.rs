@@ -97,3 +97,42 @@ fn pointer_validation_rejects_unsupported_buttons_and_unbounded_sequences() {
         );
     }
 }
+
+#[test]
+#[ignore = "requires macOS Accessibility permission; no desktop input is posted"]
+fn status_returns_busy_observation_while_another_helper_owns_the_lock() {
+    use crate::window::input_lock::lock_input;
+    let pid = std::process::id() as i32;
+    let _lock = lock_input(pid).expect("hold app lock");
+    let identity = WindowIdentity {
+        window_id: 1,
+        owner_pid: pid,
+        title: "Owned status probe".into(),
+        bounds: crate::screenshot::WindowBounds {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+        },
+    };
+    let result: Value = run_ax(
+        &identity,
+        include_str!("background_input.swift"),
+        &[],
+        &json!({
+            "action": "status", "issued_at": now_seconds().expect("clock"),
+            "caller_pid": pid, "lock_path": input_lock_path(pid).expect("lock path"),
+        }),
+    )
+    .expect("busy status should be observable without a window lookup or waiting for release");
+    assert_eq!(result["input_busy"], true);
+    for route in ["keyboard", "pointer"] {
+        assert_eq!(result[route]["dispatch_ready"], false);
+        assert!(
+            result[route]["reason"]
+                .as_str()
+                .expect("reason")
+                .contains("another input action")
+        );
+    }
+}
