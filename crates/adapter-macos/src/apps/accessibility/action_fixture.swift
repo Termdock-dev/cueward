@@ -122,6 +122,9 @@ func nodeAttribute(_ element: AXUIElement, _ key: String) -> CFTypeRef? {
 
 func AXUIElementCopyAttributeValue(_ element: AXUIElement, _ key: CFString,
                                   _ output: UnsafeMutablePointer<CFTypeRef?>) -> AXError {
+    if isField(element), key as String == kAXDescriptionAttribute, scenario == "unavailable-description" {
+        return .failure
+    }
     output.pointee = CFEqual(element, AXUIElementCreateApplication(hostPID))
         ? applicationAttribute(key as String) : nodeAttribute(element, key as String)
     return output.pointee == nil ? .attributeUnsupported : .success

@@ -18,7 +18,7 @@ Inspection accepts 1–500 nodes and 1–12 levels per request, with paths cappe
 
 Nodes include role, name, identifier when exposed, value, enabled state, actions, bounds, child count, and the actual AX `receiver_pid`. Names and values are previews capped at 512 Swift characters. Password values and targets are omitted. Disabled controls and non-leaf menu items do not receive targets.
 
-`unavailable_attributes` lists descriptive attributes for which AX returned a generic failure. Those nodes receive no action targets, but their descendants remain discoverable. An absent value on such a node does not establish an empty value. Missing roles, failed child enumeration, communication errors, and unreadable application roots stop inspection. `truncated: false` describes traversal coverage, not attribute availability or an application's internal state.
+`unavailable_attributes` lists attributes for which AX returned a generic failure. If only `AXDescription` is unavailable, independently verified actions and text assignment remain usable. Other partial reads suppress that node's targets while leaving descendants discoverable. Availability markers remain part of the target fingerprint, so changes require a fresh inspection. An absent value on a partial node does not establish an empty value. Missing or malformed roles, failed subrole reads, and malformed subroles stop inspection before reading field values; unsupported or absent subroles are allowed. Failed child enumeration, communication errors, and unreadable application roots also stop inspection. `truncated: false` describes traversal coverage, not attribute availability or an application's internal state.
 
 ## Act and verify
 

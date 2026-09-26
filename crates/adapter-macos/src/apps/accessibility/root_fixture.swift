@@ -44,15 +44,28 @@ func AXUIElementCopyAttributeValue(_ element: AXUIElement, _ key: CFString,
         switch key {
         case kAXRoleAttribute:
             if scenario == "failed-role" { return .failure }
+            if CFEqual(element, fixtureChild) {
+                if scenario == "missing-role" { return .noValue }
+                if scenario == "malformed-role" { result.pointee = NSNumber(value: 1); return .success }
+            }
             result.pointee = (CFEqual(element, fixtureChild) ? kAXTextFieldRole
                 : CFEqual(element, fixtureMenu) ? kAXMenuBarRole
                 : CFEqual(element, menuItem) ? kAXMenuItemRole : kAXWindowRole) as CFString
+        case kAXSubroleAttribute:
+            guard CFEqual(element, fixtureChild) else { return .attributeUnsupported }
+            if scenario == "failed-subrole" { return .failure }
+            if scenario == "malformed-subrole" { result.pointee = NSNumber(value: 1); return .success }
+            if scenario == "secure-subrole" { result.pointee = "AXSecureTextField" as CFString; return .success }
+            return .attributeUnsupported
         case kAXTitleAttribute: result.pointee = "Fixture" as CFString
         case kAXDescriptionAttribute:
             if scenario == "unavailable-description" { return .failure }
             return .attributeUnsupported
         case kAXValueAttribute:
             guard CFEqual(element, fixtureChild) else { return .noValue }
+            if ["missing-role", "malformed-role", "failed-subrole", "malformed-subrole", "secure-subrole"].contains(scenario) {
+                fail("fixture value was read before security classification")
+            }
             if scenario == "unavailable-value" { return .failure }
             if scenario == "failed-value" { return .cannotComplete }
             result.pointee = "Fixture text" as CFString

@@ -105,20 +105,50 @@ fn app_roots_reject_failed_reads_ambiguous_identity_and_locked_sessions() {
 
 #[test]
 fn partial_nodes_report_unavailable_attributes_and_cannot_issue_action_targets() {
-    for (scenario, attribute) in [
-        ("unavailable-value", "AXValue"),
-        ("unavailable-description", "AXDescription"),
+    let raw = inspect_fixture("unavailable-value", Some("w0")).unwrap();
+    let mut snapshot: AppAccessibilitySnapshot = serde_json::from_value(raw).unwrap();
+    issue_targets(&mut snapshot, now().unwrap()).unwrap();
+    let child = &snapshot.nodes[1];
+    assert_eq!(child.unavailable_attributes, ["AXValue"]);
+    assert!(child.node.value.is_none());
+    assert!(!child.node.settable_value);
+    assert!(child.node.actions.is_empty());
+    assert!(child.node.target.is_none());
+}
+
+#[test]
+fn optional_description_failure_preserves_verified_text_targets() {
+    let raw = inspect_fixture("unavailable-description", Some("w0")).unwrap();
+    let mut snapshot: AppAccessibilitySnapshot = serde_json::from_value(raw).unwrap();
+    issue_targets(&mut snapshot, now().unwrap()).unwrap();
+    let child = &snapshot.nodes[1];
+    assert_eq!(child.unavailable_attributes, ["AXDescription"]);
+    assert_eq!(child.node.value.as_deref(), Some("Fixture text"));
+    assert!(child.node.settable_value);
+    assert!(child.node.target.is_some());
+}
+
+#[test]
+fn app_nodes_reject_unknown_security_classification_before_reading_values() {
+    for (scenario, message) in [
+        ("missing-role", "AX node has no readable role"),
+        ("malformed-role", "AX node has no readable role"),
+        ("failed-subrole", "app AX node read failed for AXSubrole"),
+        ("malformed-subrole", "AX node has no readable subrole"),
     ] {
-        let raw = inspect_fixture(scenario, Some("w0")).unwrap();
-        let mut snapshot: AppAccessibilitySnapshot = serde_json::from_value(raw).unwrap();
-        issue_targets(&mut snapshot, now().unwrap()).unwrap();
-        let child = &snapshot.nodes[1];
-        assert_eq!(child.unavailable_attributes, [attribute]);
-        if attribute == "AXValue" {
-            assert!(child.node.value.is_none());
-        }
-        assert!(!child.node.settable_value);
-        assert!(child.node.actions.is_empty());
-        assert!(child.node.target.is_none());
+        let error = inspect_fixture(scenario, Some("w0")).unwrap_err();
+        assert!(error.contains(message), "{scenario}: {error}");
     }
+}
+
+#[test]
+fn app_nodes_never_read_secure_values_or_issue_secure_targets() {
+    let raw = inspect_fixture("secure-subrole", Some("w0")).unwrap();
+    let mut snapshot: AppAccessibilitySnapshot = serde_json::from_value(raw).unwrap();
+    issue_targets(&mut snapshot, now().unwrap()).unwrap();
+    let child = &snapshot.nodes[1];
+    assert!(child.node.value.is_none());
+    assert!(!child.node.settable_value);
+    assert!(child.node.actions.is_empty());
+    assert!(child.node.target.is_none());
 }
