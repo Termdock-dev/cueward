@@ -30,3 +30,7 @@ mod tests;
 #[cfg(test)]
 #[path = "space_create_live_tests.rs"]
 mod live_tests;
+
+#[cfg(test)]
+#[path = "space_create_request_tests.rs"]
+mod request_tests;
