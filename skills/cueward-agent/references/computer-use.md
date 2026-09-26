@@ -23,14 +23,24 @@ cueward window snapshot --id <window-id>
 ```sh
 cueward window press --target '<fresh node target>'
 cueward window set-value --target '<fresh text node target>' --value '<intended text>'
+cueward window type-text --target '<fresh snapshot input_target>' --text '<intended text>'
+cueward window key --target '<fresh snapshot input_target>' --key tab
+cueward window key --target '<fresh snapshot input_target>' --key enter
+cueward window scroll --target '<fresh snapshot input_target>' --x 320 --y 240 --delta-y -240
 ```
 
 Choose a fresh returned `target` consistent with the user's task. `press` supports AXPress; `set-value` replaces an editable text field or area's value. Other AX action names do not imply that Cueward exposes a matching command. Tokens expire after five minutes and bind observable element and ancestor attributes.
+
+Background `type-text`, `key`, and `scroll` use the snapshot's separate `input_target`. The app must be in the background; keyboard input additionally requires that the requested window uniquely matches its `AXFocusedWindow`. It does not focus a chosen control: identify the current focus and check where input landed. Use Tab only when current observations justify navigating to the next control. Text excludes control characters; use named keys for Tab and Enter. Keys also include arrows, escape, backspace, delete, home/end, page-up/down, space, US-position letters and digits, with optional comma-separated `--modifiers command,shift,control,option`.
+
+Scroll coordinates are snapshot pixels. Negative deltas scroll down/right. Reobserve after window or layout changes. An unavailable private window-routing entry point returns an error without global fallback. Shortcut handling and event acceptance depend on the app. Copy/paste shortcuts affect the shared clipboard.
 
 After an action, inspect the affected area again. Check the expected task condition, such as a changed value, a newly opened dialog, or the produced file. Use the new observation to choose the next action. `sent_unverified` does not establish the intended effect; `confirmed` for a text assignment establishes only the field's value, not a save or submission. On error, timeout, or uncertain effect, observe before deciding whether another action is appropriate.
 
 ## Current limits
 
-Cross-Space screenshots are supported; AX inspection and actions still require on-screen windows. Canvas clicks, generic keyboard input, scrolling, and dragging are not exposed by these commands. If the needed action is unavailable, report the specific missing capability rather than inventing an adapter or command.
+Cross-Space screenshots and background keyboard/wheel input are supported; AX inspection and actions still require on-screen windows. Canvas clicks and dragging are not exposed by these commands. If the needed action is unavailable, report the specific missing capability rather than inventing an adapter or command.
+
+Raw-input results can be `sent_unverified` or `partially_sent`. The latter includes an interruption reason and event count; never replay the whole input automatically. Foreground and identity guards are checked between key pairs, not atomically with delivery. If the target becomes the user's foreground app, stop background work on it. Concurrent physical typing isolation is not guaranteed.
 
 AX calls do not explicitly activate apps, but an app may activate itself as a side effect. `foreground_changed` compares only the before-and-after foreground app. When the task requires background operation, do not switch desktops or fall back to global input automatically; report any observed interference and reassess the route.

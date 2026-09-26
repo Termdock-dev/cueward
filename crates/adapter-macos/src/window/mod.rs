@@ -4,6 +4,9 @@ use crate::screenshot::{CapturableWindow, ScreenshotResult};
 
 mod actions;
 mod bridge;
+mod input;
+mod input_lock;
+mod input_target;
 mod inspection;
 mod process;
 mod snapshot;
@@ -11,6 +14,7 @@ mod target;
 
 pub use crate::screenshot::{WindowScope, list_windows};
 pub use actions::{ActionStatus, WindowActionResult, press, set_value};
+pub use input::{BackgroundInputResult, InputDelivery, key, scroll, type_text};
 pub use inspection::{inspect_window, inspect_window_subtree};
 pub use snapshot::{SnapshotImage, WindowSnapshot, snapshot_window};
 
@@ -22,6 +26,12 @@ mod ax_tests;
 
 #[cfg(test)]
 mod snapshot_live_tests;
+
+#[cfg(test)]
+mod input_live_tests;
+
+#[cfg(test)]
+mod input_lifetime_tests;
 
 /// Element frame in global macOS screen points, with a top-left origin.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

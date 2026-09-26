@@ -70,17 +70,30 @@ func sameBounds(_ left: CGRect, _ right: CGRect) -> Bool {
         && abs(left.height - right.height) <= tolerance
 }
 
-func validateCatalogWindow() {
+func catalogWindowMatches(allowOffscreen: Bool = false, exactBounds: Bool = false) -> Bool {
     let options: CGWindowListOption = [.optionIncludingWindow, .excludeDesktopElements]
     let windows = CGWindowListCopyWindowInfo(options, windowID) as? [[String: Any]] ?? []
     guard let window = windows.first(where: {
         ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID
     }), (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid,
         window[kCGWindowName as String] as? String == expectedTitle,
-        window[kCGWindowIsOnscreen as String] as? Bool == true,
+        (allowOffscreen || window[kCGWindowIsOnscreen as String] as? Bool == true),
         let rawBounds = window[kCGWindowBounds as String] as? NSDictionary,
         let frame = CGRect(dictionaryRepresentation: rawBounds),
-        sameBounds(frame, expectedBounds) else { fail("window identity changed; inspect the window again") }
+        (exactBounds ? catalogBounds(frame) == expectedBounds : sameBounds(frame, expectedBounds)) else { return false }
+    return true
+}
+
+func catalogBounds(_ frame: CGRect) -> CGRect {
+    // Match window_catalog.swift's Int conversion, including negative origins.
+    return CGRect(x: frame.origin.x.rounded(.towardZero), y: frame.origin.y.rounded(.towardZero),
+                  width: frame.width.rounded(.towardZero), height: frame.height.rounded(.towardZero))
+}
+
+func validateCatalogWindow(allowOffscreen: Bool = false, exactBounds: Bool = false) {
+    guard catalogWindowMatches(allowOffscreen: allowOffscreen, exactBounds: exactBounds) else {
+        fail("window identity changed; inspect the window again")
+    }
 }
 
 func bindWindow() -> AXUIElement {

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
+use super::input_target::InputTarget;
 use super::target::WindowIdentity;
 use crate::MacosError;
 use crate::screenshot::{
@@ -26,6 +27,7 @@ pub struct WindowSnapshot {
     pub window: CapturableWindow,
     pub screenshot: ScreenshotResult,
     pub image: SnapshotImage,
+    pub input_target: String,
 }
 
 /// Capture an exact window, including other Spaces, without activating its app.
@@ -81,6 +83,7 @@ fn snapshot_with(
             "window changed during capture; take a new snapshot".into(),
         ));
     }
+    let input_target = InputTarget::issue(&after, &image)?;
     temporary
         .persist(&destination)
         .map_err(|error| MacosError::Other(format!("failed to save snapshot: {}", error.error)))?;
@@ -89,6 +92,7 @@ fn snapshot_with(
         window: after,
         screenshot,
         image,
+        input_target,
     })
 }
 

@@ -108,3 +108,70 @@ fn parses_window_set_value_with_leading_hyphen() {
         action: WindowAction::SetValue { target, value }
     } if target == "token" && value == "--draft"));
 }
+
+#[test]
+fn parses_background_text_and_requires_target() {
+    assert!(Cli::try_parse_from(["cueward", "window", "type-text", "--text", "hello"]).is_err());
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "window",
+        "type-text",
+        "--target",
+        "snapshot",
+        "--text",
+        "--draft",
+    ])
+    .expect("background text");
+    assert!(matches!(cli.command, Command::Window {
+        action: WindowAction::TypeText { target, text }
+    } if target == "snapshot" && text == "--draft"));
+}
+
+#[test]
+fn parses_background_key_modifiers() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "window",
+        "key",
+        "--target",
+        "snapshot",
+        "--key",
+        "tab",
+        "--modifiers",
+        "shift,option",
+    ])
+    .expect("background key");
+    assert!(matches!(cli.command, Command::Window {
+        action: WindowAction::Key { key, modifiers, .. }
+    } if key == "tab" && modifiers == ["shift", "option"]));
+}
+
+#[test]
+fn parses_background_scroll_point_and_signed_deltas() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "window",
+        "scroll",
+        "--target",
+        "snapshot",
+        "--x",
+        "320.5",
+        "--y",
+        "100",
+        "--delta-y",
+        "-240",
+    ])
+    .expect("background scroll");
+    assert!(matches!(
+        cli.command,
+        Command::Window {
+            action: WindowAction::Scroll {
+                x: 320.5,
+                y: 100.0,
+                delta_x: 0,
+                delta_y: -240,
+                ..
+            }
+        }
+    ));
+}
