@@ -75,17 +75,18 @@ Use App inspection for apps without document windows or when the host app expose
 
 App targets belong only to `app press` and `app set-value`. Obtain a separate window observation for screenshots, raw input, or waits; do not substitute a service window for a host window based on appearance. Apply the same result checks and no-automatic-replay rules described above. Foreground endpoint checks do not guarantee continuous isolation from the user's work.
 
-## Existing Spaces
+## Native Spaces
 
 ```sh
 cueward space list
+cueward space create
 cueward space window --id <window-id>
 cueward space move-window --target '<fresh move_target>' --space <inactive-user-space-id>
 ```
 
-Choose an existing Space with `type: 0` and `is_visible: false`. Move only a window whose identity and destination follow from the user's task. `space window` returns a five-minute `move_target` when membership is available, without requiring a screenshot; the target binds window identity and source Spaces. Moves reject changed membership and foreground target apps and share the raw-input lock. A snapshot's `input_target` is also accepted with its original checks. `move_target` is valid only for Space movement.
+Choose a Space with `type: 0` and `is_visible: false`. When the task requires a new desktop, `space create` requests one without switching Spaces. macOS chooses its display; `confirmed` includes the new `space_id` and observed `display_id`. The desktop persists after the command exits. `create_space_available` reports only entry-point availability. If creation is unverified or times out, inspect the catalog before deciding whether to create again; a desktop may already exist. Move only a window whose identity and destination follow from the user's task. `space window` returns a five-minute `move_target` when membership is available, without requiring a screenshot; the target binds window identity and source Spaces. Moves reject changed membership and foreground target apps and share the raw-input lock. A snapshot's `input_target` is also accepted with its original checks. `move_target` is valid only for Space movement.
 
-`move_window_available` reports entry-point availability, not app acceptance. After a move, reobserve membership and obtain fresh App AX targets or a fresh snapshot for coordinate input. `confirmed` establishes membership only. On an uncertain result, query before deciding whether to retry; do not repeat automatically. These commands do not create, delete, or switch desktops.
+`move_window_available` reports entry-point availability, not app acceptance. After a move, reobserve membership and obtain fresh App AX targets or a fresh snapshot for coordinate input. `confirmed` establishes membership only. On an uncertain result, query before deciding whether to retry; do not repeat automatically. These commands do not delete or switch desktops.
 
 ## Current limits
 
