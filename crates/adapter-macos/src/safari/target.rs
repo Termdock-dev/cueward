@@ -48,11 +48,18 @@ pub(super) fn tab_identity_guard(tab: &SafariTab) -> String {
     format!(
         r#"if (count of tabs of w) < {tab_index} then error "target tab closed"
               set targetTab to tab {tab_index} of w
-              considering case
+              {metadata_guard}"#,
+        tab_index = tab.index + 1,
+        metadata_guard = tab_metadata_guard(tab),
+    )
+}
+
+fn tab_metadata_guard(tab: &SafariTab) -> String {
+    format!(
+        r#"considering case
                 if (URL of targetTab) is not "{url}" then error "target tab changed; list tabs and retry"
                 if (name of targetTab) is not "{title}" then error "target tab changed; list tabs and retry"
               end considering"#,
-        tab_index = tab.index + 1,
         url = escape(&tab.url),
         title = escape(&tab.title),
     )
