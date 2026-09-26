@@ -34,7 +34,7 @@ Output is JSON inside Cueward's `<external>` data wrapper. A snapshot contains:
 - `screenshot`: PNG path, capture timestamp, and optional OCR text.
 - `image`: pixel `width` and `height`, `scale_x` and `scale_y`, and `origin: "window_frame_top_left"`.
 
-The PNG excludes the window shadow and includes the window frame, including its title bar. Image coordinates start at the image's top-left corner. Window bounds use macOS global screen coordinates in points, with a top-left origin; coordinates can be negative on other displays.
+The PNG excludes the window shadow and attached windows such as sheets. It includes the selected window frame and its title bar. Image coordinates start at the image's top-left corner. Window bounds use macOS global screen coordinates in points, with a top-left origin; coordinates can be negative on other displays.
 
 Convert an image point `(image_x, image_y)` to global screen points as follows:
 

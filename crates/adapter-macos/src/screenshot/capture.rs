@@ -164,6 +164,6 @@ pub(crate) fn capture_window_frame(
     window_id: u32,
 ) -> Result<ScreenshotResult, MacosError> {
     capture_to_path(ocr, Some(output), "", |cmd| {
-        cmd.args(["-t", "png", "-o", "-l", &window_id.to_string()]);
+        cmd.args(["-t", "png", "-o", "-a", "-l", &window_id.to_string()]);
     })
 }
