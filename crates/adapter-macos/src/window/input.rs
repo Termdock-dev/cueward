@@ -38,6 +38,7 @@ pub struct InputRouteStatus {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BackgroundInputStatus {
     pub window_id: u32,
+    pub input_busy: bool,
     pub keyboard: InputRouteStatus,
     pub pointer: InputRouteStatus,
     pub application_acceptance: String,

@@ -10,11 +10,17 @@ guard CGPreflightPostEventAccess() else { fail("Accessibility input permission i
 // The process that posts events owns the lock, even if its caller is killed.
 let lockFD = open(lockPath, O_CREAT | O_RDWR | O_NOFOLLOW, mode_t(0o600))
 guard lockFD >= 0 else { fail("cannot open input lock") }
-guard flock(lockFD, LOCK_EX | LOCK_NB) == 0 else {
+let acquiredLock = flock(lockFD, LOCK_EX | LOCK_NB) == 0
+let inputBusy = !acquiredLock && errno == EWOULDBLOCK
+guard acquiredLock || (action == "status" && inputBusy) else {
     close(lockFD)
     fail("another input action is running for this app; observe before retrying")
 }
 defer { close(lockFD) }
+// Status is an observation, not a reservation across subsequent AX queries.
+if action == "status" && acquiredLock {
+    guard flock(lockFD, LOCK_UN) == 0 else { fail("cannot release status probe lock") }
+}
 
 let keyboard = ["type_text", "key"].contains(action)
 let startedAt = ProcessInfo.processInfo.systemUptime
@@ -72,6 +78,7 @@ let framework = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/Sky
 let windowLocationSymbol = framework.flatMap { dlsym($0, "CGEventSetWindowLocation") }
 let routingUnavailable = "background window-coordinate routing is unavailable on this system"
 if action == "status" {
+    let busyReason = inputBusy ? "another input action is running for this app" : nil
     func routeStatus(_ issue: String?) -> [String: Any] {
         var result: [String: Any] = ["dispatch_ready": issue == nil]
         if let issue { result["reason"] = issue }
@@ -79,8 +86,9 @@ if action == "status" {
     }
     emit([
         "window_id": windowID,
-        "keyboard": routeStatus(readinessIssue(forKeyboard: true)),
-        "pointer": routeStatus(readinessIssue(forKeyboard: false) ?? (windowLocationSymbol == nil ? routingUnavailable : nil)),
+        "input_busy": inputBusy,
+        "keyboard": routeStatus(busyReason ?? readinessIssue(forKeyboard: true)),
+        "pointer": routeStatus(busyReason ?? readinessIssue(forKeyboard: false) ?? (windowLocationSymbol == nil ? routingUnavailable : nil)),
         "application_acceptance": "unverified",
     ])
     exit(0)
