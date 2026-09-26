@@ -40,6 +40,82 @@ fn wait_options_reject_incomplete_and_unbounded_queries() {
 }
 
 #[test]
+fn wait_reports_missing_role_for_named_or_unqualified_element_queries() {
+    let mut request = options(WaitCondition::ElementExists);
+    for selector in [
+        None,
+        Some(WaitSelector {
+            role: String::new(),
+            name: Some("Continue".into()),
+            identifier: None,
+        }),
+        Some(WaitSelector {
+            role: String::new(),
+            name: None,
+            identifier: Some("status".into()),
+        }),
+    ] {
+        request.selector = selector;
+        assert_eq!(
+            validate(&request).expect_err("role required").to_string(),
+            "element conditions require --role"
+        );
+    }
+}
+
+#[test]
+fn wait_classifies_window_lifecycle_from_consistent_catalog_observations() {
+    let directory = tempfile::tempdir().expect("wait catalog fixture");
+    let path = directory.path().join("wait.swift");
+    fs::write(
+        &path,
+        [
+            include_str!("ax_elements.swift"),
+            include_str!("ax_common.swift"),
+            include_str!("wait_catalog_fixture.swift"),
+            include_str!("wait_logic.swift"),
+            include_str!("ax_wait.swift"),
+        ]
+        .join("\n"),
+    )
+    .expect("write catalog fixture");
+    let request = serde_json::to_vec(&json!({
+        "caller_pid": std::process::id(),
+        "options": { "condition": "window-gone", "timeout_ms": 200, "interval_ms": 50 }
+    }))
+    .expect("request");
+    for (scenario, expected) in [
+        ("close", "matched"),
+        ("absent", "matched"),
+        ("present", "timed_out"),
+        ("rename", "window_changed"),
+        ("owner", "window_changed"),
+        ("bounds", "window_changed"),
+        ("fractional", "timed_out"),
+        ("unavailable", "error"),
+    ] {
+        let output = crate::window::process::run_with_timeout(
+            Command::new("swift")
+                .arg(&path)
+                .args(["123", "7", "Fixture", "-100", "200", "640", "480", scenario]),
+            &request,
+            std::time::Duration::from_secs(40),
+        )
+        .expect("run production wait loop");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if expected == "error" {
+            assert!(!output.status.success());
+            assert!(stderr.contains("absence is unproven"), "{stderr}");
+        } else {
+            assert!(output.status.success(), "{scenario}: {stderr}");
+            let result: serde_json::Value =
+                serde_json::from_slice(&output.stdout).expect("wait result");
+            assert_eq!(result["status"], expected, "{scenario}");
+        }
+    }
+}
+
+#[test]
 fn wait_matching_requires_exact_values_unique_nodes_and_complete_absence() {
     let directory = tempfile::tempdir().expect("wait fixture");
     let path = directory.path().join("wait.swift");
