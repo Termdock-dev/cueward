@@ -6,11 +6,14 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
 use super::input_lock::input_lock_path;
-use super::input_target::InputTarget;
 use super::process::run_with_timeout;
 use super::target::{WindowIdentity, now_seconds};
 use super::{WindowScope, list_windows};
 use crate::MacosError;
+
+#[path = "space_target.rs"]
+mod move_target;
+use move_target::MoveTarget;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SpaceInfo {
@@ -36,6 +39,9 @@ pub struct SpaceCatalog {
 pub struct WindowSpaces {
     pub window_id: u32,
     pub space_ids: Vec<u64>,
+    /// Short-lived Space-move observation; absent when membership is unavailable.
+    #[serde(skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub move_target: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -112,32 +118,59 @@ pub fn list_spaces() -> Result<SpaceCatalog, MacosError> {
     run(json!({"action": "list"}))
 }
 
-/// Read membership for one current, titled application window.
+/// Read membership and issue a move target for a current, titled application window.
 pub fn window_spaces(window_id: u32) -> Result<WindowSpaces, MacosError> {
     if window_id == 0 {
         return Err(MacosError::Other("window id must be positive".into()));
     }
+    let issued_at = now_seconds()?;
     let window = list_windows(WindowScope::AllSpaces)?
         .into_iter()
         .find(|w| w.window_id == window_id)
         .ok_or_else(|| MacosError::NotFound("window disappeared; observe again".into()))?;
-    run(json!({"action": "membership", "window": WindowIdentity::from(&window)}))
+    let identity = WindowIdentity::from(&window);
+    let result = run(json!({"action": "membership", "window": identity}))?;
+    bind_membership(result, identity, issued_at)
 }
 
-/// Move a snapshot-bound background window to an existing inactive user Space and read back membership.
+fn bind_membership(
+    mut result: WindowSpaces,
+    window: WindowIdentity,
+    issued_at: u64,
+) -> Result<WindowSpaces, MacosError> {
+    if result.window_id != window.window_id {
+        return Err(MacosError::Other(
+            "window changed during Space lookup".into(),
+        ));
+    }
+    if !result.space_ids.is_empty() {
+        result.move_target = Some(MoveTarget::issue(
+            window,
+            result.space_ids.clone(),
+            issued_at,
+        )?);
+    }
+    Ok(result)
+}
+
+/// Move an observed background window to an existing inactive user Space and read back membership.
 pub fn move_window_to_space(token: &str, space_id: u64) -> Result<SpaceMoveResult, MacosError> {
     if space_id == 0 {
         return Err(MacosError::Other("Space id must be positive".into()));
     }
-    let target = InputTarget::decode(token, now_seconds()?)?;
+    let target = MoveTarget::decode(token, now_seconds()?)?;
     let lock = input_lock_path(target.window.owner_pid)?;
     let lock = lock
         .to_str()
         .ok_or_else(|| MacosError::Other("input lock path must be UTF-8".into()))?;
-    run(json!({
+    let mut request = json!({
         "action": "move", "window": target.window, "issued_at": target.issued_at,
         "space_id": space_id, "caller_pid": std::process::id(), "lock_path": lock,
-    }))
+    });
+    if let Some(spaces) = target.expected_spaces {
+        request["expected_spaces"] = json!(spaces);
+    }
+    run(request)
 }
 
 #[cfg(test)]

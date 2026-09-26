@@ -1,7 +1,18 @@
 static void require(BOOL result, const char *message) {
     if (!result) { fprintf(stderr, "%s\n", message); exit(1); }
 }
+static void checkMembership(void) {
+    require(spaceMembershipMatches(@[@3, @9], @[@9, @3]), "membership order changed identity");
+    require(spaceMembershipMatches(@[@3], @[@3]), "unchanged membership rejected");
+    require(!spaceMembershipMatches(@[@3], @[@9]), "changed source accepted");
+    require(!spaceMembershipMatches(@[@3], @[@3, @9]), "additional source accepted");
+    for (id bad in @[@[], @[@0], @[@YES], @[@(-1)], @[@1.5], @[@"3"], @[@3, @3], NSNull.null]) {
+        require(!spaceMembershipMatches(bad, @[@3]), "invalid expected membership accepted");
+        require(!spaceMembershipMatches(@[@3], bad), "invalid current membership accepted");
+    }
+}
 int main(void) { @autoreleasepool {
+    checkMembership();
     NSArray *catalog = @[
         @{@"Current Space": @{@"ManagedSpaceID": @1}, @"Spaces": @[
             @{@"ManagedSpaceID": @1, @"type": @0}, @{@"ManagedSpaceID": @2, @"type": @0},

@@ -1,5 +1,24 @@
 #import <Cocoa/Cocoa.h>
 
+static NSArray *orderedMembership(id raw) {
+    if (![raw isKindOfClass:NSArray.class] || ![raw count] || [raw count] > 64) return nil;
+    NSMutableSet *ids = [NSMutableSet set];
+    for (id value in raw) {
+        if (![value isKindOfClass:NSNumber.class] ||
+            CFGetTypeID((__bridge CFTypeRef)value) == CFBooleanGetTypeID() ||
+            !([value doubleValue] > 0) ||
+            [value compare:@([value unsignedLongLongValue])] != NSOrderedSame ||
+            [ids containsObject:value]) return nil;
+        [ids addObject:value];
+    }
+    return [[ids allObjects] sortedArrayUsingSelector:@selector(compare:)];
+}
+
+static BOOL spaceMembershipMatches(id expected, id actual) {
+    NSArray *before = orderedMembership(expected), *current = orderedMembership(actual);
+    return before && current && [before isEqual:current];
+}
+
 static NSArray *visibleSpaces(NSArray *displays) {
     if (!displays.count) return nil;
     NSMutableSet *visible = [NSMutableSet set];

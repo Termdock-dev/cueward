@@ -76,10 +76,12 @@ App targets belong only to `app press` and `app set-value`. Obtain a separate wi
 ```sh
 cueward space list
 cueward space window --id <window-id>
-cueward space move-window --target '<fresh snapshot input_target>' --space <inactive-user-space-id>
+cueward space move-window --target '<fresh move_target>' --space <inactive-user-space-id>
 ```
 
-Choose an existing Space with `type: 0` and `is_visible: false`. Move only a window whose identity and destination follow from the user's task. Moves reject foreground target apps and share the raw-input lock. `move_window_available` reports entry-point availability, not app acceptance. After a move, read membership and take a fresh snapshot before further input. `confirmed` establishes membership only. On an uncertain result, query before deciding whether to retry; do not repeat automatically. These commands do not create, delete, or switch desktops.
+Choose an existing Space with `type: 0` and `is_visible: false`. Move only a window whose identity and destination follow from the user's task. `space window` returns a five-minute `move_target` when membership is available, without requiring a screenshot; the target binds window identity and source Spaces. Moves reject changed membership and foreground target apps and share the raw-input lock. A snapshot's `input_target` is also accepted with its original checks. `move_target` is valid only for Space movement.
+
+`move_window_available` reports entry-point availability, not app acceptance. After a move, reobserve membership and obtain fresh App AX targets or a fresh snapshot for coordinate input. `confirmed` establishes membership only. On an uncertain result, query before deciding whether to retry; do not repeat automatically. These commands do not create, delete, or switch desktops.
 
 ## Current limits
 
