@@ -22,8 +22,9 @@ struct WaitScan {
         guard let role = text(checkedAttribute(element, kAXRoleAttribute)) else { fail("wait element has no role") }
         let title = text(checkedAttribute(element, kAXTitleAttribute))
         let description = text(checkedAttribute(element, kAXDescriptionAttribute))
+        let name = [title, description].compactMap { $0 }.first { !$0.isEmpty } ?? ""
         var node: [String: Any] = ["role": role, "ref": ref,
-            "name": [title, description].compactMap { $0 }.first { !$0.isEmpty } ?? ""]
+            "name": String(name.prefix(512))]
         if let id = text(checkedAttribute(element, kAXIdentifierAttribute)) { node["identifier"] = id }
         if selectorMatches(node, selector) {
             if condition == "enabled", let enabled = checkedAttribute(element, kAXEnabledAttribute) as? Bool {
