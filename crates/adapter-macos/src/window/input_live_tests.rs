@@ -22,10 +22,17 @@ impl Drop for Receiver {
 
 impl Receiver {
     pub(super) fn start(interrupt: bool) -> Self {
+        Self::with_source(
+            include_str!("input_fixture.swift"),
+            if interrupt { "interrupt" } else { "normal" },
+        )
+    }
+
+    pub(super) fn with_source(body: &str, mode: &str) -> Self {
         let directory = tempfile::tempdir().expect("fixture directory");
         let source = directory.path().join("receiver.swift");
         let binary = directory.path().join("Receiver");
-        fs::write(&source, include_str!("input_fixture.swift")).expect("fixture source");
+        fs::write(&source, body).expect("fixture source");
         let compiled = Command::new("swiftc")
             .arg(&source)
             .arg("-o")
@@ -39,7 +46,7 @@ impl Receiver {
         );
         let child = Command::new(binary)
             .arg(directory.path().join("state.json"))
-            .arg(if interrupt { "interrupt" } else { "normal" })
+            .arg(mode)
             .spawn()
             .expect("receiver");
         let mut receiver = Self {
@@ -71,7 +78,7 @@ impl Receiver {
         .expect("state JSON")
     }
 
-    fn wait_for(&self, condition: impl Fn(&Value) -> bool) -> Value {
+    pub(super) fn wait_for(&self, condition: impl Fn(&Value) -> bool) -> Value {
         let deadline = Instant::now() + Duration::from_secs(3);
         loop {
             let state = self.state();

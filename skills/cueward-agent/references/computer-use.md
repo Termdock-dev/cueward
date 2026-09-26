@@ -27,6 +27,9 @@ cueward window type-text --target '<fresh snapshot input_target>' --text '<inten
 cueward window key --target '<fresh snapshot input_target>' --key tab
 cueward window key --target '<fresh snapshot input_target>' --key enter
 cueward window scroll --target '<fresh snapshot input_target>' --x 320 --y 240 --delta-y -240
+cueward window input-status --target '<fresh snapshot input_target>'
+cueward window click --target '<fresh snapshot input_target>' --x 320 --y 240
+cueward window drag --target '<fresh snapshot input_target>' --x 320 --y 240 --to-x 480 --to-y 320
 ```
 
 Choose a fresh returned `target` consistent with the user's task. `press` supports AXPress; `set-value` replaces an editable text field or area's value. Other AX action names do not imply that Cueward exposes a matching command. Tokens expire after five minutes and bind observable element and ancestor attributes.
@@ -35,11 +38,15 @@ Background `type-text`, `key`, and `scroll` use the snapshot's separate `input_t
 
 Scroll coordinates are snapshot pixels. Negative deltas scroll down/right. Reobserve after window or layout changes. An unavailable private window-routing entry point returns an error without global fallback. Shortcut handling and event acceptance depend on the app. Copy/paste shortcuts affect the shared clipboard.
 
+Clicks and drags use the same image coordinates and background guard. `click` supports `--button left|right` and `--count 1|2`. Double-click is a different action and may cause the app to replay an ignored first click; do not substitute it automatically for an unsuccessful single click. `drag` holds the left button for a straight path within the window, with `--duration-ms 50..2000` (default 500). It releases at the last delivered point after a detected interruption. System or cross-app drag-and-drop is not established.
+
+Use `input-status` to check current dispatch prerequisites without sending events. A route's `dispatch_ready` value does not establish that a control will accept input; `application_acceptance` is explicitly unverified. On a no-effect result, reobserve and choose the next operation from the task and current UI.
+
 After an action, inspect the affected area again. Check the expected task condition, such as a changed value, a newly opened dialog, or the produced file. Use the new observation to choose the next action. `sent_unverified` does not establish the intended effect; `confirmed` for a text assignment establishes only the field's value, not a save or submission. On error, timeout, or uncertain effect, observe before deciding whether another action is appropriate.
 
 ## Current limits
 
-Cross-Space screenshots and background keyboard/wheel input are supported; AX inspection and actions still require on-screen windows. Canvas clicks and dragging are not exposed by these commands. If the needed action is unavailable, report the specific missing capability rather than inventing an adapter or command.
+Cross-Space screenshots and targeted keyboard/pointer input are supported; AX inspection and actions still require on-screen windows. App acceptance of background canvas clicks and drags varies. If the needed action is unavailable, report the specific missing capability rather than inventing an adapter or command.
 
 Raw-input results can be `sent_unverified` or `partially_sent`. The latter includes an interruption reason and event count; never replay the whole input automatically. Foreground and identity guards are checked between key pairs, not atomically with delivery. If the target becomes the user's foreground app, stop background work on it. Concurrent physical typing isolation is not guaranteed.
 

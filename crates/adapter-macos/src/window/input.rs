@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
 use super::bridge::run_ax;
@@ -28,7 +28,22 @@ pub struct BackgroundInputResult {
     pub foreground_changed: bool,
 }
 
-fn send(target: InputTarget, mut request: Value) -> Result<BackgroundInputResult, MacosError> {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InputRouteStatus {
+    pub dispatch_ready: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BackgroundInputStatus {
+    pub window_id: u32,
+    pub keyboard: InputRouteStatus,
+    pub pointer: InputRouteStatus,
+    pub application_acceptance: String,
+}
+
+fn send<T: DeserializeOwned>(target: InputTarget, mut request: Value) -> Result<T, MacosError> {
     let current = list_windows(WindowScope::AllSpaces)?
         .into_iter()
         .find(|window| window.window_id == target.window.window_id)
@@ -51,6 +66,54 @@ fn send(target: InputTarget, mut request: Value) -> Result<BackgroundInputResult
         include_str!("background_input.swift"),
         &[],
         &request,
+    )
+}
+
+/// Check current dispatch prerequisites without posting input or predicting app acceptance.
+pub fn input_status(token: &str) -> Result<BackgroundInputStatus, MacosError> {
+    let target = InputTarget::decode(token, now_seconds()?)?;
+    send(target, json!({"action": "status"}))
+}
+
+/// Send one or two pointer click pairs at a snapshot pixel coordinate.
+pub fn click(
+    token: &str,
+    x: f64,
+    y: f64,
+    button: &str,
+    count: u8,
+) -> Result<BackgroundInputResult, MacosError> {
+    if !["left", "right"].contains(&button) || !(1..=2).contains(&count) {
+        return Err(MacosError::Other(
+            "click requires left/right button and count 1..=2".into(),
+        ));
+    }
+    let target = InputTarget::decode(token, now_seconds()?)?;
+    let (x, y) = target.frame_point(x, y)?;
+    send(
+        target,
+        json!({"action": "click", "x": x, "y": y, "button": button, "count": count}),
+    )
+}
+
+/// Drag the left button between snapshot pixel coordinates, releasing on detected interruption.
+pub fn drag(
+    token: &str,
+    from: (f64, f64),
+    to: (f64, f64),
+    duration_ms: u64,
+) -> Result<BackgroundInputResult, MacosError> {
+    if !(50..=2000).contains(&duration_ms) {
+        return Err(MacosError::Other(
+            "drag duration must be 50..=2000 milliseconds".into(),
+        ));
+    }
+    let target = InputTarget::decode(token, now_seconds()?)?;
+    let (x, y) = target.frame_point(from.0, from.1)?;
+    let (to_x, to_y) = target.frame_point(to.0, to.1)?;
+    send(
+        target,
+        json!({"action": "drag", "x": x, "y": y, "to_x": to_x, "to_y": to_y, "duration_ms": duration_ms}),
     )
 }
 

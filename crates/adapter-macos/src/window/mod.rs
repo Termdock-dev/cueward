@@ -14,7 +14,10 @@ mod target;
 
 pub use crate::screenshot::{WindowScope, list_windows};
 pub use actions::{ActionStatus, WindowActionResult, press, set_value};
-pub use input::{BackgroundInputResult, InputDelivery, key, scroll, type_text};
+pub use input::{
+    BackgroundInputResult, BackgroundInputStatus, InputDelivery, InputRouteStatus, click, drag,
+    input_status, key, scroll, type_text,
+};
 pub use inspection::{inspect_window, inspect_window_subtree};
 pub use snapshot::{SnapshotImage, WindowSnapshot, snapshot_window};
 
@@ -29,6 +32,9 @@ mod snapshot_live_tests;
 
 #[cfg(test)]
 mod input_live_tests;
+
+#[cfg(test)]
+mod pointer_live_tests;
 
 #[cfg(test)]
 mod input_lifetime_tests;

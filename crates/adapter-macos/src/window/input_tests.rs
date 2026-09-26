@@ -77,3 +77,23 @@ fn input_validation_rejects_unbounded_or_unsupported_requests() {
         );
     }
 }
+
+#[test]
+fn pointer_validation_rejects_unsupported_buttons_and_unbounded_sequences() {
+    for (button, count) in [("middle", 1), ("left", 0), ("left", 3)] {
+        assert!(
+            click("unused", 0.0, 0.0, button, count)
+                .expect_err("invalid click")
+                .to_string()
+                .contains("click requires")
+        );
+    }
+    for duration in [0, 49, 2001, u64::MAX] {
+        assert!(
+            drag("unused", (0.0, 0.0), (1.0, 1.0), duration)
+                .expect_err("invalid drag")
+                .to_string()
+                .contains("drag duration")
+        );
+    }
+}

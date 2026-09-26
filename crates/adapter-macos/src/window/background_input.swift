@@ -4,7 +4,7 @@ guard let request = try? JSONSerialization.jsonObject(with: data) as? [String: A
       let issuedAt = request["issued_at"] as? Double,
       let callerPID = request["caller_pid"] as? Int32, callerPID > 0,
       let lockPath = request["lock_path"] as? String,
-      ["type_text", "key", "scroll"].contains(action) else { fail("invalid background input request") }
+      ["type_text", "key", "scroll", "click", "drag", "status"].contains(action) else { fail("invalid background input request") }
 guard CGPreflightPostEventAccess() else { fail("Accessibility input permission is required", code: 3) }
 
 // The process that posts events owns the lock, even if its caller is killed.
@@ -16,7 +16,7 @@ guard flock(lockFD, LOCK_EX | LOCK_NB) == 0 else {
 }
 defer { close(lockFD) }
 
-let keyboard = action != "scroll"
+let keyboard = ["type_text", "key"].contains(action)
 let startedAt = ProcessInfo.processInfo.systemUptime
 let frontBefore = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
 var eventsSent = 0
@@ -40,7 +40,7 @@ func focusedWindowMatches() -> Bool {
     return matches.count == 1 && (matches[0][kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID
 }
 
-func readinessIssue() -> String? {
+func readinessIssue(forKeyboard: Bool) -> String? {
     if kill(callerPID, 0) != 0 { return "input caller exited; background input was stopped" }
     let age = Date().timeIntervalSince1970 - issuedAt
     if age < 0 || age > 300 { return "input target expired; take a new snapshot" }
@@ -51,14 +51,14 @@ func readinessIssue() -> String? {
     if !catalogWindowMatches(allowOffscreen: true, exactBounds: true) {
         return "window changed; take a new snapshot"
     }
-    if keyboard && !focusedWindowMatches() {
+    if forKeyboard && !focusedWindowMatches() {
         return "target is not the app's verified keyboard window; input was not redirected"
     }
     return nil
 }
 
 func maySend() -> Bool {
-    if let issue = readinessIssue() {
+    if let issue = readinessIssue(forKeyboard: keyboard) {
         if eventsSent == 0 { fail(issue) }
         interruption = issue
         return false
@@ -66,11 +66,104 @@ func maySend() -> Bool {
     return true
 }
 
+// Optional platform functionality. Its presence proves a route, not app acceptance.
+typealias SetWindowLocation = @convention(c) (CGEvent, CGFloat, CGFloat) -> Void
+let framework = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY)
+let windowLocationSymbol = framework.flatMap { dlsym($0, "CGEventSetWindowLocation") }
+let routingUnavailable = "background window-coordinate routing is unavailable on this system"
+if action == "status" {
+    func routeStatus(_ issue: String?) -> [String: Any] {
+        var result: [String: Any] = ["dispatch_ready": issue == nil]
+        if let issue { result["reason"] = issue }
+        return result
+    }
+    emit([
+        "window_id": windowID,
+        "keyboard": routeStatus(readinessIssue(forKeyboard: true)),
+        "pointer": routeStatus(readinessIssue(forKeyboard: false) ?? (windowLocationSymbol == nil ? routingUnavailable : nil)),
+        "application_acceptance": "unverified",
+    ])
+    exit(0)
+}
+
 guard let source = CGEventSource(stateID: .privateState) else { fail("cannot create private input source") }
 func configure(_ event: CGEvent, flags: CGEventFlags = []) {
     event.flags = flags
     event.setIntegerValueField(.eventSourceUserData, value: 0x43554549)
     event.setIntegerValueField(.eventTargetUnixProcessID, value: Int64(pid))
+}
+
+func point(_ xName: String = "x", _ yName: String = "y") -> CGPoint {
+    guard let localX = request[xName] as? Double, let localY = request[yName] as? Double,
+          localX.isFinite, localY.isFinite, localX >= 0, localY >= 0,
+          localX < width, localY < height else { fail("input point must be inside the window frame") }
+    return CGPoint(x: localX, y: localY)
+}
+
+func routePointer(_ event: CGEvent, at point: CGPoint) {
+    guard let symbol = windowLocationSymbol else { fail(routingUnavailable) }
+    configure(event)
+    event.location = CGPoint(x: x + point.x, y: y + point.y)
+    unsafeBitCast(symbol, to: SetWindowLocation.self)(event, point.x, point.y)
+    for (field, value): (UInt32, Int64) in [(51, Int64(windowID)), (58, 1), (7, 3)] {
+        guard let key = CGEventField(rawValue: field) else { fail("window routing field unavailable") }
+        event.setIntegerValueField(key, value: value)
+    }
+    event.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(windowID))
+    event.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(windowID))
+}
+
+func mouseEvent(_ type: CGEventType, at point: CGPoint, button: CGMouseButton = .left, count: Int64 = 1) -> CGEvent {
+    guard let event = CGEvent(mouseEventSource: source, mouseType: type,
+                              mouseCursorPosition: .zero, mouseButton: button) else { fail("cannot create pointer event") }
+    routePointer(event, at: point)
+    event.setIntegerValueField(.mouseEventClickState, value: count)
+    event.setDoubleValueField(.mouseEventPressure, value: type == .leftMouseUp || type == .rightMouseUp ? 0 : 1)
+    return event
+}
+
+func click() {
+    let location = point()
+    guard let name = request["button"] as? String, ["left", "right"].contains(name),
+          let count = request["count"] as? Int, (1...2).contains(count) else { fail("invalid click") }
+    let right = name == "right"
+    // Prepare every pair before starting; allocation failure must not leave a down event.
+    let pairs = (1...count).map { ordinal in (
+        mouseEvent(right ? .rightMouseDown : .leftMouseDown, at: location, button: right ? .right : .left, count: Int64(ordinal)),
+        mouseEvent(right ? .rightMouseUp : .leftMouseUp, at: location, button: right ? .right : .left, count: Int64(ordinal))
+    ) }
+    for (down, up) in pairs {
+        guard maySend() else { break }
+        down.postToPid(pid)
+        up.postToPid(pid)
+        eventsSent += 2
+        if count == 2 { Thread.sleep(forTimeInterval: 0.05) }
+    }
+}
+
+func drag() {
+    let start = point(), end = point("to_x", "to_y")
+    guard let duration = request["duration_ms"] as? Int, (50...2000).contains(duration) else { fail("invalid drag duration") }
+    let steps = max(2, duration / 20)
+    let down = mouseEvent(.leftMouseDown, at: start)
+    var release = mouseEvent(.leftMouseUp, at: start)
+    let sequence = (1...steps).map { index -> (CGEvent, CGEvent) in
+        let fraction = Double(index) / Double(steps)
+        let location = CGPoint(x: start.x + (end.x - start.x) * fraction, y: start.y + (end.y - start.y) * fraction)
+        return (mouseEvent(.leftMouseDragged, at: location), mouseEvent(.leftMouseUp, at: location))
+    }
+    guard maySend() else { return }
+    down.postToPid(pid)
+    eventsSent += 1
+    // Always release the original receiver at the last delivered point after a detected interruption.
+    defer { release.postToPid(pid); eventsSent += 1 }
+    for (event, up) in sequence {
+        Thread.sleep(forTimeInterval: Double(duration) / Double(steps) / 1000)
+        guard maySend() else { break }
+        event.postToPid(pid)
+        eventsSent += 1
+        release = up
+    }
 }
 
 func keyPair(code: CGKeyCode, unicode: String = "", flags: CGEventFlags = []) -> Bool {
@@ -109,34 +202,20 @@ case "key":
           flags & ~UInt64(0x1E0000) == 0 else { fail("invalid key input") }
     _ = keyPair(code: code, flags: CGEventFlags(rawValue: flags))
 case "scroll":
-    guard let localX = request["x"] as? Double, let localY = request["y"] as? Double,
-          localX.isFinite, localY.isFinite, localX >= 0, localY >= 0,
-          localX < width, localY < height,
-          let dx = request["delta_x"] as? Int32, let dy = request["delta_y"] as? Int32,
+    let location = point()
+    guard let dx = request["delta_x"] as? Int32, let dy = request["delta_y"] as? Int32,
           (-4096...4096).contains(dx), (-4096...4096).contains(dy), dx != 0 || dy != 0 else {
         fail("invalid scroll input")
     }
-    // Window-local routing is optional platform functionality. Never fall back to global input.
-    typealias SetWindowLocation = @convention(c) (CGEvent, CGFloat, CGFloat) -> Void
-    guard let framework = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY),
-          let symbol = dlsym(framework, "CGEventSetWindowLocation") else {
-        fail("background window-coordinate routing is unavailable on this system")
-    }
     guard let event = CGEvent(scrollWheelEvent2Source: source, units: .pixel, wheelCount: 2,
                               wheel1: dy, wheel2: dx, wheel3: 0) else { fail("cannot create scroll event") }
-    configure(event)
-    event.location = CGPoint(x: x + localX, y: y + localY)
-    unsafeBitCast(symbol, to: SetWindowLocation.self)(event, localX, localY)
-    for (field, value): (UInt32, Int64) in [(51, Int64(windowID)), (58, 1), (7, 3)] {
-        guard let key = CGEventField(rawValue: field) else { fail("window routing field unavailable") }
-        event.setIntegerValueField(key, value: value)
-    }
-    event.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(windowID))
-    event.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(windowID))
+    routePointer(event, at: location)
     if maySend() {
         event.postToPid(pid)
         eventsSent += 1
     }
+case "click": click()
+case "drag": drag()
 default: fail("unsupported background input")
 }
 
