@@ -26,7 +26,7 @@ pub(super) fn lock_input(pid: i32) -> Result<File, MacosError> {
 }
 
 #[cfg(test)]
-fn lock_path(path: &Path) -> Result<File, MacosError> {
+pub(super) fn lock_path(path: &Path) -> Result<File, MacosError> {
     let file = OpenOptions::new()
         .create(true)
         .truncate(false)

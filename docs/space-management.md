@@ -1,7 +1,8 @@
-# Existing Space discovery and background window moves
+# Native desktops and background window moves
 
 ```sh
 cueward space list
+cueward space create
 cueward space window --id 12345
 cueward space move-window --target '<move_target>' --space 7
 ```
@@ -9,6 +10,16 @@ cueward space move-window --target '<move_target>' --space 7
 Space discovery reports displays, their current Space, and available Space IDs. `type: 0` identifies a user desktop; other types are not move destinations. `is_visible` is evaluated per display. IDs are current system identifiers, not durable desktop numbers; refresh the catalog before choosing a destination.
 
 `space window` reads membership for a titled application window from `window list --all-spaces`. A window can belong to multiple Spaces. When membership is available, the result includes a `move_target` bound to the observed window and source Spaces, valid for five minutes. Empty membership omits the target. This observation requires no image capture. Listing membership does not prove that AX inspection or image capture is available.
+
+## Create a native desktop
+
+`space create` asks macOS to create one native user desktop without requesting activation or switching the visible Space. macOS selects the display; the result reports the observed `display_id`. The desktop remains after the command exits. Use its confirmed `space_id` with the existing window-move workflow, then take a fresh observation before input.
+
+`create_space_available` in `space list` reports whether the optional private macOS creation entry point exists. Availability alone does not prove that a request will succeed. Creation uses a separate Cueward lock to reject overlapping creation commands, checks that its caller is still running, and requires a readable pre-request Space catalog and foreground PID.
+
+`confirmed` requires a new returned ID, the unique identity generated for this request, type `0`, one managed display, and absence from all visible Spaces. Readback is bounded to two seconds. The result includes foreground and visible-Space endpoints; these observations cannot detect a transient change between endpoints. Creation does not establish that a particular app can operate on that desktop.
+
+`sent_unverified` means creation was submitted but those conditions were not confirmed. `space_id` is null if no usable new ID was returned; `display_id` stays null until verification succeeds. If visibility cannot be read after submission, `visible_spaces_after` and `visible_spaces_changed` are null. A timeout or CLI exit can occur after the desktop was created. Inspect `space list` before deciding what to do next. Cueward does not automatically repeat or undo creation.
 
 ## Move requirements
 
@@ -34,4 +45,4 @@ The result includes before/after memberships, `window_changed`, foreground PID e
 
 Read `space window` again after a move to obtain current membership and a new move target. For coordinate input, take a new snapshot even if `window_changed` is false: geometry can change across displays, and previous image coordinates can become stale. AX exploration can use a fresh App observation when image capture is unavailable. On a timeout or uncertain result, read membership before deciding whether another move is appropriate. Do not replay automatically.
 
-This command does not create, delete, rename, or switch Spaces. It only moves the specifically observed window. Standalone untitled windows remain outside the current catalog; inspect attached dialogs through their parent window when AX exposes them.
+`space move-window` only moves the specifically observed window. These commands do not delete, rename, or switch Spaces. Standalone untitled windows remain outside the current catalog; inspect attached dialogs through their parent window when AX exposes them.
