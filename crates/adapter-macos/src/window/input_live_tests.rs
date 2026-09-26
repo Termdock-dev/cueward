@@ -111,7 +111,7 @@ fn background_input_routes_text_keys_and_scroll_without_activating_receiver() {
     );
     assert_eq!(receiver.state()["texts"][1], "");
     let snapshot = receiver.snapshot(1);
-    let text = "Unicode 測試 e\u{301} \u{1d538}";
+    let text = "Unicode 測試 e\u{301} \u{1d538} a\u{200d}b a\u{200c}b";
     let sent = type_text(&snapshot.input_target, text).expect("text");
     assert_eq!(sent.status, InputDelivery::SentUnverified);
     assert_ne!(sent.frontmost_pid_before, receiver.child.id() as i32);
