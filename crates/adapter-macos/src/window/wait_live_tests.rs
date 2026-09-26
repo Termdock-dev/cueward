@@ -117,3 +117,92 @@ fn wait_observes_async_conditions_timeout_ambiguity_and_window_lifecycle() {
         WaitStatus::Matched
     );
 }
+
+fn check_observed_names(fixture: &Fixture, token: &str) {
+    let tree = fixture.inspect();
+    let node = tree
+        .accessibility
+        .nodes
+        .iter()
+        .find(|n| n.identifier.as_deref() == Some("long-name-0"))
+        .expect("long-name control");
+    assert_eq!(node.name, "測".repeat(512));
+    let mut request = query(
+        WaitCondition::ElementAbsent,
+        &node.role,
+        Some(&node.name),
+        None,
+    );
+    request.timeout_ms = 300;
+    assert_eq!(
+        wait_for_window(token, &request)
+            .expect("absence check")
+            .status,
+        WaitStatus::TimedOut,
+        "observed name must not falsely prove absence"
+    );
+    request.condition = WaitCondition::ElementExists;
+    assert_eq!(
+        wait_for_window(token, &request)
+            .expect("presence check")
+            .status,
+        WaitStatus::Matched
+    );
+    request.condition = WaitCondition::Enabled;
+    assert_eq!(
+        wait_for_window(token, &request)
+            .expect("colliding names")
+            .status,
+        WaitStatus::Ambiguous
+    );
+    request.selector.as_mut().expect("selector").identifier = node.identifier.clone();
+    assert_eq!(
+        wait_for_window(token, &request)
+            .expect("identifier narrows name")
+            .status,
+        WaitStatus::Matched
+    );
+}
+
+fn check_full_values(fixture: &Fixture, token: &str) {
+    let tree = fixture.inspect();
+    let node = tree
+        .accessibility
+        .nodes
+        .iter()
+        .find(|n| n.identifier.as_deref() == Some("long-value"))
+        .expect("long-value field");
+    assert_eq!(node.value.as_deref(), Some("值".repeat(512).as_str()));
+    let mut request = query(
+        WaitCondition::ValueEquals,
+        &node.role,
+        None,
+        Some("long-value"),
+    );
+    request.timeout_ms = 300;
+    request.value = node.value.clone();
+    assert_eq!(
+        wait_for_window(token, &request)
+            .expect("prefix is not full value")
+            .status,
+        WaitStatus::TimedOut
+    );
+    request.value = Some(format!("{}tail", "值".repeat(512)));
+    assert_eq!(
+        wait_for_window(token, &request).expect("full value").status,
+        WaitStatus::Matched
+    );
+}
+
+#[test]
+#[ignore = "requires an unlocked desktop and Accessibility/Screen Recording permissions"]
+fn wait_matches_inspected_long_names_without_truncating_expected_values() {
+    let fixture = Fixture::launch_source(
+        include_str!("wait_name_fixture.swift"),
+        "Cueward Wait Name Fixture",
+    );
+    let image = fixture.directory.path().join("window.png");
+    let shot = snapshot_window(fixture.window_id, false, image.to_str()).expect("snapshot");
+    check_observed_names(&fixture, &shot.input_target);
+    check_full_values(&fixture, &shot.input_target);
+}
