@@ -61,4 +61,10 @@ Results contain `action`, `window_id`, `events_sent`, and a status:
 
 After input, take a new observation and check the actual task condition. On a partial result, error, or timeout, inspect before deciding whether to send more input. Automatically replaying text can duplicate input that was already delivered.
 
-The opt-in desktop tests use disposable AppKit receivers to verify text, keys, shortcuts, non-key-window scrolling/clicks/drags, wrong-window rejection, dispatch status, and interrupted text/drag delivery with releases. They do not establish compatibility with every app or isolation during physical typing in a foreground app.
+The opt-in desktop tests use disposable AppKit receivers to verify text, keys, shortcuts, non-key-window scrolling/clicks/drags, wrong-window rejection, dispatch status, and interrupted text/drag delivery with releases. They do not establish compatibility with every app. Caller-exit tests also verify that the helper retains its lock until it stops and releases a drag at the last delivered point. Direct helper termination can still interrupt release.
+
+## Concurrent input evidence
+
+A separate, consented experiment used a disposable AppKit foreground text receiver while another receiver accepted background text and shortcuts. All 74 physical key-downs reached the foreground receiver, including 27 during background posting; no background text appeared there. The background text matched the requested result, and 34 background Unicode key-downs posted while physical Shift was held retained zero modifier flags.
+
+This establishes the observed isolation for those receivers and that run. It does not establish compatibility with every app, eliminate focus races, or provide a continuous focus/Space trace. Raw foreground typing and machine-specific diagnostics are not distributed.

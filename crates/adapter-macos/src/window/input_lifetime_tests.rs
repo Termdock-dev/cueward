@@ -5,7 +5,9 @@ use std::time::{Duration, Instant};
 
 use super::input_live_tests::Receiver;
 use super::input_lock::lock_input;
-use super::type_text;
+use super::{drag, type_text};
+
+const TOKEN_FILE: &str = "CUEWARD_TEST_INPUT_TOKEN_FILE";
 
 struct InputChild {
     child: Child,
@@ -73,24 +75,14 @@ impl Drop for InputChild {
     }
 }
 
-#[test]
-#[ignore = "requires a logged-in macOS desktop, Accessibility and Screen Recording permissions"]
-fn input_helper_retains_lock_and_stops_when_caller_exits() {
-    const TOKEN_FILE: &str = "CUEWARD_TEST_INPUT_TOKEN_FILE";
-    if let Some(path) = std::env::var_os(TOKEN_FILE) {
-        let token = std::fs::read_to_string(path).expect("test input token");
-        type_text(&token, &"a".repeat(1000)).expect("child text");
-        return;
-    }
-    let receiver = Receiver::start(false);
-    let snapshot = receiver.snapshot(1);
+fn begin_input(name: &str, token: &str) -> (InputChild, tempfile::TempDir) {
     let directory = tempfile::tempdir().expect("test files");
     let path = directory.path().join("token");
-    std::fs::write(&path, &snapshot.input_target).expect("token file");
+    std::fs::write(&path, token).expect("token file");
     let child = Command::new(std::env::current_exe().expect("test executable"))
         .args([
             "--exact",
-            "window::input_lifetime_tests::input_helper_retains_lock_and_stops_when_caller_exits",
+            &format!("window::input_lifetime_tests::{name}"),
             "--ignored",
         ])
         .env(TOKEN_FILE, &path)
@@ -98,26 +90,32 @@ fn input_helper_retains_lock_and_stops_when_caller_exits() {
         .stderr(Stdio::null())
         .spawn()
         .expect("input caller");
-    let mut input = InputChild {
-        child,
-        helpers: Vec::new(),
-        group_anchor: None,
-    };
+    (
+        InputChild {
+            child,
+            helpers: Vec::new(),
+            group_anchor: None,
+        },
+        directory,
+    )
+}
+
+fn stop_caller_after_event(input: &mut InputChild, receiver: &Receiver, event_type: u64) {
     let deadline = Instant::now() + Duration::from_secs(35);
     loop {
         if receiver.state()["events"]
             .as_array()
             .expect("events")
             .iter()
-            .any(|e| e["tag"] == 0x43554549_u64 && e["type"] == 10)
+            .any(|e| e["type"] == event_type && (event_type != 10 || e["tag"] == 0x43554549_u64))
         {
             break;
         }
         assert!(
             input.child.try_wait().expect("caller status").is_none(),
-            "input caller exited before key-down"
+            "caller exited before input"
         );
-        assert!(Instant::now() < deadline, "no key-down");
+        assert!(Instant::now() < deadline, "no input event");
         thread::sleep(Duration::from_millis(10));
     }
     input.find_helper();
@@ -134,16 +132,17 @@ fn input_helper_retains_lock_and_stops_when_caller_exits() {
     input.child.kill().expect("stop caller");
     input.child.wait().expect("reap caller");
     thread::sleep(Duration::from_millis(50));
-    let count = receiver.state()["events"].as_array().expect("events").len();
-    let overlap = lock_input(snapshot.window.owner_pid);
+}
+
+fn resume_until_stopped(input: &InputChild, pid: i32) {
     assert!(
-        overlap.is_err(),
+        lock_input(pid).is_err(),
         "input lock was released while a stopped helper could still send input"
     );
     input.helper_signal("-CONT");
     let deadline = Instant::now() + Duration::from_secs(3);
     loop {
-        if lock_input(snapshot.window.owner_pid).is_ok() {
+        if lock_input(pid).is_ok() {
             break;
         }
         assert!(
@@ -153,6 +152,25 @@ fn input_helper_retains_lock_and_stops_when_caller_exits() {
         thread::sleep(Duration::from_millis(20));
     }
     thread::sleep(Duration::from_millis(50));
+}
+
+#[test]
+#[ignore = "requires a logged-in macOS desktop, Accessibility and Screen Recording permissions"]
+fn input_helper_retains_lock_and_stops_when_caller_exits() {
+    if let Some(path) = std::env::var_os(TOKEN_FILE) {
+        let token = std::fs::read_to_string(path).expect("test input token");
+        type_text(&token, &"a".repeat(1000)).expect("child text");
+        return;
+    }
+    let receiver = Receiver::start(false);
+    let snapshot = receiver.snapshot(1);
+    let (mut input, _files) = begin_input(
+        "input_helper_retains_lock_and_stops_when_caller_exits",
+        &snapshot.input_target,
+    );
+    stop_caller_after_event(&mut input, &receiver, 10);
+    let count = receiver.state()["events"].as_array().expect("events").len();
+    resume_until_stopped(&input, snapshot.window.owner_pid);
     let state = receiver.state();
     let events = state["events"].as_array().expect("events");
     assert!(
@@ -164,4 +182,45 @@ fn input_helper_retains_lock_and_stops_when_caller_exits() {
         assert_eq!(pair[0]["type"], 10);
         assert_eq!(pair[1]["type"], 11);
     }
+}
+
+#[test]
+#[ignore = "requires a logged-in macOS desktop, Accessibility and Screen Recording permissions"]
+fn drag_helper_releases_at_last_point_when_caller_exits() {
+    if let Some(path) = std::env::var_os(TOKEN_FILE) {
+        let token = std::fs::read_to_string(path).expect("test input token");
+        drag(&token, (100.0, 100.0), (300.0, 200.0), 2000).expect("child drag");
+        return;
+    }
+    let receiver = Receiver::with_source(include_str!("pointer_fixture.swift"), "normal");
+    let snapshot = receiver.snapshot(0);
+    let (mut input, _files) = begin_input(
+        "drag_helper_releases_at_last_point_when_caller_exits",
+        &snapshot.input_target,
+    );
+    stop_caller_after_event(&mut input, &receiver, 6);
+    let stopped = receiver.state();
+    let sent = stopped["events"].as_array().expect("events");
+    assert_eq!(sent[0]["type"], 1);
+    assert!(
+        sent.iter().skip(1).all(|event| event["type"] == 6),
+        "drag ended before interruption"
+    );
+    resume_until_stopped(&input, snapshot.window.owner_pid);
+    let state = receiver.wait_for(|s| {
+        s["events"]
+            .as_array()
+            .is_some_and(|events| events.last().is_some_and(|e| e["type"] == 2))
+    });
+    let events = state["events"].as_array().expect("events");
+    assert_eq!(
+        events.len(),
+        sent.len() + 1,
+        "only release may follow detected caller exit"
+    );
+    let last = events.last().expect("release");
+    let previous = &events[events.len() - 2];
+    assert_eq!(last["x"], previous["x"]);
+    assert_eq!(last["y"], previous["y"]);
+    assert_eq!(state["active"], false);
 }
