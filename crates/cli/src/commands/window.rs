@@ -60,6 +60,40 @@ pub(crate) enum WindowAction {
         #[arg(long, allow_hyphen_values = true)]
         value: String,
     },
+    /// Send text to the background app's verified keyboard window.
+    TypeText {
+        /// input_target from a recent window snapshot.
+        #[arg(long)]
+        target: String,
+        #[arg(long, allow_hyphen_values = true)]
+        text: String,
+    },
+    /// Send a key pair to the background app's verified keyboard window.
+    Key {
+        #[arg(long)]
+        target: String,
+        /// tab, enter, escape, backspace, delete, arrows, home/end, page-up/down, space, a-z, 0-9.
+        #[arg(long)]
+        key: String,
+        /// Comma-separated command, shift, control, option flags.
+        #[arg(long, value_delimiter = ',')]
+        modifiers: Vec<String>,
+    },
+    /// Scroll at a snapshot pixel coordinate without moving the pointer.
+    Scroll {
+        #[arg(long)]
+        target: String,
+        #[arg(long)]
+        x: f64,
+        #[arg(long)]
+        y: f64,
+        /// Pixel-unit delta; positive scrolls left.
+        #[arg(long, default_value_t = 0, allow_hyphen_values = true)]
+        delta_x: i32,
+        /// Pixel-unit delta; positive scrolls up.
+        #[arg(long, default_value_t = 0, allow_hyphen_values = true)]
+        delta_y: i32,
+    },
 }
 
 pub(crate) fn dispatch(action: WindowAction) {
@@ -101,6 +135,28 @@ pub(crate) fn dispatch(action: WindowAction) {
         WindowAction::SetValue { target, value } => output(
             "window/set-value",
             cueward_adapter_macos::window::set_value(&target, &value),
+        ),
+        WindowAction::TypeText { target, text } => output(
+            "window/type-text",
+            cueward_adapter_macos::window::type_text(&target, &text),
+        ),
+        WindowAction::Key {
+            target,
+            key,
+            modifiers,
+        } => output(
+            "window/key",
+            cueward_adapter_macos::window::key(&target, &key, &modifiers),
+        ),
+        WindowAction::Scroll {
+            target,
+            x,
+            y,
+            delta_x,
+            delta_y,
+        } => output(
+            "window/scroll",
+            cueward_adapter_macos::window::scroll(&target, x, y, delta_x, delta_y),
         ),
     }
 }

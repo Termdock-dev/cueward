@@ -70,17 +70,24 @@ func sameBounds(_ left: CGRect, _ right: CGRect) -> Bool {
         && abs(left.height - right.height) <= tolerance
 }
 
-func validateCatalogWindow() {
+func catalogWindowMatches(allowOffscreen: Bool = false, exactBounds: Bool = false) -> Bool {
     let options: CGWindowListOption = [.optionIncludingWindow, .excludeDesktopElements]
     let windows = CGWindowListCopyWindowInfo(options, windowID) as? [[String: Any]] ?? []
     guard let window = windows.first(where: {
         ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID
     }), (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid,
         window[kCGWindowName as String] as? String == expectedTitle,
-        window[kCGWindowIsOnscreen as String] as? Bool == true,
+        (allowOffscreen || window[kCGWindowIsOnscreen as String] as? Bool == true),
         let rawBounds = window[kCGWindowBounds as String] as? NSDictionary,
         let frame = CGRect(dictionaryRepresentation: rawBounds),
-        sameBounds(frame, expectedBounds) else { fail("window identity changed; inspect the window again") }
+        (exactBounds ? frame == expectedBounds : sameBounds(frame, expectedBounds)) else { return false }
+    return true
+}
+
+func validateCatalogWindow(allowOffscreen: Bool = false, exactBounds: Bool = false) {
+    guard catalogWindowMatches(allowOffscreen: allowOffscreen, exactBounds: exactBounds) else {
+        fail("window identity changed; inspect the window again")
+    }
 }
 
 func bindWindow() -> AXUIElement {
