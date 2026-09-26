@@ -192,7 +192,7 @@ pub(crate) enum Command {
         #[command(subcommand)]
         action: VoiceMemosAction,
     },
-    /// Inspect native macOS windows.
+    /// Inspect and operate native macOS windows through Accessibility.
     Window {
         #[command(subcommand)]
         action: WindowAction,

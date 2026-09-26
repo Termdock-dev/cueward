@@ -1,6 +1,3 @@
-use std::io::Write;
-use std::process::Command;
-
 use serde::{Deserialize, Serialize};
 
 use crate::MacosError;
@@ -8,7 +5,13 @@ use crate::screenshot::{
     CapturableWindow, ScreenshotResult, capture_window, list_capturable_windows,
 };
 
-const AX_INSPECT_SCRIPT: &str = include_str!("ax_inspect.swift");
+mod actions;
+mod bridge;
+mod target;
+
+pub use actions::{ActionStatus, WindowActionResult, press, set_value};
+use bridge::run_ax;
+use target::{Target, WindowIdentity, now_seconds};
 
 #[cfg(test)]
 mod tests;
@@ -19,11 +22,19 @@ pub struct AccessibilityNode {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_ref: Option<String>,
     pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subrole: Option<String>,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
     pub actions: Vec<String>,
     pub settable_value: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing)]
+    fingerprint: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,44 +58,36 @@ fn run_ax_inspect(
     limit: usize,
     max_depth: usize,
 ) -> Result<AccessibilitySnapshot, MacosError> {
-    let mut script = tempfile::NamedTempFile::with_suffix(".swift")
-        .map_err(|error| MacosError::Other(format!("failed to create AX script: {error}")))?;
-    script
-        .write_all(AX_INSPECT_SCRIPT.as_bytes())
-        .map_err(|error| MacosError::Other(format!("failed to write AX script: {error}")))?;
-    let output = Command::new("swift")
-        .arg(script.path())
-        .arg(window.owner_pid.to_string())
-        .arg(window.window_id.to_string())
-        .arg(&window.title)
-        .arg(window.bounds.x.to_string())
-        .arg(window.bounds.y.to_string())
-        .arg(window.bounds.width.to_string())
-        .arg(window.bounds.height.to_string())
-        .arg(limit.to_string())
-        .arg(max_depth.to_string())
-        .output()
-        .map_err(|error| MacosError::Other(format!("swift AX inspection failed: {error}")))?;
-
-    if !output.status.success() {
-        if output.status.code() == Some(3) {
-            return Err(MacosError::Other(
-                "Accessibility permission is required for window inspection; allow the terminal app in System Settings > Privacy & Security > Accessibility".into(),
-            ));
-        }
-        let message = String::from_utf8_lossy(&output.stderr);
-        return Err(MacosError::Other(format!(
-            "window accessibility inspection failed: {}",
-            message.trim()
-        )));
-    }
-
-    let snapshot: AccessibilitySnapshot = serde_json::from_slice(&output.stdout)
-        .map_err(|error| MacosError::Other(format!("invalid AX snapshot: {error}")))?;
+    let identity = WindowIdentity::from(window);
+    let issued_at = now_seconds()?;
+    let mut snapshot: AccessibilitySnapshot = run_ax(
+        &identity,
+        include_str!("ax_inspect.swift"),
+        &[limit.to_string(), max_depth.to_string()],
+        &serde_json::Value::Null,
+    )?;
     if snapshot.window_id != window.window_id || snapshot.owner_pid != window.owner_pid {
         return Err(MacosError::Other(
             "window identity changed during accessibility inspection".into(),
         ));
+    }
+    for node in &mut snapshot.nodes {
+        let can_set_text =
+            node.settable_value && matches!(node.role.as_str(), "AXTextField" | "AXTextArea");
+        if node.enabled != Some(false)
+            && (can_set_text || node.actions.iter().any(|action| action == "AXPress"))
+        {
+            node.target = Some(
+                Target {
+                    version: 1,
+                    issued_at,
+                    window: identity.clone(),
+                    r#ref: node.r#ref.clone(),
+                    fingerprint: node.fingerprint.clone(),
+                }
+                .encode()?,
+            );
+        }
     }
     Ok(snapshot)
 }

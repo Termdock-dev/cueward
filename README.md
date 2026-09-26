@@ -63,7 +63,7 @@ Some integrations may additionally require:
 - **Accessibility / 輔助使用** for UI scripting style automations
 - app-specific data access via **Full Disk Access** when reading container files
 
-`cueward window inspect` requires Accessibility access for the terminal app running Cueward. Enable it in **System Settings > Privacy & Security > Accessibility**.
+`cueward window inspect` requires Accessibility access for the terminal app running Cueward. Enable it in **System Settings > Privacy & Security > Accessibility**. If access is still denied after a terminal app update, remove the app from that list and add its current copy again; an old code-signing requirement can invalidate an enabled permission.
 
 ### Calendar / Reminders Read Access
 
@@ -519,7 +519,7 @@ cueward screenshot window --id 12345 --ocr
 cueward screenshot --output ~/Desktop/shot.png --ocr
 ```
 
-### Window inspection
+### Window inspection and actions (PoC)
 
 Inspect an on-screen window in any macOS app that exposes Accessibility elements:
 
@@ -532,9 +532,19 @@ cueward window inspect --id 12345
 
 # Limit the tree and include a window screenshot with OCR
 cueward window inspect --id 12345 --limit 100 --depth 6 --ocr
+
+# Use a node's target token from the inspection result
+cueward window press --target '<target token>'
+cueward window set-value --target '<text field target token>' --value 'Draft text'
 ```
 
-The result includes the window identity, element roles, names, values, actions, and element refs. `truncated` reports when the node or depth limit omitted elements. Window matching requires one Accessibility window with the same app process, title, and bounds; ambiguous or changed windows return an error. Element refs describe the returned snapshot and may change when the app updates its UI.
+These commands require the Swift toolchain (`swift` on PATH), Accessibility access, and permission to read window metadata. Inspection returns window identity, element roles, names, values, actions, and element refs. Password fields omit values and action targets. `truncated` reports when the node or depth limit omitted elements.
+
+Actionable nodes include a `target` token valid for five minutes. Actions recheck the window's process, title, and bounds, then the element's path, attributes, and ancestors. Changed or ambiguous targets return an error and require a fresh inspection. These checks use observable attributes; they cannot distinguish a replacement with identical attributes at the same location. Tokens are snapshot references, not authorization credentials.
+
+`press` invokes `AXPress` and reports `sent_unverified`: the app accepted the API call, but Cueward cannot confirm the intended effect. `set-value` supports editable text fields and areas; `confirmed` means their AXValue matched the requested text on readback. It does not confirm saving or form submission. An unconfirmed result or timeout requires inspecting the current state before retrying.
+
+Cueward sends no global mouse or keyboard events and does not activate the app. `foreground_changed` compares the frontmost app before and after the action; an app may still activate itself as a side effect. Canvas-only apps and elements without the required Accessibility action are outside this PoC.
 
 ### Clipboard
 

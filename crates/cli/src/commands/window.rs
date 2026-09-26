@@ -1,4 +1,5 @@
 use clap::Subcommand;
+use serde::Serialize;
 use std::process;
 
 use super::helpers::print_external;
@@ -23,6 +24,21 @@ pub(crate) enum WindowAction {
         #[arg(long)]
         ocr: bool,
     },
+    /// Send AXPress to an inspected element without activating its app.
+    Press {
+        /// Short-lived target token from `window inspect`.
+        #[arg(long)]
+        target: String,
+    },
+    /// Set a text field's AXValue and verify it by reading the value back.
+    SetValue {
+        /// Short-lived target token from `window inspect`.
+        #[arg(long)]
+        target: String,
+        /// Text to assign to the field.
+        #[arg(long, allow_hyphen_values = true)]
+        value: String,
+    },
 }
 
 pub(crate) fn dispatch(action: WindowAction) {
@@ -33,20 +49,33 @@ pub(crate) fn dispatch(action: WindowAction) {
             depth,
             screenshot,
             ocr,
-        } => {
-            match cueward_adapter_macos::window::inspect_window(id, limit, depth, screenshot, ocr) {
-                Ok(result) => match serde_json::to_string_pretty(&result) {
-                    Ok(payload) => print_external("window/inspect", &payload),
-                    Err(error) => {
-                        eprintln!("error: failed to encode window inspection: {error}");
-                        process::exit(1);
-                    }
-                },
-                Err(error) => {
-                    eprintln!("error: {error}");
-                    process::exit(1);
-                }
+        } => output(
+            "window/inspect",
+            cueward_adapter_macos::window::inspect_window(id, limit, depth, screenshot, ocr),
+        ),
+        WindowAction::Press { target } => output(
+            "window/press",
+            cueward_adapter_macos::window::press(&target),
+        ),
+        WindowAction::SetValue { target, value } => output(
+            "window/set-value",
+            cueward_adapter_macos::window::set_value(&target, &value),
+        ),
+    }
+}
+
+fn output<T: Serialize>(source: &str, result: Result<T, cueward_adapter_macos::MacosError>) {
+    match result {
+        Ok(result) => match serde_json::to_string_pretty(&result) {
+            Ok(payload) => print_external(source, &payload),
+            Err(error) => {
+                eprintln!("error: failed to encode window result: {error}");
+                process::exit(1);
             }
+        },
+        Err(error) => {
+            eprintln!("error: {error}");
+            process::exit(1);
         }
     }
 }
