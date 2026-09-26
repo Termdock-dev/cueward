@@ -30,6 +30,9 @@ mod snapshot_live_tests;
 #[cfg(test)]
 mod input_live_tests;
 
+#[cfg(test)]
+mod input_lifetime_tests;
+
 /// Element frame in global macOS screen points, with a top-left origin.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AccessibilityBounds {

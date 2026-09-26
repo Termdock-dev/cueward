@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use super::{InputDelivery, WindowScope, key, list_windows, scroll, snapshot_window, type_text};
 
-struct Receiver {
+pub(super) struct Receiver {
     child: Child,
     directory: tempfile::TempDir,
     windows: Vec<u32>,
@@ -21,7 +21,7 @@ impl Drop for Receiver {
 }
 
 impl Receiver {
-    fn start(interrupt: bool) -> Self {
+    pub(super) fn start(interrupt: bool) -> Self {
         let directory = tempfile::tempdir().expect("fixture directory");
         let source = directory.path().join("receiver.swift");
         let binary = directory.path().join("Receiver");
@@ -64,7 +64,7 @@ impl Receiver {
         }
     }
 
-    fn state(&self) -> Value {
+    pub(super) fn state(&self) -> Value {
         serde_json::from_slice(
             &fs::read(self.directory.path().join("state.json")).expect("state file"),
         )
@@ -86,7 +86,7 @@ impl Receiver {
         }
     }
 
-    fn snapshot(&self, index: usize) -> super::WindowSnapshot {
+    pub(super) fn snapshot(&self, index: usize) -> super::WindowSnapshot {
         let path = self.directory.path().join(format!("window-{index}.png"));
         snapshot_window(self.windows[index], false, path.to_str()).expect("snapshot")
     }
