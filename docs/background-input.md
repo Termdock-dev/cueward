@@ -42,6 +42,8 @@ Window-local wheel routing uses a dynamically discovered private macOS entry poi
 
 `input-status` posts no events. It returns `keyboard` and `pointer` objects with `dispatch_ready` and an optional `reason`. The check includes current window identity, foreground conflict, keyboard-window binding, and availability of the pointer-routing entry point. `application_acceptance` remains `unverified`: a ready route does not prove that an app, canvas, or control will process the event. Recheck the actual effect after delivery.
 
+`input_busy` reports whether another Cueward helper held the per-app input lock at the probe. A busy lock returns both routes as not ready instead of failing the status query. An idle probe releases its lock immediately; it does not reserve the app while AX checks run. This is a point-in-time observation, so readiness can change before the next command. Invalid or changed targets and permission errors still fail the query.
+
 Controls that reject background first clicks can ignore a single click despite a ready route. Click, double-click, and drag handling can differ even within one app. If an action has no effect, take a new observation and select an action supported by the task and current interface.
 
 ## Interruption and verification

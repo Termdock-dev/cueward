@@ -44,6 +44,8 @@ Clicks and drags use the same image coordinates and background guard. `click` su
 
 Use `input-status` to check current dispatch prerequisites without sending events. A route's `dispatch_ready` value does not establish that a control will accept input; `application_acceptance` is explicitly unverified. On a no-effect result, reobserve and choose the next operation from the task and current UI.
 
+If `input_busy` is true, another Cueward input helper owns the app lock and both routes report not ready. Status releases an idle probe lock immediately; it does not reserve input. Reobserve after the current action finishes before choosing the next action.
+
 After an action, inspect the affected area again. Check the expected task condition, such as a changed value, a newly opened dialog, or the produced file. Use the new observation to choose the next action. `sent_unverified` does not establish the intended effect; `confirmed` for a text assignment establishes only the field's value, not a save or submission. On error, timeout, or uncertain effect, observe before deciding whether another action is appropriate.
 
 ## Current limits
