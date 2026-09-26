@@ -113,31 +113,40 @@ fn launch_helper_has_no_unsafe_cross_queue_capture_diagnostics() {
 }
 
 #[test]
-#[ignore = "registers two disposable app bundles with Launch Services and removes them afterward"]
+#[ignore = "uses a controlled workspace catalog; may launch one disposable application on regression"]
 fn bundle_id_resolution_rejects_multiple_installed_copies() {
     let first = Fixture::build();
     let second = Fixture::build();
-    let source = first.directory.path().join("register.swift");
-    fs::write(&source, "import CoreServices\nimport Foundation\nfor path in CommandLine.arguments.dropFirst() { guard LSRegisterURL(URL(fileURLWithPath: path) as CFURL, true) == noErr else { exit(1) } }\n").expect("registration source");
-    let registration = Command::new("swift")
-        .arg(source)
-        .arg(&first.path)
-        .arg(&second.path)
-        .output()
-        .expect("register fixtures");
-    assert!(
-        registration.status.success(),
-        "{}",
-        String::from_utf8_lossy(&registration.stderr)
-    );
+    let source = first.directory.path().join("catalog.swift");
+    fs::write(
+        &source,
+        format!(
+            "{}\n{}",
+            include_str!("catalog_fixture.swift"),
+            include_str!("apps.swift")
+        ),
+    )
+    .expect("controlled catalog and production helper");
     let id = format!("org.example.cueward.fixture.{}", std::process::id());
-    let result =
-        launch_app(Some(&id), None).expect_err("bundle selector must not pick one installation");
+    let request = launch_request(Some(&id), None).expect("bundle request");
+    let output = run_with_timeout(
+        Command::new("swift")
+            .arg(source)
+            .arg(&first.path)
+            .arg(&second.path),
+        &serde_json::to_vec(&request).expect("JSON"),
+        Duration::from_secs(35),
+    )
+    .expect("run helper");
     assert!(
-        result
-            .to_string()
-            .contains("multiple application installations"),
-        "{result}"
+        !output.status.success(),
+        "bundle selector picked one installation: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("multiple application installations"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
     );
 }
 
