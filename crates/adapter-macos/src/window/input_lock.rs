@@ -47,6 +47,22 @@ fn lock_path(path: &Path) -> Result<File, MacosError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    fn wait_for_release(path: &Path) {
+        // Concurrent tests can fork while this descriptor is open. Their child
+        // retains the lock until exec closes it, even after this thread drops it.
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            if lock_path(path).is_ok() {
+                return;
+            }
+            assert!(Instant::now() < deadline, "input lock was not released");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
     #[test]
     fn input_lock_rejects_overlap_and_releases_on_drop() {
         let dir = tempfile::tempdir().expect("directory");
@@ -54,6 +70,26 @@ mod tests {
         let first = lock_path(&path).expect("first action");
         assert!(lock_path(&path).is_err());
         drop(first);
-        assert!(lock_path(&path).is_ok());
+        wait_for_release(&path);
+    }
+
+    #[test]
+    fn inherited_descriptor_keeps_the_lock_until_the_child_exits() {
+        let dir = tempfile::tempdir().expect("directory");
+        let path = dir.path().join("lock");
+        let owner = lock_path(&path).expect("owner lock");
+        let mut child = Command::new("/bin/sleep")
+            .arg("2")
+            .stdin(Stdio::from(
+                owner.try_clone().expect("inherited descriptor"),
+            ))
+            .spawn()
+            .expect("owned child");
+        drop(owner);
+        let retained = lock_path(&path).is_err();
+        child.kill().expect("stop owned child");
+        child.wait().expect("reap owned child");
+        assert!(retained, "inherited descriptor must retain the lock");
+        wait_for_release(&path);
     }
 }
