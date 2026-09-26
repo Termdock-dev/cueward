@@ -190,7 +190,7 @@ switch action {
 case "type_text":
     guard let value = request["text"] as? String, !value.isEmpty,
           value.utf16.count <= 1024,
-          value.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) }) else {
+          value.unicodeScalars.allSatisfy({ $0.properties.generalCategory != .control }) else {
         fail("invalid text input")
     }
     for character in value {
