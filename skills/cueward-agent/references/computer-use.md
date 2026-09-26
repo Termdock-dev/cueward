@@ -46,6 +46,16 @@ Use `input-status` to check current dispatch prerequisites without sending event
 
 After an action, inspect the affected area again. Check the expected task condition, such as a changed value, a newly opened dialog, or the produced file. Use the new observation to choose the next action. `sent_unverified` does not establish the intended effect; `confirmed` for a text assignment establishes only the field's value, not a save or submission. On error, timeout, or uncertain effect, observe before deciding whether another action is appropriate.
 
+## Existing Spaces
+
+```sh
+cueward space list
+cueward space window --id <window-id>
+cueward space move-window --target '<fresh snapshot input_target>' --space <inactive-user-space-id>
+```
+
+Choose an existing Space with `type: 0` and `is_visible: false`. Move only a window whose identity and destination follow from the user's task. Moves reject foreground target apps and share the raw-input lock. `move_window_available` reports entry-point availability, not app acceptance. After a move, read membership and take a fresh snapshot before further input. `confirmed` establishes membership only. On an uncertain result, query before deciding whether to retry; do not repeat automatically. These commands do not create, delete, or switch desktops.
+
 ## Current limits
 
 Cross-Space screenshots and targeted keyboard/pointer input are supported. AX inspection, menu actions, and attached sheet controls work when the app exposes a uniquely bindable tree; menu actions also require the selected main/focused-window context and a background target app. App acceptance of background canvas clicks and drags varies. If the needed action is unavailable, report the specific missing capability rather than inventing an adapter or command.

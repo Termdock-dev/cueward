@@ -552,6 +552,16 @@ Actionable nodes include a `target` token valid for five minutes. Actions rechec
 
 Cueward sends no global mouse or keyboard events and does not activate the app. `foreground_changed` compares the frontmost app before and after the action; an app may still activate itself as a side effect. Canvas-only apps and elements without the required Accessibility action are outside this PoC.
 
+### Existing macOS Spaces
+
+```bash
+cueward space list
+cueward space window --id 12345
+cueward space move-window --target '<snapshot input_target>' --space 7
+```
+
+Move a specifically observed background window to an existing inactive user Space, then verify membership and take a fresh snapshot. See [Space management](docs/space-management.md) for routing requirements, result semantics, and limitations.
+
 ### Clipboard
 
 Read and write the system clipboard:
