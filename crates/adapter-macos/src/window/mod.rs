@@ -10,6 +10,7 @@ mod input_target;
 mod inspection;
 mod process;
 mod snapshot;
+mod spaces;
 mod target;
 
 pub use crate::screenshot::{WindowScope, list_windows};
@@ -20,6 +21,10 @@ pub use input::{
 };
 pub use inspection::{inspect_window, inspect_window_subtree, inspect_window_surface};
 pub use snapshot::{SnapshotImage, WindowSnapshot, snapshot_window};
+pub use spaces::{
+    SpaceCatalog, SpaceDisplay, SpaceInfo, SpaceMoveResult, WindowSpaces, list_spaces,
+    move_window_to_space, window_spaces,
+};
 
 #[cfg(test)]
 mod tests;

@@ -19,6 +19,7 @@ pub(crate) mod screenshot;
 pub(crate) mod search;
 pub(crate) mod send;
 pub(crate) mod shortcuts;
+pub(crate) mod space;
 pub(crate) mod stickies;
 pub(crate) mod triage;
 pub(crate) mod voice_memos;
@@ -61,6 +62,7 @@ pub(crate) use reminders::RemindersAction;
 pub(crate) use safari::SafariAction;
 pub(crate) use screenshot::ScreenshotAction;
 pub(crate) use shortcuts::ShortcutsAction;
+pub(crate) use space::SpaceAction;
 pub(crate) use stickies::StickiesAction;
 pub(crate) use voice_memos::VoiceMemosAction;
 pub(crate) use window::WindowAction;
@@ -78,6 +80,11 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
+    /// Discover macOS Spaces and move background windows between existing desktops.
+    Space {
+        #[command(subcommand)]
+        action: SpaceAction,
+    },
     /// Capture knowledge fragments from local sources
     Capture {
         /// Data source to capture from
@@ -219,6 +226,7 @@ pub(crate) enum Source {
 
 pub(crate) fn dispatch(command: Command) {
     match command {
+        Command::Space { action } => space::dispatch(action),
         Command::Capture { source, since } => capture::dispatch(source, since),
         Command::Triage => triage::dispatch(),
         Command::Search { query, limit } => search::dispatch(query, limit),
