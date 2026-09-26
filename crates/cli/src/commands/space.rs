@@ -7,14 +7,14 @@ use super::helpers::print_external;
 pub(crate) enum SpaceAction {
     /// List existing macOS Spaces and background window-move availability.
     List,
-    /// Read the current Space membership of a titled application window.
+    /// Read Space membership and a move target without capturing an image.
     Window {
         #[arg(long)]
         id: u32,
     },
     /// Move a background window to an existing inactive user Space.
     MoveWindow {
-        /// input_target from a fresh window snapshot.
+        /// move_target from space window, or input_target from a window snapshot.
         #[arg(long)]
         target: String,
         /// An inactive user Space id from space list.

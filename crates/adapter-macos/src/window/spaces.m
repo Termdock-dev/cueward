@@ -63,7 +63,7 @@ static void listSpaces(void) {
     }
     emit(@{@"displays": result, @"move_window_available": boolean(moveClass() != Nil)});
 }
-static void submitMove(uint32_t windowID, NSDictionary *expected, NSNumber *destination) {
+static void submitMove(uint32_t windowID, NSDictionary *expected, NSNumber *destination, id expectedSpaces) {
     Class cls = moveClass();
     if (!cls) fail(@"background Space move routing is unavailable on this system");
     id operation = ((id (*)(id, SEL, id, uint64_t))objc_msgSend)(
@@ -73,6 +73,8 @@ static void submitMove(uint32_t windowID, NSDictionary *expected, NSNumber *dest
     if (!inactiveUserSpace(displays(), destination) ||
         NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier == [expected[@"owner_pid"] intValue])
         fail(@"Space or foreground changed; observe before retrying");
+    if (expectedSpaces && !spaceMembershipMatches(expectedSpaces, membership(windowID)))
+        fail(@"window Space membership changed; observe with space window again");
     ((void (*)(id, SEL))objc_msgSend)(operation, NSSelectorFromString(@"performWithWMBridgeDelegate"));
 }
 static void reportMove(uint32_t windowID, NSDictionary *expected, NSNumber *destination,
@@ -114,12 +116,15 @@ static void moveWindow(NSDictionary *request, NSDictionary *expected, uint32_t w
     if (!inactiveUserSpace(beforeDisplays, destination)) fail(@"destination must be an existing inactive user Space");
     NSArray *before = membership(windowID);
     if (before.count == 0) fail(@"window Space membership is unavailable");
+    id expectedSpaces = request[@"expected_spaces"];
+    if (expectedSpaces && !spaceMembershipMatches(expectedSpaces, before))
+        fail(@"window Space membership changed; observe with space window again");
     pid_t frontBefore = NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;
     NSTimeInterval age = NSDate.date.timeIntervalSince1970 - issuedAt.doubleValue;
     if (age < 0 || age > 300 || kill(caller, 0) != 0) fail(@"move target expired or caller exited");
     if (frontBefore == [expected[@"owner_pid"] intValue]) fail(@"target app is in the foreground");
-    if (!catalogIdentityMatches(windowRow(windowID), expected)) fail(@"window changed; take a new snapshot");
-    if (![before isEqual:@[destination]]) submitMove(windowID, expected, destination);
+    if (!catalogIdentityMatches(windowRow(windowID), expected)) fail(@"window changed; observe again");
+    if (![before isEqual:@[destination]]) submitMove(windowID, expected, destination, expectedSpaces);
     reportMove(windowID, expected, destination, before, beforeDisplays, frontBefore);
     close(fd);
 }
