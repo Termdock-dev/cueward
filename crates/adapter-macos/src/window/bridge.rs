@@ -1,9 +1,11 @@
 use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::Command;
+use std::time::Duration;
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+use super::process::run_with_timeout;
 use super::target::WindowIdentity;
 use crate::MacosError;
 
@@ -13,7 +15,11 @@ pub(super) fn run_ax<T: DeserializeOwned>(
     arguments: &[String],
     request: &Value,
 ) -> Result<T, MacosError> {
-    let source = format!("{}\n{body}", include_str!("ax_common.swift"));
+    let source = format!(
+        "{}\n{}\n{body}",
+        include_str!("ax_elements.swift"),
+        include_str!("ax_common.swift")
+    );
     let mut script = tempfile::NamedTempFile::with_suffix(".swift")
         .map_err(|error| MacosError::Other(format!("failed to create AX script: {error}")))?;
     script
@@ -21,7 +27,8 @@ pub(super) fn run_ax<T: DeserializeOwned>(
         .map_err(|error| MacosError::Other(format!("failed to write AX script: {error}")))?;
     let payload = serde_json::to_vec(request)
         .map_err(|error| MacosError::Other(format!("invalid AX request: {error}")))?;
-    let mut child = Command::new("swift")
+    let mut command = Command::new("swift");
+    command
         .arg(script.path())
         .arg(window.owner_pid.to_string())
         .arg(window.window_id.to_string())
@@ -30,26 +37,9 @@ pub(super) fn run_ax<T: DeserializeOwned>(
         .arg(window.bounds.y.to_string())
         .arg(window.bounds.width.to_string())
         .arg(window.bounds.height.to_string())
-        .args(arguments)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .args(arguments);
+    let output = run_with_timeout(&mut command, &payload, Duration::from_secs(40))
         .map_err(|error| MacosError::Other(format!("swift AX helper failed: {error}")))?;
-    let write = child
-        .stdin
-        .take()
-        .map(|mut input| input.write_all(&payload));
-    if let Some(Err(error)) = write {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(MacosError::Other(format!(
-            "failed to send AX request: {error}"
-        )));
-    }
-    let output = child
-        .wait_with_output()
-        .map_err(|error| MacosError::Other(format!("failed to wait for AX helper: {error}")))?;
     parse_output(output)
 }
 

@@ -7,6 +7,7 @@ use crate::screenshot::{
 
 mod actions;
 mod bridge;
+mod process;
 mod target;
 
 pub use actions::{ActionStatus, WindowActionResult, press, set_value};
@@ -15,6 +16,9 @@ use target::{Target, WindowIdentity, now_seconds};
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod ax_tests;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccessibilityNode {

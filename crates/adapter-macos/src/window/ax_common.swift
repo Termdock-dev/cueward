@@ -41,7 +41,13 @@ func text(_ value: CFTypeRef?) -> String? {
 }
 
 func elements(_ element: AXUIElement, _ name: String) -> [AXUIElement] {
-    attribute(element, name) as? [AXUIElement] ?? []
+    var value: CFTypeRef?
+    let status = AXUIElementCopyAttributeValue(element, name as CFString, &value)
+    do {
+        return try checkedElements(status: status, value: value)
+    } catch {
+        fail("failed to enumerate \(name): \(error); inspect the window again")
+    }
 }
 
 func bounds(_ element: AXUIElement) -> CGRect? {
