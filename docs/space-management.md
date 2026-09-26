@@ -15,7 +15,7 @@ Space discovery reports displays, their current Space, and available Space IDs. 
 
 `space create` asks macOS to create one native user desktop without requesting activation or switching the visible Space. macOS selects the display; the result reports the observed `display_id`. The desktop remains after the command exits. Use its confirmed `space_id` with the existing window-move workflow, then take a fresh observation before input.
 
-`create_space_available` in `space list` reports whether the optional private macOS creation entry point exists. Availability alone does not prove that a request will succeed. Creation uses a separate Cueward lock to reject overlapping creation commands, checks that its caller is still running, and requires a readable pre-request Space catalog and foreground PID.
+`create_space_available` in `space list` reports whether the optional private macOS creation entry point exists. Availability alone does not prove that a request will succeed. A nonblocking request lock rejects overlapping creation commands before helper compilation and remains held through readback. The helper also holds a separate submission lock, including if its caller exits after submission. Creation checks that its caller is still running and requires a readable pre-request Space catalog and foreground PID.
 
 `confirmed` requires a new returned ID, the unique identity generated for this request, type `0`, one managed display, and absence from all visible Spaces. Readback is bounded to two seconds. The result includes foreground and visible-Space endpoints; these observations cannot detect a transient change between endpoints. Creation does not establish that a particular app can operate on that desktop.
 

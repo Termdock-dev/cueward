@@ -17,7 +17,13 @@ pub struct SpaceCreateResult {
 /// Request a new native desktop without switching Spaces, then verify its identity and visibility.
 pub fn create_space() -> Result<SpaceCreateResult, MacosError> {
     let directory = crate::screenshot::ensure_cache_dir()?;
-    let lock = std::path::Path::new(&directory).join("space-create.lock");
+    let directory = std::path::Path::new(&directory);
+    // Cover compilation as well as readback. The helper retains its separate
+    // submission lock if this caller exits after submitting creation.
+    let _request_lock =
+        super::super::input_lock::lock_path(&directory.join("space-create-request.lock"))
+            .map_err(|error| MacosError::Other(format!("cannot start Space creation: {error}")))?;
+    let lock = directory.join("space-create.lock");
     run(json!({
         "action": "create", "caller_pid": std::process::id(), "lock_path": lock,
     }))
