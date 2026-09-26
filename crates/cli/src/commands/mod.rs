@@ -25,6 +25,7 @@ pub(crate) mod stickies;
 pub(crate) mod triage;
 pub(crate) mod voice_memos;
 pub(crate) mod window;
+pub(crate) mod window_wait;
 #[cfg(test)]
 mod calendar_tests;
 #[cfg(test)]
