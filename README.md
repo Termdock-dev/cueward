@@ -552,6 +552,10 @@ Actionable nodes include a `target` token valid for five minutes. Actions rechec
 
 Cueward sends no global mouse or keyboard events and does not activate the app. `foreground_changed` compares the frontmost app before and after the action; an app may still activate itself as a side effect. Canvas-only apps and elements without the required Accessibility action are outside this PoC.
 
+### Application discovery
+
+Use `cueward app list` to discover running apps. `cueward app launch --bundle org.example.Editor` requests a background launch or returns an existing instance without reopening it. Discover the resulting windows before sending input. See [application discovery](docs/app-discovery.md) for launch-result semantics and limitations.
+
 ### Existing macOS Spaces
 
 ```bash

@@ -42,7 +42,7 @@ fn read_output(mut file: File) -> io::Result<Vec<u8>> {
     Ok(bytes)
 }
 
-pub(super) fn run_with_timeout(
+pub(crate) fn run_with_timeout(
     command: &mut Command,
     payload: &[u8],
     timeout: Duration,
