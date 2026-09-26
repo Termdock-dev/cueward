@@ -1,16 +1,25 @@
 #import <Cocoa/Cocoa.h>
 
 static NSArray *visibleSpaces(NSArray *displays) {
+    if (!displays.count) return nil;
     NSMutableSet *visible = [NSMutableSet set];
     for (NSDictionary *display in displays) {
-        NSNumber *current = display[@"Current Space"][@"ManagedSpaceID"];
-        if (current) [visible addObject:current];
+        if (![display isKindOfClass:NSDictionary.class]) return nil;
+        NSDictionary *currentSpace = display[@"Current Space"];
+        if (![currentSpace isKindOfClass:NSDictionary.class]) return nil;
+        NSNumber *current = currentSpace[@"ManagedSpaceID"];
+        if (![current isKindOfClass:NSNumber.class] ||
+            CFGetTypeID((__bridge CFTypeRef)current) == CFBooleanGetTypeID() ||
+            !(current.doubleValue > 0) ||
+            [current compare:@(current.unsignedLongLongValue)] != NSOrderedSame) return nil;
+        [visible addObject:current];
     }
     return [[visible allObjects] sortedArrayUsingSelector:@selector(compare:)];
 }
 
 static BOOL inactiveUserSpace(NSArray *displays, NSNumber *destination) {
-    if ([visibleSpaces(displays) containsObject:destination]) return NO;
+    NSArray *visible = visibleSpaces(displays);
+    if (!visible || [visible containsObject:destination]) return NO;
     for (NSDictionary *display in displays) {
         for (NSDictionary *space in display[@"Spaces"]) {
             if ([space[@"ManagedSpaceID"] isEqual:destination] &&
