@@ -1,4 +1,5 @@
 pub mod applescript;
+pub mod apps;
 pub mod bookmarks;
 pub mod calendar;
 pub mod clipboard;

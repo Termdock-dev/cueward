@@ -8,7 +8,7 @@ mod input;
 mod input_lock;
 mod input_target;
 mod inspection;
-mod process;
+pub(crate) mod process;
 mod snapshot;
 mod spaces;
 mod target;

@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
 
+pub(crate) mod app;
 pub(crate) mod calendar;
 pub(crate) mod capture;
 pub(crate) mod clipboard;
@@ -53,6 +54,7 @@ mod voice_memos_tests;
 #[cfg(test)]
 mod window_tests;
 
+pub(crate) use app::AppAction;
 pub(crate) use calendar::CalendarAction;
 pub(crate) use clipboard::ClipboardAction;
 pub(crate) use notes::NotesAction;
@@ -80,6 +82,11 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
+    /// Discover and launch macOS applications without requesting activation.
+    App {
+        #[command(subcommand)]
+        action: AppAction,
+    },
     /// Discover macOS Spaces and move background windows between existing desktops.
     Space {
         #[command(subcommand)]
@@ -226,6 +233,7 @@ pub(crate) enum Source {
 
 pub(crate) fn dispatch(command: Command) {
     match command {
+        Command::App { action } => app::dispatch(action),
         Command::Space { action } => space::dispatch(action),
         Command::Capture { source, since } => capture::dispatch(source, since),
         Command::Triage => triage::dispatch(),

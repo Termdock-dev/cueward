@@ -46,6 +46,10 @@ Use `input-status` to check current dispatch prerequisites without sending event
 
 After an action, inspect the affected area again. Check the expected task condition, such as a changed value, a newly opened dialog, or the produced file. Use the new observation to choose the next action. `sent_unverified` does not establish the intended effect; `confirmed` for a text assignment establishes only the field's value, not a save or submission. On error, timeout, or uncertain effect, observe before deciding whether another action is appropriate.
 
+## Application discovery
+
+Use `cueward app list` to discover running applications. If the user's task requires an unopened app, use `cueward app launch --bundle <bundle-id>` or `--path <absolute-app-path>`. Existing instances are returned without reopening. A launch result establishes only that the process exists; discover windows and inspect their current state before acting. An app may activate itself even though Cueward does not request activation. On timeout, list apps before deciding whether to retry.
+
 ## Existing Spaces
 
 ```sh
