@@ -1,5 +1,5 @@
 use crate::MacosError;
-use crate::applescript::escape_body;
+use crate::applescript::{escape, escape_body};
 
 use super::core::{active, tabs};
 use super::map_js_timeout;
@@ -15,16 +15,45 @@ pub(super) fn resolve_tab(
         return active(profile_filter)?
             .ok_or_else(|| MacosError::Other("no Safari tab available".to_string()));
     };
-    let all_tabs = tabs(profile_filter)?;
-    let matched = if let Ok(index) = selector.parse::<usize>() {
-        all_tabs.into_iter().nth(index)
-    } else {
-        let query = selector.to_lowercase();
-        all_tabs.into_iter().find(|tab| {
-            tab.url.to_lowercase().contains(&query) || tab.title.to_lowercase().contains(&query)
-        })
-    };
-    matched.ok_or_else(|| MacosError::Other(format!("no tab matching '{selector}'")))
+    select_tab(tabs(profile_filter)?, selector)
+}
+
+pub(super) fn select_tab(
+    all_tabs: Vec<SafariTab>,
+    selector: &str,
+) -> Result<SafariTab, MacosError> {
+    if let Ok(index) = selector.parse::<usize>() {
+        return all_tabs
+            .into_iter()
+            .nth(index)
+            .ok_or_else(|| MacosError::Other(format!("no tab matching '{selector}'")));
+    }
+
+    let query = selector.to_lowercase();
+    let mut matching = all_tabs.into_iter().filter(|tab| {
+        tab.url.to_lowercase().contains(&query) || tab.title.to_lowercase().contains(&query)
+    });
+    let selected = matching
+        .next()
+        .ok_or_else(|| MacosError::Other(format!("no tab matching '{selector}'")))?;
+    if matching.next().is_some() {
+        return Err(MacosError::Other(format!(
+            "tab selector is ambiguous: '{selector}'; use a unique URL/title or numeric --tab index"
+        )));
+    }
+    Ok(selected)
+}
+
+pub(super) fn tab_identity_guard(tab: &SafariTab) -> String {
+    format!(
+        r#"if (count of tabs of w) < {tab_index} then error "target tab closed"
+              set targetTab to tab {tab_index} of w
+              if (URL of targetTab) is not "{url}" then error "target tab changed; list tabs and retry"
+              if (name of targetTab) is not "{title}" then error "target tab changed; list tabs and retry""#,
+        tab_index = tab.index + 1,
+        url = escape(&tab.url),
+        title = escape(&tab.title),
+    )
 }
 
 pub(super) fn execute_js_in_tab(
@@ -33,14 +62,15 @@ pub(super) fn execute_js_in_tab(
     context: &str,
 ) -> Result<String, MacosError> {
     let js_expr = escape_body(js_code);
-    let js_command = js_apple_event_command(&format!("tab {} of w", tab.index + 1), None);
+    let js_command = js_apple_event_command("targetTab", None);
+    let identity_guard = tab_identity_guard(tab);
     let script = format!(
         r#"
         {prelude}
         tell application "Safari"
           repeat with w in every window
             if (id of w) is {window_id} then
-              if (count of tabs of w) < {tab_index} then error "target tab closed"
+              {identity_guard}
               set jsCode to {js_expr}
               {js_command}
               if rawResult is missing value then error "JavaScript did not return a string"
@@ -52,7 +82,7 @@ pub(super) fn execute_js_in_tab(
         "#,
         prelude = safari_script_prelude(),
         window_id = tab.window_id,
-        tab_index = tab.index + 1,
+        identity_guard = identity_guard,
         js_command = js_command,
     );
     let output = run_capture(&script, context).map_err(|error| {
@@ -66,7 +96,7 @@ pub(super) fn execute_js_in_tab(
 
 #[cfg(test)]
 mod tests {
-    use super::{select_tab, SafariTab};
+    use super::{SafariTab, select_tab};
 
     fn tab(index: usize, title: &str, url: &str) -> SafariTab {
         SafariTab {

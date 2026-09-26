@@ -9,7 +9,7 @@ use super::script::{
     build_tabs_script, decode_field, extract_profile, parse_tab_line, parse_tabs_output,
     selector_text_js,
 };
-use super::target::{execute_js_in_tab, resolve_tab};
+use super::target::{execute_js_in_tab, resolve_tab, select_tab, tab_identity_guard};
 use super::types::{
     SafariClickResult, SafariCloseResult, SafariFillResult, SafariReadResult, SafariSourceResult,
     SafariTab,
@@ -79,24 +79,16 @@ pub fn focus_tab(
             return Err(MacosError::Other("no Safari tabs found".to_string()));
         }
 
-        let matched = if let Ok(index) = tab_selector.parse::<usize>() {
-            all_tabs.into_iter().nth(index)
-        } else {
-            let query = tab_selector.to_lowercase();
-            all_tabs.into_iter().find(|t| {
-                t.url.to_lowercase().contains(&query) || t.title.to_lowercase().contains(&query)
-            })
-        };
-
-        let tab = matched
-            .ok_or_else(|| MacosError::Other(format!("no tab matching '{tab_selector}'")))?;
+        let tab = select_tab(all_tabs, tab_selector)?;
+        let identity_guard = tab_identity_guard(&tab);
 
         let script = format!(
             r#"
         tell application "Safari"
             repeat with w in every window
                 if (id of w) is {window_id} then
-                    set current tab of w to tab {one_based} of w
+                    {identity_guard}
+                    set current tab of w to targetTab
                     set index of w to 1
                     return "true"
                 end if
@@ -105,7 +97,7 @@ pub fn focus_tab(
         end tell
         "#,
             window_id = tab.window_id,
-            one_based = tab.index + 1,
+            identity_guard = identity_guard,
         );
         let result = run_capture(&script, "safari_focus_tab")?;
         if result.trim() != "true" {
