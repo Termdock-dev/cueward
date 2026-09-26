@@ -29,7 +29,7 @@ Window-local wheel routing uses a dynamically discovered private macOS entry poi
 
 ## Interruption and verification
 
-Input uses a private event source with explicit modifier flags. Concurrent raw-input commands to the same PID are rejected with a per-process file lock. This does not lock out user input, other automation tools, or AX actions.
+Input uses a private event source with explicit modifier flags. Concurrent raw-input commands to the same PID are rejected with a per-process file lock held by the event-posting helper. The lock stays held if the CLI caller exits while the helper is still alive. Before each event pair or wheel event, the helper checks whether its caller still exists and stops further input after detecting its exit. This does not lock out user input, other automation tools, or AX actions.
 
 Before each key pair or wheel event, Cueward rechecks token age, the window identity, and whether the target app is in the foreground. Keyboard actions also recheck the keyboard window. A target app in the foreground is rejected to reduce interference with user input. Switching to that app during a text sequence stops further pairs once detected. These checks and delivery are separate operations; they cannot eliminate races with focus changes.
 

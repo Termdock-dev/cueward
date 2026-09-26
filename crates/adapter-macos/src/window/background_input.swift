@@ -2,8 +2,19 @@ let data = FileHandle.standardInput.readDataToEndOfFile()
 guard let request = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
       let action = request["action"] as? String,
       let issuedAt = request["issued_at"] as? Double,
+      let callerPID = request["caller_pid"] as? Int32, callerPID > 0,
+      let lockPath = request["lock_path"] as? String,
       ["type_text", "key", "scroll"].contains(action) else { fail("invalid background input request") }
 guard CGPreflightPostEventAccess() else { fail("Accessibility input permission is required", code: 3) }
+
+// The process that posts events owns the lock, even if its caller is killed.
+let lockFD = open(lockPath, O_CREAT | O_RDWR | O_NOFOLLOW, mode_t(0o600))
+guard lockFD >= 0 else { fail("cannot open input lock") }
+guard flock(lockFD, LOCK_EX | LOCK_NB) == 0 else {
+    close(lockFD)
+    fail("another input action is running for this app; observe before retrying")
+}
+defer { close(lockFD) }
 
 let keyboard = action != "scroll"
 let startedAt = ProcessInfo.processInfo.systemUptime
@@ -30,6 +41,7 @@ func focusedWindowMatches() -> Bool {
 }
 
 func readinessIssue() -> String? {
+    if kill(callerPID, 0) != 0 { return "input caller exited; background input was stopped" }
     let age = Date().timeIntervalSince1970 - issuedAt
     if age < 0 || age > 300 { return "input target expired; take a new snapshot" }
     if ProcessInfo.processInfo.systemUptime - startedAt > 20 { return "input time limit reached; inspect before retrying" }

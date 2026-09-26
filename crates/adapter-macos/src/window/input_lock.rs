@@ -1,20 +1,31 @@
+#[cfg(test)]
 use std::fs::{File, OpenOptions};
+#[cfg(test)]
 use std::os::fd::AsRawFd;
+#[cfg(test)]
 use std::os::unix::fs::OpenOptionsExt;
+#[cfg(test)]
 use std::path::Path;
+use std::path::PathBuf;
 
 use crate::MacosError;
 use crate::screenshot::ensure_cache_dir;
 
+#[cfg(test)]
 unsafe extern "C" {
     fn flock(fd: std::ffi::c_int, operation: std::ffi::c_int) -> std::ffi::c_int;
 }
 
-pub(super) fn lock_input(pid: i32) -> Result<File, MacosError> {
-    let path = Path::new(&ensure_cache_dir()?).join(format!("input-{pid}.lock"));
-    lock_path(&path)
+pub(super) fn input_lock_path(pid: i32) -> Result<PathBuf, MacosError> {
+    Ok(PathBuf::from(ensure_cache_dir()?).join(format!("input-{pid}.lock")))
 }
 
+#[cfg(test)]
+pub(super) fn lock_input(pid: i32) -> Result<File, MacosError> {
+    lock_path(&input_lock_path(pid)?)
+}
+
+#[cfg(test)]
 fn lock_path(path: &Path) -> Result<File, MacosError> {
     let file = OpenOptions::new()
         .create(true)
