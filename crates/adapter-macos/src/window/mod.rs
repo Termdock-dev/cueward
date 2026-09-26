@@ -12,6 +12,7 @@ pub(crate) mod process;
 mod snapshot;
 mod spaces;
 mod target;
+mod wait;
 
 pub use crate::screenshot::{WindowScope, list_windows};
 pub use actions::{ActionStatus, WindowActionResult, press, set_value};
@@ -25,6 +26,7 @@ pub use spaces::{
     SpaceCatalog, SpaceDisplay, SpaceInfo, SpaceMoveResult, WindowSpaces, list_spaces,
     move_window_to_space, window_spaces,
 };
+pub use wait::{WaitCondition, WaitOptions, WaitResult, WaitSelector, WaitStatus, wait_for_window};
 
 #[cfg(test)]
 mod tests;
@@ -47,6 +49,9 @@ mod input_lifetime_tests;
 #[cfg(test)]
 mod menu_live_tests;
 
+#[cfg(test)]
+mod wait_live_tests;
+
 /// Element frame in global macOS screen points, with a top-left origin.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AccessibilityBounds {
@@ -65,6 +70,8 @@ pub struct AccessibilityNode {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subrole: Option<String>,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identifier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
     pub actions: Vec<String>,

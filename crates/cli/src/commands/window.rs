@@ -6,6 +6,11 @@ use super::helpers::print_external;
 
 #[derive(Subcommand)]
 pub(crate) enum WindowAction {
+    /// Wait for an observed window or element condition without replaying an action.
+    Wait {
+        #[command(flatten)]
+        args: super::window_wait::WindowWaitArgs,
+    },
     /// List titled application windows without activating them.
     List {
         /// Include off-screen windows, such as other Spaces or minimized windows.
@@ -134,6 +139,7 @@ pub(crate) enum WindowAction {
 
 pub(crate) fn dispatch(action: WindowAction) {
     match action {
+        WindowAction::Wait { args } => super::window_wait::dispatch(args),
         WindowAction::List { all_spaces } => {
             use cueward_adapter_macos::window::{WindowScope, list_windows};
             let scope = if all_spaces {
@@ -233,7 +239,7 @@ pub(crate) fn dispatch(action: WindowAction) {
     }
 }
 
-fn output<T: Serialize>(source: &str, result: Result<T, cueward_adapter_macos::MacosError>) {
+pub(super) fn output<T: Serialize>(source: &str, result: Result<T, cueward_adapter_macos::MacosError>) {
     match result {
         Ok(result) => match serde_json::to_string_pretty(&result) {
             Ok(payload) => print_external(source, &payload),
