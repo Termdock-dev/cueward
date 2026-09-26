@@ -67,6 +67,8 @@ fn validate(options: &WaitOptions) -> Result<(), MacosError> {
         ));
     }
     if let Some(selector) = &options.selector {
+        // The helper enforces the 512 Swift-character name limit before observing.
+        // Keep this byte bound too; Rust scalar counts differ for combining characters.
         if selector.role.is_empty()
             || selector.role.len() > 128
             || selector.name.as_ref().is_some_and(|s| s.len() > 4096)

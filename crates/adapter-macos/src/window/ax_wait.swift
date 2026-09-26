@@ -59,6 +59,10 @@ guard let request = try? JSONSerialization.jsonObject(with: input) as? [String: 
       let timeout = options["timeout_ms"] as? Double,
       let interval = options["interval_ms"] as? Double,
       let caller = request["caller_pid"] as? Int32 else { fail("invalid wait request") }
+if let selector = options["selector"] as? [String: Any],
+   let name = selector["name"] as? String, name.count > 512 {
+    fail("wait selector name exceeds 512 characters; use the name displayed by inspect or an identifier")
+}
 let started = ProcessInfo.processInfo.systemUptime
 let deadline = started + timeout / 1000
 var polls = 0

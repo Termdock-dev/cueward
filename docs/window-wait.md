@@ -10,7 +10,7 @@ cueward window wait --target '<snapshot input_target>' --condition window-gone
 
 Waiting sends no input and never replays the preceding action. Use the role, exact accessible name, or identifier from a current inspection. `--role` is required for element conditions; `--name` and `--identifier` narrow the match. `window-gone` omits element selectors. Only `value-equals` accepts `--value`, including an empty string.
 
-Name selectors compare the same first 512 Swift characters displayed by `window inspect`. Longer names with identical displayed prefixes match the same selector; use an identifier to distinguish them. Duplicate matches remain ambiguous for value or enabled checks. `value-equals` compares the full AX value: an inspection's 512-character value preview is not evidence of the complete expected value.
+Name selectors compare the same first 512 Swift characters displayed by `window inspect`. A selector exceeding 512 Swift characters (extended grapheme clusters) is rejected before observing the window. Longer names with identical displayed prefixes match the same selector; use an identifier to distinguish them. Duplicate matches remain ambiguous for value or enabled checks. `value-equals` compares the full AX value: an inspection's 512-character value preview is not evidence of the complete expected value.
 
 ## Conditions
 
