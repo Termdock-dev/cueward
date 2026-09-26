@@ -25,17 +25,29 @@ func emitLaunch(_ app: NSRunningApplication, _ status: String, _ before: pid_t) 
     emit(["status": status, "app": describe(app), "frontmost_pid_before": before,
           "frontmost_pid_after": after, "foreground_changed": before != after])
 }
+func executableBundle(_ url: URL) -> Bundle? {
+    guard let bundle = Bundle(url: url), bundle.bundleURL.pathExtension == "app",
+          bundle.object(forInfoDictionaryKey: "CFBundlePackageType") as? String == "APPL",
+          let executable = bundle.executableURL,
+          FileManager.default.isExecutableFile(atPath: executable.path) else { return nil }
+    return bundle
+}
+func resolveBundleID(_ id: String) -> URL {
+    guard #available(macOS 12.0, *) else { fail("bundle discovery requires macOS 12 or later; use --path") }
+    let matches = Set(NSWorkspace.shared.urlsForApplications(withBundleIdentifier: id).map(canonical).filter {
+        executableBundle($0)?.bundleIdentifier == id
+    })
+    guard matches.count <= 1 else { fail("multiple application installations match this bundle id; use --path") }
+    guard let found = matches.first else { fail("application was not found") }
+    return found
+}
 func resolve(_ request: [String: Any]) -> URL {
     let url: URL
     if let path = request["path"] as? String { url = URL(fileURLWithPath: path) }
-    else if let id = request["bundle_id"] as? String,
-            let found = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) { url = found }
+    else if let id = request["bundle_id"] as? String { url = resolveBundleID(id) }
     else { fail("application was not found") }
     let result = canonical(url)
-    guard let bundle = Bundle(url: result), bundle.bundleURL.pathExtension == "app",
-          bundle.object(forInfoDictionaryKey: "CFBundlePackageType") as? String == "APPL",
-          let executable = bundle.executableURL,
-          FileManager.default.isExecutableFile(atPath: executable.path) else { fail("path is not an executable application bundle") }
+    guard let bundle = executableBundle(result) else { fail("path is not an executable application bundle") }
     if let expected = request["bundle_id"] as? String, bundle.bundleIdentifier != expected {
         fail("resolved application bundle id does not match")
     }
@@ -66,18 +78,21 @@ func launch(_ request: [String: Any]) {
     config.promptsUserIfNeeded = false
     config.createsNewApplicationInstance = false
     config.allowsRunningApplicationSubstitution = false
-    var finished = false
+    let completion = LaunchCompletion<(NSRunningApplication?, Bool)>(deadline: ProcessInfo.processInfo.systemUptime + 20)
     NSWorkspace.shared.openApplication(at: url, configuration: config) { app, error in
-        guard let app = app, error == nil else { fail("application launch failed; inspect running apps before retrying") }
-        guard app.bundleURL.map({ canonical($0) == url }) == true else { fail("launched application path differs from request") }
-        emitLaunch(app, "launched", before)
-        finished = true
+        completion.complete((app, error == nil))
     }
-    let deadline = Date().addingTimeInterval(20)
-    while !finished && deadline.timeIntervalSinceNow > 0 {
-        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    while true {
+        switch completion.poll() {
+        case .pending: RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        case .timedOut: fail("launch completion timed out; application may still start")
+        case .completed(let result):
+            guard let app = result.0, result.1 else { fail("application launch failed; inspect running apps before retrying") }
+            guard app.bundleURL.map({ canonical($0) == url }) == true else { fail("launched application path differs from request") }
+            emitLaunch(app, "launched", before)
+            return
+        }
     }
-    if !finished { fail("launch completion timed out; application may still start") }
 }
 alarm(30)
 guard let request = try? JSONSerialization.jsonObject(with: FileHandle.standardInput.readDataToEndOfFile()) as? [String: Any] else {

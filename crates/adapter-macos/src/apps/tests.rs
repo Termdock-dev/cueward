@@ -87,7 +87,92 @@ impl Drop for Fixture {
                 }
             }
         }
+        let _ = Command::new("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister")
+            .arg("-u").arg(&self.path).output();
     }
+}
+
+#[test]
+fn launch_helper_has_no_unsafe_cross_queue_capture_diagnostics() {
+    let directory = tempfile::tempdir().expect("compiler fixture");
+    let source = directory.path().join("apps.swift");
+    fs::write(&source, helper_source()).expect("production helper");
+    let output = Command::new("swiftc")
+        .args(["-strict-concurrency=complete", "-warnings-as-errors"])
+        .arg(source)
+        .arg("-o")
+        .arg(directory.path().join("apps"))
+        .output()
+        .expect("strict concurrency compilation");
+    let diagnostics = String::from_utf8_lossy(&output.stderr);
+    // Preconcurrency framework imports can keep this diagnostic a warning even with -warnings-as-errors.
+    assert!(
+        output.status.success() && !diagnostics.contains("SendableClosureCaptures"),
+        "{diagnostics}"
+    );
+}
+
+#[test]
+fn completion_and_timeout_have_one_winner_across_queues() {
+    let directory = tempfile::tempdir().expect("completion fixture");
+    let source = directory.path().join("completion.swift");
+    fs::write(
+        &source,
+        format!(
+            "{}\n{}",
+            include_str!("completion.swift"),
+            include_str!("completion_tests.swift")
+        ),
+    )
+    .expect("completion tests");
+    let output = Command::new("swift")
+        .arg(source)
+        .output()
+        .expect("cross-queue completion test");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "passed");
+}
+
+#[test]
+#[ignore = "uses a controlled workspace catalog; may launch one disposable application on regression"]
+fn bundle_id_resolution_rejects_multiple_installed_copies() {
+    let first = Fixture::build();
+    let second = Fixture::build();
+    let source = first.directory.path().join("catalog.swift");
+    fs::write(
+        &source,
+        format!(
+            "{}\n{}",
+            include_str!("catalog_fixture.swift"),
+            helper_source()
+        ),
+    )
+    .expect("controlled catalog and production helper");
+    let id = format!("org.example.cueward.fixture.{}", std::process::id());
+    let request = launch_request(Some(&id), None).expect("bundle request");
+    let output = run_with_timeout(
+        Command::new("swift")
+            .arg(source)
+            .arg(&first.path)
+            .arg(&second.path),
+        &serde_json::to_vec(&request).expect("JSON"),
+        Duration::from_secs(35),
+    )
+    .expect("run helper");
+    assert!(
+        !output.status.success(),
+        "bundle selector picked one installation: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("multiple application installations"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
@@ -118,4 +203,41 @@ fn background_launch_discovers_app_and_does_not_reopen_existing_instance() {
         state,
         "existing app must not receive reopen or activation"
     );
+}
+
+#[test]
+#[ignore = "requires macOS application services and Swift Thread Sanitizer; launches a disposable app"]
+fn launch_completion_has_no_cross_queue_data_race() {
+    let fixture = Fixture::build();
+    let source = fixture.directory.path().join("apps.swift");
+    let binary = fixture.directory.path().join("apps-tsan");
+    fs::write(&source, helper_source()).expect("production helper");
+    let compiled = Command::new("swiftc")
+        .args(["-sanitize=thread", "-g"])
+        .arg(&source)
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .expect("compile sanitized helper");
+    assert!(
+        compiled.status.success(),
+        "{}",
+        String::from_utf8_lossy(&compiled.stderr)
+    );
+    let request = launch_request(None, Some(&fixture.path)).expect("launch request");
+    let output = run_with_timeout(
+        Command::new(binary).env("TSAN_OPTIONS", "halt_on_error=1:exitcode=66"),
+        &serde_json::to_vec(&request).expect("request JSON"),
+        Duration::from_secs(35),
+    )
+    .expect("run sanitized helper");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: LaunchResult =
+        serde_json::from_slice(&output.stdout).expect("single launch result");
+    assert_eq!(result.status, LaunchStatus::Launched);
+    assert_eq!(fixture.state()["pid"], result.app.pid);
 }

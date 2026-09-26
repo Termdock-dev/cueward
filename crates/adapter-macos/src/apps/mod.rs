@@ -40,7 +40,7 @@ pub struct LaunchResult {
 fn run<T: DeserializeOwned>(request: Value) -> Result<T, MacosError> {
     let directory = tempfile::tempdir().map_err(|e| MacosError::Other(e.to_string()))?;
     let script = directory.path().join("apps.swift");
-    fs::write(&script, include_str!("apps.swift")).map_err(|e| MacosError::Other(e.to_string()))?;
+    fs::write(&script, helper_source()).map_err(|e| MacosError::Other(e.to_string()))?;
     let payload = serde_json::to_vec(&request).map_err(|e| MacosError::Other(e.to_string()))?;
     let output = run_with_timeout(
         Command::new("swift").arg(script),
@@ -59,6 +59,14 @@ fn run<T: DeserializeOwned>(request: Value) -> Result<T, MacosError> {
             "invalid app result: {e}; list apps before retrying"
         ))
     })
+}
+
+fn helper_source() -> String {
+    format!(
+        "{}\n{}",
+        include_str!("completion.swift"),
+        include_str!("apps.swift")
+    )
 }
 
 /// List running regular and accessory applications without activating them.

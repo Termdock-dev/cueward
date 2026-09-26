@@ -15,6 +15,8 @@ Space discovery reports displays, their current Space, and available Space IDs. 
 
 Use the `input_target` from a fresh window snapshot. The helper rechecks the window ID, PID, title, integer frame, token age, and caller. The target app must be in the background. The destination must be an existing user Space that is not visible on any display.
 
+If any display's current Space is missing or malformed, discovery and moves stop. Unknown visibility is not treated as an inactive desktop.
+
 Moves share the per-PID input lock with keyboard, scrolling, clicks, and drags. A busy app returns an error. The helper holds the lock through the membership check, including if its CLI caller exits after the move request. Once submitted, the asynchronous move cannot be cancelled or automatically undone.
 
 The implementation uses optional private macOS Space queries and a dynamically discovered window-management operation. `move_window_available` means the entry point exists; it does not establish that every window accepts a move. An unavailable route is rejected without a fallback that switches desktops or activates apps.
@@ -24,6 +26,8 @@ The macOS command line tools, including `clang`, are required to build the tempo
 ## Result and verification
 
 `confirmed` means the window still belongs to the expected PID and its membership was read back as the requested Space. `sent_unverified` means that condition was not observed within two seconds. Neither status proves that the window's content or focus is unchanged.
+
+Confirmation requires membership in exactly the destination Space. Membership that includes other Spaces remains `sent_unverified`, even when the destination appears in the list.
 
 The result includes before/after memberships, `window_changed`, foreground PID endpoints, and visible Space endpoints. `foreground_changed` and `visible_spaces_changed` cannot detect a transient change that reverses between observations. Do not infer that a change was caused by Cueward solely from these fields.
 

@@ -11,6 +11,14 @@ int main(void) { @autoreleasepool {
     require(inactiveUserSpace(catalog, @2), "inactive user Space rejected");
     for (NSNumber *sid in @[@1, @3, @4, @5, @99]) require(!inactiveUserSpace(catalog, sid), "unsafe destination accepted");
     require([visibleSpaces(catalog) isEqual:@[@1, @5]], "visible Spaces lost");
+    NSDictionary *unknownDisplay = @{@"Spaces": @[@{@"ManagedSpaceID": @2, @"type": @0}]};
+    require(!inactiveUserSpace(@[unknownDisplay], @2), "unknown current Space accepted as inactive");
+    for (id current in @[@{}, @{@"ManagedSpaceID": @"2"}, @{@"ManagedSpaceID": @0},
+                         @{@"ManagedSpaceID": @YES}, @{@"ManagedSpaceID": @1.5}, NSNull.null]) {
+        NSDictionary *display = @{@"Current Space": current, @"Spaces": unknownDisplay[@"Spaces"]};
+        require(!inactiveUserSpace(@[display], @2), "malformed current Space accepted");
+        require(!inactiveUserSpace(@[catalog[0], display], @2), "partial visibility accepted");
+    }
     NSDictionary *expected = @{@"window_id": @7, @"owner_pid": @123, @"title": @"Fixture",
         @"bounds": @{@"x": @(-100), @"y": @200, @"width": @640, @"height": @480}};
     NSMutableDictionary *row = [@{
