@@ -22,6 +22,7 @@ pub(crate) mod shortcuts;
 pub(crate) mod stickies;
 pub(crate) mod triage;
 pub(crate) mod voice_memos;
+pub(crate) mod window;
 #[cfg(test)]
 mod calendar_tests;
 #[cfg(test)]
@@ -48,6 +49,8 @@ mod shortcuts_tests;
 mod stickies_tests;
 #[cfg(test)]
 mod voice_memos_tests;
+#[cfg(test)]
+mod window_tests;
 
 pub(crate) use calendar::CalendarAction;
 pub(crate) use clipboard::ClipboardAction;
@@ -60,6 +63,7 @@ pub(crate) use screenshot::ScreenshotAction;
 pub(crate) use shortcuts::ShortcutsAction;
 pub(crate) use stickies::StickiesAction;
 pub(crate) use voice_memos::VoiceMemosAction;
+pub(crate) use window::WindowAction;
 
 #[derive(Parser)]
 #[command(
@@ -188,6 +192,11 @@ pub(crate) enum Command {
         #[command(subcommand)]
         action: VoiceMemosAction,
     },
+    /// Inspect native macOS windows.
+    Window {
+        #[command(subcommand)]
+        action: WindowAction,
+    },
     /// Manage Stickies notes
     Stickies {
         #[command(subcommand)]
@@ -236,6 +245,7 @@ pub(crate) fn dispatch(command: Command) {
         Command::Clipboard { action } => clipboard::dispatch(action),
         Command::Doctor { json, live_safari } => doctor::dispatch(json, live_safari),
         Command::VoiceMemos { action } => voice_memos::dispatch(action),
+        Command::Window { action } => window::dispatch(action),
         Command::Stickies { action } => stickies::dispatch(action),
         Command::Shortcuts { action } => shortcuts::dispatch(action),
     }

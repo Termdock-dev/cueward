@@ -63,6 +63,8 @@ Some integrations may additionally require:
 - **Accessibility / 輔助使用** for UI scripting style automations
 - app-specific data access via **Full Disk Access** when reading container files
 
+`cueward window inspect` requires Accessibility access for the terminal app running Cueward. Enable it in **System Settings > Privacy & Security > Accessibility**.
+
 ### Calendar / Reminders Read Access
 
 As of `0.3.0`, Cueward prefers EventKit for `reminders` and `calendar` read commands because it is dramatically faster and more reliable than app scripting.
@@ -516,6 +518,23 @@ cueward screenshot window --id 12345 --ocr
 # Custom output path
 cueward screenshot --output ~/Desktop/shot.png --ocr
 ```
+
+### Window inspection
+
+Inspect an on-screen window in any macOS app that exposes Accessibility elements:
+
+```bash
+# Find the window id
+cueward screenshot windows
+
+# Read its Accessibility element tree
+cueward window inspect --id 12345
+
+# Limit the tree and include a window screenshot with OCR
+cueward window inspect --id 12345 --limit 100 --depth 6 --ocr
+```
+
+The result includes the window identity, element roles, names, values, actions, and element refs. `truncated` reports when the node or depth limit omitted elements. Window matching requires one Accessibility window with the same app process, title, and bounds; ambiguous or changed windows return an error. Element refs describe the returned snapshot and may change when the app updates its UI.
 
 ### Clipboard
 

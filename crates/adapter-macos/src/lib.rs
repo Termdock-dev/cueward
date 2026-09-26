@@ -18,6 +18,7 @@ pub mod screenshot;
 pub mod shortcuts;
 pub mod stickies;
 pub mod voice_memos;
+pub mod window;
 
 pub use error::MacosError;
 pub use scan_state::{ScanEnvelope, ScanStatus};
