@@ -175,3 +175,60 @@ fn parses_background_scroll_point_and_signed_deltas() {
         }
     ));
 }
+
+#[test]
+fn parses_background_input_status() {
+    assert!(Cli::try_parse_from(["cueward", "window", "input-status"]).is_err());
+    let cli = Cli::try_parse_from(["cueward", "window", "input-status", "--target", "snapshot"])
+        .expect("status");
+    assert!(
+        matches!(cli.command, Command::Window { action: WindowAction::InputStatus { target } } if target == "snapshot")
+    );
+}
+
+#[test]
+fn parses_background_click_button_and_count() {
+    let cli = Cli::try_parse_from([
+        "cueward", "window", "click", "--target", "snapshot", "--x", "100", "--y", "200",
+        "--button", "right", "--count", "2",
+    ])
+    .expect("click");
+    assert!(
+        matches!(cli.command, Command::Window { action: WindowAction::Click { x: 100.0, y: 200.0, button, count: 2, .. } } if button == "right")
+    );
+}
+
+#[test]
+fn parses_background_drag_endpoints_and_duration() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "window",
+        "drag",
+        "--target",
+        "snapshot",
+        "--x",
+        "100",
+        "--y",
+        "200",
+        "--to-x",
+        "400",
+        "--to-y",
+        "500",
+        "--duration-ms",
+        "800",
+    ])
+    .expect("drag");
+    assert!(matches!(
+        cli.command,
+        Command::Window {
+            action: WindowAction::Drag {
+                x: 100.0,
+                y: 200.0,
+                to_x: 400.0,
+                to_y: 500.0,
+                duration_ms: 800,
+                ..
+            }
+        }
+    ));
+}

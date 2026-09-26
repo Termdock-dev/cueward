@@ -94,6 +94,39 @@ pub(crate) enum WindowAction {
         #[arg(long, default_value_t = 0, allow_hyphen_values = true)]
         delta_y: i32,
     },
+    /// Check input dispatch prerequisites without posting events.
+    InputStatus {
+        #[arg(long)]
+        target: String,
+    },
+    /// Click a background window at a snapshot pixel coordinate.
+    Click {
+        #[arg(long)]
+        target: String,
+        #[arg(long)]
+        x: f64,
+        #[arg(long)]
+        y: f64,
+        #[arg(long, default_value = "left", value_parser = ["left", "right"])]
+        button: String,
+        #[arg(long, default_value_t = 1)]
+        count: u8,
+    },
+    /// Drag the left button within a background window using snapshot pixels.
+    Drag {
+        #[arg(long)]
+        target: String,
+        #[arg(long)]
+        x: f64,
+        #[arg(long)]
+        y: f64,
+        #[arg(long)]
+        to_x: f64,
+        #[arg(long)]
+        to_y: f64,
+        #[arg(long, default_value_t = 500)]
+        duration_ms: u64,
+    },
 }
 
 pub(crate) fn dispatch(action: WindowAction) {
@@ -157,6 +190,31 @@ pub(crate) fn dispatch(action: WindowAction) {
         } => output(
             "window/scroll",
             cueward_adapter_macos::window::scroll(&target, x, y, delta_x, delta_y),
+        ),
+        WindowAction::InputStatus { target } => output(
+            "window/input-status",
+            cueward_adapter_macos::window::input_status(&target),
+        ),
+        WindowAction::Click {
+            target,
+            x,
+            y,
+            button,
+            count,
+        } => output(
+            "window/click",
+            cueward_adapter_macos::window::click(&target, x, y, &button, count),
+        ),
+        WindowAction::Drag {
+            target,
+            x,
+            y,
+            to_x,
+            to_y,
+            duration_ms,
+        } => output(
+            "window/drag",
+            cueward_adapter_macos::window::drag(&target, (x, y), (to_x, to_y), duration_ms),
         ),
     }
 }
