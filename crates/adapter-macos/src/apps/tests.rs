@@ -96,7 +96,7 @@ impl Drop for Fixture {
 fn launch_helper_has_no_unsafe_cross_queue_capture_diagnostics() {
     let directory = tempfile::tempdir().expect("compiler fixture");
     let source = directory.path().join("apps.swift");
-    fs::write(&source, include_str!("apps.swift")).expect("production helper");
+    fs::write(&source, helper_source()).expect("production helper");
     let output = Command::new("swiftc")
         .args(["-strict-concurrency=complete", "-warnings-as-errors"])
         .arg(source)
@@ -113,6 +113,31 @@ fn launch_helper_has_no_unsafe_cross_queue_capture_diagnostics() {
 }
 
 #[test]
+fn completion_and_timeout_have_one_winner_across_queues() {
+    let directory = tempfile::tempdir().expect("completion fixture");
+    let source = directory.path().join("completion.swift");
+    fs::write(
+        &source,
+        format!(
+            "{}\n{}",
+            include_str!("completion.swift"),
+            include_str!("completion_tests.swift")
+        ),
+    )
+    .expect("completion tests");
+    let output = Command::new("swift")
+        .arg(source)
+        .output()
+        .expect("cross-queue completion test");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "passed");
+}
+
+#[test]
 #[ignore = "uses a controlled workspace catalog; may launch one disposable application on regression"]
 fn bundle_id_resolution_rejects_multiple_installed_copies() {
     let first = Fixture::build();
@@ -123,7 +148,7 @@ fn bundle_id_resolution_rejects_multiple_installed_copies() {
         format!(
             "{}\n{}",
             include_str!("catalog_fixture.swift"),
-            include_str!("apps.swift")
+            helper_source()
         ),
     )
     .expect("controlled catalog and production helper");
@@ -186,7 +211,7 @@ fn launch_completion_has_no_cross_queue_data_race() {
     let fixture = Fixture::build();
     let source = fixture.directory.path().join("apps.swift");
     let binary = fixture.directory.path().join("apps-tsan");
-    fs::write(&source, include_str!("apps.swift")).expect("production helper");
+    fs::write(&source, helper_source()).expect("production helper");
     let compiled = Command::new("swiftc")
         .args(["-sanitize=thread", "-g"])
         .arg(&source)

@@ -11,6 +11,8 @@ cueward window list --all-spaces
 
 `app launch` accepts exactly one bundle identifier or absolute `.app` path. It validates the executable application bundle before asking macOS to launch it. A matching running instance returns `already_running` without an open or reopen event. Multiple matching instances are rejected; select their windows by PID instead. An application with the same bundle identifier at a different path is rejected rather than substituted.
 
+Bundle lookup requires macOS 12 or later and examines every matching registered application. Canonical paths are deduplicated; multiple executable installations require an explicit `--path`. Older systems can use `--path` directly.
+
 For a new instance, Cueward requests launch with activation, recent-item additions, and system prompts disabled. It does not hide other applications, send global input, or request a new instance of an already running application. No arguments, environment overrides, document URLs, or executable shell commands are accepted by this interface.
 
 `launched` means the workspace launch callback returned a running application at the requested path. It does not establish that a window exists, loading has finished, or Accessibility inspection will work. Discover its windows and observe them before acting.
