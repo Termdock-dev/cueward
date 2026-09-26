@@ -54,6 +54,7 @@ fn parses_window_inspection_with_image_options() {
             action:
                 WindowAction::Inspect {
                     id,
+                    root,
                     limit,
                     depth,
                     screenshot,
@@ -61,6 +62,7 @@ fn parses_window_inspection_with_image_options() {
                 },
         } => {
             assert_eq!(id, 123);
+            assert_eq!(root, "0");
             assert_eq!(limit, 40);
             assert_eq!(depth, 4);
             assert!(!screenshot);
@@ -68,6 +70,17 @@ fn parses_window_inspection_with_image_options() {
         }
         _ => panic!("wrong command"),
     }
+}
+
+#[test]
+fn parses_window_inspection_subtree() {
+    let cli = Cli::try_parse_from([
+        "cueward", "window", "inspect", "--id", "42", "--root", "0.2.1", "--depth", "2",
+    ])
+    .expect("subtree inspection");
+    assert!(matches!(cli.command, Command::Window {
+        action: WindowAction::Inspect { id: 42, root, depth: 2, .. }
+    } if root == "0.2.1"));
 }
 
 #[test]

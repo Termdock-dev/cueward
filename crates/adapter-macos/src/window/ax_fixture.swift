@@ -47,6 +47,9 @@ let window = NSWindow(
 window.title = "Cueward AX Fixture"
 
 let content = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 280))
+content.setAccessibilityElement(true)
+content.setAccessibilityRole(.group)
+content.setAccessibilityLabel("Editor")
 let input = NSTextField(frame: NSRect(x: 40, y: 220, width: 300, height: 28))
 input.stringValue = "draft"
 input.setAccessibilityLabel("Draft")

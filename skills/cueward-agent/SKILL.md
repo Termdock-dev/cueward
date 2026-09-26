@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Use when the user asks about things they read, saved, planned, opened, or want to automate on their own macOS machine, especially in Safari, Notes, Reminders, Calendar, Messages, Quick Notes, screenshots, clipboard, voice memos, stickies, Reddit, or Apple Shortcuts. Also use for requests like "what did I read today", "find that note/tab/link", "what's due today", "what's on my calendar", "list my quick notes", "OCR this image", "search my bookmarks", or "create/edit/run a shortcut".
+description: Use when the user wants to explore or operate macOS app interfaces, including apps without a dedicated integration, or asks about things they read, saved, planned, opened, or want to automate on their Mac. Covers Safari, Notes, Reminders, Calendar, Messages, Quick Notes, screenshots, clipboard, voice memos, stickies, Reddit, and Apple Shortcuts.
 ---
 
 # Cueward Agent
@@ -43,6 +43,10 @@ Strong trigger situations:
   - create a reminder
   - write a note
   - build or run a shortcut
+- App interface tasks:
+  - explore an unfamiliar app's controls
+  - find a button or editable field in an open window
+  - perform a UI action and check what changed
 
 Do not wait for the user to name the underlying macOS app if the request is clearly about their own local machine state, their own browsing history, or a real action on their Mac.
 
@@ -105,6 +109,8 @@ These thoughts usually mean Cueward should have been used:
 
 ## Routing
 
+- Exploring or operating an app interface, including apps without dedicated commands:
+  Load `references/computer-use.md`
 - Historical or indexed knowledge:
   Load `references/retrieval.md`
 - Live Safari tabs, bookmarks, or Safari AI state:
