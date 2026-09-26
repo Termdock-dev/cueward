@@ -1,4 +1,4 @@
-//! Generic application discovery, background launch, and Accessibility exploration.
+//! Generic app discovery, background launch/file opening, and Accessibility exploration.
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -11,10 +11,12 @@ use crate::MacosError;
 use crate::window::process::run_with_timeout;
 
 mod accessibility;
+mod open;
 pub use accessibility::{
     AppAXActionResult, AppAccessibilityNode, AppAccessibilitySnapshot, AppInstance, inspect_app,
     press_app_element, set_app_value,
 };
+pub use open::{OpenFileResult, OpenFileStatus, open_file};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RunningApp {
@@ -72,11 +74,13 @@ fn run_source<T: DeserializeOwned>(request: Value, source: &str) -> Result<T, Ma
 }
 
 fn helper_source() -> String {
-    format!(
-        "{}\n{}",
+    [
         include_str!("completion.swift"),
-        include_str!("apps.swift")
-    )
+        include_str!("workspace.swift"),
+        include_str!("open.swift"),
+        include_str!("apps.swift"),
+    ]
+    .join("\n")
 }
 
 /// List running regular and accessory applications without activating them.
@@ -123,3 +127,6 @@ pub fn launch_app(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod open_live_tests;

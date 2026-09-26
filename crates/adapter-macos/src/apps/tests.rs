@@ -30,19 +30,23 @@ fn launch_rejects_non_application_directories_in_helper() {
     );
 }
 
-struct Fixture {
-    directory: tempfile::TempDir,
-    path: std::path::PathBuf,
+pub(super) struct Fixture {
+    pub(super) directory: tempfile::TempDir,
+    pub(super) path: std::path::PathBuf,
 }
 
 impl Fixture {
     fn build() -> Self {
+        Self::with_source(include_str!("fixture.swift"))
+    }
+
+    pub(super) fn with_source(body: &str) -> Self {
         let directory = tempfile::tempdir().expect("app fixture directory");
         let path = directory.path().join("CuewardApplicationFixture.app");
         let contents = path.join("Contents");
         fs::create_dir_all(contents.join("MacOS")).expect("bundle directories");
         let source = directory.path().join("fixture.swift");
-        fs::write(&source, include_str!("fixture.swift")).expect("fixture source");
+        fs::write(&source, body).expect("fixture source");
         let compiled = Command::new("swiftc")
             .arg(source)
             .arg("-o")
@@ -77,13 +81,28 @@ impl Fixture {
 
 impl Drop for Fixture {
     fn drop(&mut self) {
-        if let Ok(data) = fs::read(self.directory.path().join("state.json")) {
-            if let Ok(value) = serde_json::from_slice::<Value>(&data) {
-                if let Some(pid) = value["pid"].as_i64() {
-                    let _ = Command::new("/bin/kill")
-                        .arg("-TERM")
-                        .arg(pid.to_string())
-                        .output();
+        let states = fs::read_dir(self.directory.path())
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| {
+                        name == "state.json"
+                            || (name.starts_with("state-") && name.ends_with(".json"))
+                    })
+            });
+        for path in states {
+            if let Ok(data) = fs::read(path) {
+                if let Ok(value) = serde_json::from_slice::<Value>(&data) {
+                    if let Some(pid) = value["pid"].as_i64() {
+                        let _ = Command::new("/bin/kill")
+                            .arg("-TERM")
+                            .arg(pid.to_string())
+                            .output();
+                    }
                 }
             }
         }

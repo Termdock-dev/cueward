@@ -15,6 +15,18 @@ pub(crate) enum AppAction {
         #[arg(long, required_unless_present = "bundle", conflicts_with = "bundle")]
         path: Option<PathBuf>,
     },
+    /// Ask a selected app to open one local file without requesting activation.
+    Open {
+        #[arg(long, required_unless_present = "path", conflicts_with = "path")]
+        bundle: Option<String>,
+        #[arg(long, required_unless_present = "bundle", conflicts_with = "bundle")]
+        path: Option<PathBuf>,
+        #[arg(long)]
+        file: PathBuf,
+        /// Request another process; app state and restored windows may still be shared.
+        #[arg(long)]
+        new_instance: bool,
+    },
     /// Discover an app's AX roots, or inspect an observed subtree.
     Inspect {
         #[arg(long)]
@@ -56,13 +68,22 @@ fn output<T: Serialize>(source: &str, result: Result<T, cueward_adapter_macos::M
 
 pub(crate) fn dispatch(action: AppAction) {
     use cueward_adapter_macos::apps::{
-        inspect_app, launch_app, list_apps, press_app_element, set_app_value,
+        inspect_app, launch_app, list_apps, open_file, press_app_element, set_app_value,
     };
     match action {
         AppAction::List => output("app/list", list_apps()),
         AppAction::Launch { bundle, path } => {
             output("app/launch", launch_app(bundle.as_deref(), path.as_deref()))
         }
+        AppAction::Open {
+            bundle,
+            path,
+            file,
+            new_instance,
+        } => output(
+            "app/open",
+            open_file(bundle.as_deref(), path.as_deref(), &file, new_instance),
+        ),
         AppAction::Inspect {
             pid,
             root,
@@ -84,6 +105,70 @@ mod tests {
     use super::*;
     use crate::commands::{Cli, Command};
     use clap::Parser;
+    #[test]
+    fn parses_file_open_with_one_app_and_explicit_new_instance() {
+        let command = Cli::try_parse_from([
+            "cueward",
+            "app",
+            "open",
+            "--bundle",
+            "org.example.Editor",
+            "--file",
+            "/tmp/Document.txt",
+        ])
+        .expect("open")
+        .command;
+        assert!(matches!(
+            command,
+            Command::App {
+                action: AppAction::Open {
+                    new_instance: false,
+                    ..
+                }
+            }
+        ));
+        let command = Cli::try_parse_from([
+            "cueward",
+            "app",
+            "open",
+            "--path",
+            "/tmp/Editor.app",
+            "--file",
+            "/tmp/Document.txt",
+            "--new-instance",
+        ])
+        .expect("new instance")
+        .command;
+        assert!(matches!(
+            command,
+            Command::App {
+                action: AppAction::Open {
+                    new_instance: true,
+                    ..
+                }
+            }
+        ));
+    }
+
+    #[test]
+    fn file_open_requires_a_file_and_exactly_one_app_selector() {
+        for arguments in [
+            vec!["app", "open", "--file", "/tmp/Document.txt"],
+            vec!["app", "open", "--bundle", "org.example.Editor"],
+            vec![
+                "app",
+                "open",
+                "--file",
+                "/tmp/Document.txt",
+                "--bundle",
+                "org.example.Editor",
+                "--path",
+                "/tmp/Editor.app",
+            ],
+        ] {
+            assert!(Cli::try_parse_from(std::iter::once("cueward").chain(arguments)).is_err());
+        }
+    }
     #[test]
     fn parses_app_ax_exploration_and_actions() {
         for args in [

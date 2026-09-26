@@ -58,6 +58,8 @@ Use `window wait --target '<snapshot input_target>' --condition <condition>` aft
 
 Use `cueward app list` to discover running applications. If the user's task requires an unopened app, use `cueward app launch --bundle <bundle-id>` or `--path <absolute-app-path>`. Existing instances are returned without reopening. A launch result establishes only that the process exists; discover windows and inspect their current state before acting. An app may activate itself even though Cueward does not request activation. On timeout, list apps before deciding whether to retry.
 
+To hand a local document to a selected app, use `cueward app open --file <absolute-file-path> --bundle <bundle-id>` (or `--path <absolute-app-path>`). Only readable regular files are accepted. The default requires an unambiguous background recipient; `--new-instance` explicitly requests another process. New instances may share settings and restore existing documents, so identify the requested file's window before acting. `sent_unverified` confirms only the workspace callback, not that the file loaded. Inspect the returned app and compare the document content with the intended artifact; verify a later save on disk. Observe after uncertain delivery before deciding whether to reopen.
+
 ### Application roots and system panels
 
 ```sh

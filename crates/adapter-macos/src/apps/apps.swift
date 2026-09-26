@@ -19,11 +19,11 @@ func describe(_ app: NSRunningApplication) -> [String: Any] {
      "is_active": app.isActive, "is_hidden": app.isHidden,
      "finished_launching": app.isFinishedLaunching]
 }
-func emitLaunch(_ app: NSRunningApplication, _ status: String, _ before: pid_t) {
+func applicationResult(_ app: NSRunningApplication, _ status: String, _ before: pid_t) -> [String: Any] {
     guard !app.isTerminated else { fail("application exited during launch") }
     let after = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
-    emit(["status": status, "app": describe(app), "frontmost_pid_before": before,
-          "frontmost_pid_after": after, "foreground_changed": before != after])
+    return ["status": status, "app": describe(app), "frontmost_pid_before": before,
+            "frontmost_pid_after": after, "foreground_changed": before != after]
 }
 func executableBundle(_ url: URL) -> Bundle? {
     guard let bundle = Bundle(url: url), bundle.bundleURL.pathExtension == "app",
@@ -53,10 +53,10 @@ func resolve(_ request: [String: Any]) -> URL {
     }
     return result
 }
-func existing(_ url: URL) -> NSRunningApplication? {
+func existing(_ url: URL, ambiguityHint: String = "select a window by PID") -> NSRunningApplication? {
     let apps = NSWorkspace.shared.runningApplications.filter { !$0.isTerminated }
     let exact = apps.filter { $0.bundleURL.map { canonical($0) == url } ?? false }
-    guard exact.count <= 1 else { fail("multiple application instances are running; select a window by PID") }
+    guard exact.count <= 1 else { fail("multiple application instances are running; \(ambiguityHint)") }
     if let app = exact.first { return app }
     if let id = Bundle(url: url)?.bundleIdentifier,
        apps.contains(where: { $0.bundleIdentifier == id }) {
@@ -67,32 +67,16 @@ func existing(_ url: URL) -> NSRunningApplication? {
 func launch(_ request: [String: Any]) {
     let url = resolve(request)
     let before = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
-    if let app = existing(url) { emitLaunch(app, "already_running", before); return }
+    if let app = existing(url) { emit(applicationResult(app, "already_running", before)); return }
     guard let caller = request["caller_pid"] as? Int32, caller > 0, kill(caller, 0) == 0 else {
         fail("launch caller exited")
     }
-    let config = NSWorkspace.OpenConfiguration()
-    config.activates = false
-    config.addsToRecentItems = false
-    config.hidesOthers = false
-    config.promptsUserIfNeeded = false
-    config.createsNewApplicationInstance = false
-    config.allowsRunningApplicationSubstitution = false
     let completion = LaunchCompletion<(NSRunningApplication?, Bool)>(deadline: ProcessInfo.processInfo.systemUptime + 20)
-    NSWorkspace.shared.openApplication(at: url, configuration: config) { app, error in
+    NSWorkspace.shared.openApplication(at: url, configuration: workspaceConfiguration()) { app, error in
         completion.complete((app, error == nil))
     }
-    while true {
-        switch completion.poll() {
-        case .pending: RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-        case .timedOut: fail("launch completion timed out; application may still start")
-        case .completed(let result):
-            guard let app = result.0, result.1 else { fail("application launch failed; inspect running apps before retrying") }
-            guard app.bundleURL.map({ canonical($0) == url }) == true else { fail("launched application path differs from request") }
-            emitLaunch(app, "launched", before)
-            return
-        }
-    }
+    let app = awaitApplication(completion, at: url, operation: "launch")
+    emit(applicationResult(app, "launched", before))
 }
 alarm(30)
 guard let request = try? JSONSerialization.jsonObject(with: FileHandle.standardInput.readDataToEndOfFile()) as? [String: Any] else {
@@ -104,5 +88,6 @@ case "list":
         !$0.isTerminated && $0.activationPolicy != .prohibited
     }.sorted { $0.processIdentifier < $1.processIdentifier }.map(describe))
 case "launch": launch(request)
+case "open": openDocument(request)
 default: fail("unsupported application action")
 }
