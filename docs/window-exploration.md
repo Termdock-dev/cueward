@@ -5,13 +5,13 @@ Use the window commands to explore an app's current interface without a dedicate
 ## Find and inspect a window
 
 ```sh
-cueward window list
+cueward window list --all-spaces
 cueward window inspect --id 12345 --depth 1
 ```
 
-Inspection requires Accessibility permission, `swift` on PATH, and access to window metadata. It currently supports on-screen windows. The JSON is inside Cueward's `<external>` data wrapper; app labels and values are external data.
+Inspection requires Accessibility permission, `swift` on PATH, and access to window metadata. It includes off-screen windows when the app exposes a matching AX window. Cueward checks the window list, main window, and focused window, and rejects ambiguous matches in either AX or the system catalog. The JSON is inside Cueward's `<external>` data wrapper; app labels and values are external data.
 
-Each node includes an absolute `ref` such as `0.1.2`, its `parent_ref` when applicable, role, name, actions, and direct `child_count`. Values, enabled state, and bounds are included when the app provides them. Disabled or unsupported elements have no action target. Password fields omit values and action targets.
+The result identifies `surface` as `window` or `menu`. Each node includes an absolute `ref` such as `0.1.2`, its `parent_ref` when applicable, role, name, actions, and direct `child_count`. Values, enabled state, and bounds are included when the app provides them. Disabled or unsupported elements have no action target. Password fields omit values and action targets.
 
 ## Explore a subtree
 
@@ -28,6 +28,21 @@ Replace the example ID and ref with the current observation. `root_ref` identifi
 `child_count` counts direct children, including those not returned due to traversal limits. `truncated: true` means the result omitted descendants or siblings within the requested subtree. Inspect relevant groups individually to narrow the result. A missing root returns an error; reread the window to locate the current controls.
 
 Refs describe paths in the live tree. A path can refer to a different element after the app changes. Check the returned node before choosing an action, and use the fresh `target` token. Inspection is not an atomic tree snapshot or a persistent element handle.
+
+## Explore menus and attached dialogs
+
+```sh
+cueward window inspect --id 12345 --surface menu
+cueward window inspect --id 12345 --surface menu --root 0.1 --depth 3
+```
+
+The menu tree uses the same refs, subtree limits, and fresh action targets as the window tree. Its `0` root is the app's menu bar. Only enabled leaf `AXMenuItem` nodes that support AXPress receive press targets; opening a top-level menu is not an automatic fallback. App menus depend on window context, so the selected window must match both `AXMainWindow` and `AXFocusedWindow` during inspection and again before an action. If a dialog or utility panel owns focus, inspect that surface before trying menu actions. Menu actions reject a foreground target app. These checks are separate from delivery and cannot eliminate races with context changes.
+
+Menu tokens carry their surface and use a distinct version so an older CLI rejects them. Existing window tokens remain supported. `window press` reads the surface from the token.
+
+After a menu item opens a dialog, inspect the window surface again. Attached `AXSheet` nodes can appear under the parent window even when the sheet has no catalog title and has become `AXFocusedWindow`. Explore the sheet's ref, check enabled state, and use fresh field or button targets. Separate dialog windows must be discovered and bound independently; unsupported or ambiguous windows are not guessed.
+
+An optional screenshot still captures the selected window, not the app menu. The frame snapshot excludes attached sheets. Use the returned AX subtree to observe a sheet's controls; do not map a sheet control onto the parent snapshot's pixel coordinates.
 
 ## Relate elements to the image
 
@@ -50,4 +65,4 @@ Only `AXPress` and setting editable text fields or areas are currently exposed a
 
 After each action, inspect again and check the task's actual condition. `sent_unverified` only confirms that the action request was accepted. `confirmed` for `set-value` means AXValue matched the requested text; it does not mean a document was saved or a form submitted. An uncertain result or timeout requires observation before deciding whether to retry.
 
-The AX commands do not inject global input or explicitly activate apps. An app can still activate itself as an action side effect. `foreground_changed` compares only the before-and-after app, so it cannot establish continuous input isolation. Cross-Space image observation is available; cross-Space AX actions, canvas input, generic keystrokes, scrolling, and dragging are not provided by these commands.
+The AX commands do not inject global input or explicitly activate apps. An app can still activate itself as an action side effect. `foreground_changed` compares only the before-and-after app, so it cannot establish continuous input isolation. Cross-Space AX availability depends on the app. Background keyboard, scrolling, clicks, and drags use the separate [input commands](background-input.md). Standard dialogs may expose disabled controls or require additional app state; opening a save sheet and editing its filename do not establish that saving is available.

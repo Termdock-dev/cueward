@@ -1,8 +1,8 @@
 use super::bridge::run_ax;
 use super::target::{Target, WindowIdentity, now_seconds};
-use super::{AccessibilitySnapshot, WindowInspectResult};
+use super::{AccessibilitySnapshot, AccessibilitySurface, WindowInspectResult};
 use crate::MacosError;
-use crate::screenshot::{CapturableWindow, capture_window, list_capturable_windows};
+use crate::screenshot::{CapturableWindow, WindowScope, capture_window, list_windows};
 
 fn root_depth(root: &str) -> Result<usize, MacosError> {
     let parts: Vec<_> = root.split('.').collect();
@@ -25,6 +25,7 @@ fn root_depth(root: &str) -> Result<usize, MacosError> {
 
 fn run_ax_inspect(
     window: &CapturableWindow,
+    surface: AccessibilitySurface,
     root: &str,
     limit: usize,
     max_depth: usize,
@@ -34,12 +35,18 @@ fn run_ax_inspect(
     let mut snapshot: AccessibilitySnapshot = run_ax(
         &identity,
         include_str!("ax_inspect.swift"),
-        &[limit.to_string(), max_depth.to_string(), root.to_string()],
+        &[
+            limit.to_string(),
+            max_depth.to_string(),
+            root.to_string(),
+            surface.as_str().into(),
+        ],
         &serde_json::Value::Null,
     )?;
     if snapshot.window_id != window.window_id
         || snapshot.owner_pid != window.owner_pid
         || snapshot.root_ref != root
+        || snapshot.surface != surface
     {
         return Err(MacosError::Other(
             "window identity changed during accessibility inspection".into(),
@@ -48,13 +55,21 @@ fn run_ax_inspect(
     for node in &mut snapshot.nodes {
         let can_set_text =
             node.settable_value && matches!(node.role.as_str(), "AXTextField" | "AXTextArea");
-        if node.enabled != Some(false)
+        let menu_leaf = surface != AccessibilitySurface::Menu
+            || (node.role == "AXMenuItem" && node.child_count == 0);
+        if menu_leaf
+            && node.enabled != Some(false)
             && (can_set_text || node.actions.iter().any(|action| action == "AXPress"))
         {
             node.target = Some(
                 Target {
-                    version: 1,
+                    version: if surface == AccessibilitySurface::Menu {
+                        2
+                    } else {
+                        1
+                    },
                     issued_at,
+                    surface,
                     window: identity.clone(),
                     r#ref: node.r#ref.clone(),
                     fingerprint: node.fingerprint.clone(),
@@ -66,7 +81,7 @@ fn run_ax_inspect(
     Ok(snapshot)
 }
 
-/// Inspect an exact on-screen window through Accessibility, with optional screenshot and OCR.
+/// Inspect an exact window through Accessibility, including other Spaces when AX exposes it.
 pub fn inspect_window(
     window_id: u32,
     limit: usize,
@@ -86,6 +101,27 @@ pub fn inspect_window_subtree(
     screenshot: bool,
     ocr: bool,
 ) -> Result<WindowInspectResult, MacosError> {
+    inspect_window_surface(
+        window_id,
+        AccessibilitySurface::Window,
+        root,
+        limit,
+        max_depth,
+        screenshot,
+        ocr,
+    )
+}
+
+/// Explore a window or its app menu, binding menu actions to the app's verified main window.
+pub fn inspect_window_surface(
+    window_id: u32,
+    surface: AccessibilitySurface,
+    root: &str,
+    limit: usize,
+    max_depth: usize,
+    screenshot: bool,
+    ocr: bool,
+) -> Result<WindowInspectResult, MacosError> {
     let depth = root_depth(root)?;
     if !(1..=500).contains(&limit) {
         return Err(MacosError::Other(
@@ -97,13 +133,13 @@ pub fn inspect_window_subtree(
             "window inspect depth must be 1..=12".into(),
         ));
     }
-    let window = list_capturable_windows()?
+    let window = list_windows(WindowScope::AllSpaces)?
         .into_iter()
         .find(|window| window.window_id == window_id)
         .ok_or_else(|| {
             MacosError::NotFound(format!("capturable window id not found: {window_id}"))
         })?;
-    let accessibility = run_ax_inspect(&window, root, limit, max_depth.min(12 - depth))?;
+    let accessibility = run_ax_inspect(&window, surface, root, limit, max_depth.min(12 - depth))?;
     let screenshot = if screenshot || ocr {
         Some(capture_window(ocr, None, window_id)?)
     } else {

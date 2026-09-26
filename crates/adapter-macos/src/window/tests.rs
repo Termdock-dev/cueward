@@ -9,10 +9,10 @@ use super::{
 };
 use crate::screenshot::list_capturable_windows;
 
-struct Fixture {
+pub(super) struct Fixture {
     child: Child,
-    directory: tempfile::TempDir,
-    window_id: u32,
+    pub(super) directory: tempfile::TempDir,
+    pub(super) window_id: u32,
 }
 
 impl Drop for Fixture {
@@ -24,10 +24,14 @@ impl Drop for Fixture {
 
 impl Fixture {
     fn launch() -> Self {
+        Self::launch_source(include_str!("ax_fixture.swift"), "Cueward AX Fixture")
+    }
+
+    pub(super) fn launch_source(body: &str, title: &str) -> Self {
         let directory = tempfile::tempdir().expect("temporary fixture directory");
         let source = directory.path().join("ax_fixture.swift");
         let executable = directory.path().join("CuewardAXFixture");
-        fs::write(&source, include_str!("ax_fixture.swift")).expect("write fixture");
+        fs::write(&source, body).expect("write fixture");
         let compile = Command::new("swiftc")
             .arg(&source)
             .arg("-o")
@@ -54,8 +58,7 @@ impl Fixture {
                 .expect("list windows")
                 .into_iter()
                 .find(|window| {
-                    window.owner_pid == fixture.child.id() as i32
-                        && window.title == "Cueward AX Fixture"
+                    window.owner_pid == fixture.child.id() as i32 && window.title == title
                 });
             if let Some(window) = window {
                 fixture.window_id = window.window_id;
@@ -66,7 +69,7 @@ impl Fixture {
         }
     }
 
-    fn inspect(&self) -> WindowInspectResult {
+    pub(super) fn inspect(&self) -> WindowInspectResult {
         inspect_window(self.window_id, 100, 6, false, false).expect("inspect fixture")
     }
 

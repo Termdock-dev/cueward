@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+use super::AccessibilitySurface;
 use super::bridge::run_ax;
 use super::target::{Target, WindowIdentity, now_seconds};
 use crate::MacosError;
-use crate::screenshot::list_capturable_windows;
+use crate::screenshot::{WindowScope, list_windows};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -16,6 +17,7 @@ pub enum ActionStatus {
 pub struct WindowActionResult {
     pub action: String,
     pub window_id: u32,
+    pub surface: AccessibilitySurface,
     pub r#ref: String,
     pub status: ActionStatus,
     pub frontmost_pid_before: i32,
@@ -25,7 +27,7 @@ pub struct WindowActionResult {
 
 fn act(token: &str, action: &str, value: Option<&str>) -> Result<WindowActionResult, MacosError> {
     let target = Target::decode(token, now_seconds()?)?;
-    let windows = list_capturable_windows()?;
+    let windows = list_windows(WindowScope::AllSpaces)?;
     let current = windows
         .iter()
         .find(|window| window.window_id == target.window.window_id)
@@ -41,6 +43,7 @@ fn act(token: &str, action: &str, value: Option<&str>) -> Result<WindowActionRes
         &[],
         &serde_json::json!({
             "ref": target.r#ref,
+            "surface": target.surface,
             "fingerprint": target.fingerprint,
             "issued_at": target.issued_at,
             "action": action,

@@ -60,6 +60,6 @@ OCR follows the existing screenshot behavior: no sufficiently confident text mea
 
 ## Accessibility commands
 
-`window snapshot` produces an image observation and a window-level `input_target`. It does not produce AX element targets. `window inspect`, `window press`, and `window set-value` retain their existing on-screen Accessibility contract. A window appearing in `window list --all-spaces` does not imply that those commands can operate it.
+`window snapshot` produces an image observation and a window-level `input_target`. It does not produce AX element targets. `window inspect`, `window press`, and `window set-value` can use off-screen windows when AX exposes an unambiguous matching window. Inspection also supports `--surface menu`, anchored to the app's main window. A catalog entry alone does not prove AX availability. See [Exploring app interfaces](window-exploration.md).
 
 `screenshot windows` continues to list on-screen windows. Its results now also include `is_onscreen`. Existing `screenshot` image-capture commands retain their behavior.

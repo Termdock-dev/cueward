@@ -10,7 +10,8 @@ let path = parts.compactMap { Int($0) }
 guard path.first == 0, path.count == parts.count, path.count <= 13,
       path.allSatisfy({ $0 >= 0 }) else { fail("invalid element ref") }
 
-let window = bindWindow()
+let surface = request["surface"] as? String ?? "window"
+let window = bindInspectionRoot(surface)
 var element = window
 var parentIdentity = ""
 var identity = fingerprint(describeElement(element), parent: parentIdentity)
@@ -27,11 +28,19 @@ guard identity == expectedFingerprint,
     fail("element changed; inspect the window again")
 }
 guard node["enabled"] as? Bool != false else { fail("element is disabled") }
-validateCatalogWindow()
+validateCatalogWindow(allowOffscreen: true)
 let age = Date().timeIntervalSince1970 - issuedAt
 guard age >= 0 && age <= 300 else { fail("target expired; inspect the window again") }
 
 let frontmostBefore = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+if surface == "menu" {
+    guard node["role"] as? String == kAXMenuItemRole,
+          elements(element, kAXChildrenAttribute).isEmpty else { fail("only leaf menu items can be pressed") }
+    _ = bindInspectionRoot(surface)
+    guard NSWorkspace.shared.frontmostApplication?.processIdentifier != pid else {
+        fail("target app is in the foreground; background menu action was stopped")
+    }
+}
 var status = "sent_unverified"
 switch action {
 case "press":
@@ -60,7 +69,7 @@ default:
 
 let frontmostAfter = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
 emit([
-    "action": action, "window_id": windowID, "ref": ref, "status": status,
+    "action": action, "window_id": windowID, "surface": surface, "ref": ref, "status": status,
     "frontmost_pid_before": frontmostBefore, "frontmost_pid_after": frontmostAfter,
     "foreground_changed": frontmostBefore != frontmostAfter,
 ])

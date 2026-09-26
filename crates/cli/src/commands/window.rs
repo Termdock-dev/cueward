@@ -24,11 +24,14 @@ pub(crate) enum WindowAction {
         #[arg(long)]
         output: Option<String>,
     },
-    /// Inspect one window from `cueward screenshot windows` through Accessibility.
+    /// Explore a window or its app menu through Accessibility, including other Spaces.
     Inspect {
-        /// Window id from `cueward screenshot windows`.
+        /// Window id from `cueward window list --all-spaces`.
         #[arg(long)]
         id: u32,
+        /// Inspect the window tree or the app menu anchored to its main window.
+        #[arg(long, default_value = "window", value_parser = ["window", "menu"])]
+        surface: String,
         /// Absolute element ref to explore in the current tree; defaults to the window root.
         #[arg(long, default_value = "0")]
         root: String,
@@ -150,6 +153,7 @@ pub(crate) fn dispatch(action: WindowAction) {
         ),
         WindowAction::Inspect {
             id,
+            surface,
             root,
             limit,
             depth,
@@ -157,8 +161,18 @@ pub(crate) fn dispatch(action: WindowAction) {
             ocr,
         } => output(
             "window/inspect",
-            cueward_adapter_macos::window::inspect_window_subtree(
-                id, &root, limit, depth, screenshot, ocr,
+            cueward_adapter_macos::window::inspect_window_surface(
+                id,
+                if surface == "menu" {
+                    cueward_adapter_macos::window::AccessibilitySurface::Menu
+                } else {
+                    cueward_adapter_macos::window::AccessibilitySurface::Window
+                },
+                &root,
+                limit,
+                depth,
+                screenshot,
+                ocr,
             ),
         ),
         WindowAction::Press { target } => output(

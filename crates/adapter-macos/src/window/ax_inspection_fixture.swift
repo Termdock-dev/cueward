@@ -17,7 +17,8 @@ let kAXChildrenAttribute = "children"
 let windowID = 42
 let pid = 123
 func bindWindow() -> AXUIElement { fixtureRoot }
-func validateCatalogWindow() {}
+func bindInspectionRoot(_ surface: String) -> AXUIElement { fixtureRoot }
+func validateCatalogWindow(allowOffscreen: Bool = false) {}
 func elements(_ element: AXUIElement, _ attribute: String) -> [AXUIElement] { element.children }
 func describeElement(_ element: AXUIElement) -> [String: Any] { ["name": element.name] }
 func fingerprint(_ node: [String: Any], parent: String) -> String {
