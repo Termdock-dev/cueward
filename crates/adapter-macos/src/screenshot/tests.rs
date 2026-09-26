@@ -1,8 +1,9 @@
 use std::path::Path;
 
 use super::{
-    ensure_screenshot_file_exists, validate_display, validate_user_output_path, windows::parse_window_list_payload,
-    windows::find_capturable_window, windows::select_capturable_windows, windows::WindowCatalogEntry, WindowBounds,
+    WindowBounds, WindowScope, ensure_screenshot_file_exists, validate_display,
+    validate_user_output_path, windows::WindowCatalogEntry, windows::find_capturable_window,
+    windows::parse_window_list_payload, windows::select_capturable_windows,
 };
 
 #[test]
@@ -116,7 +117,7 @@ fn select_capturable_windows_filters_out_noise_windows() {
     ]"#;
 
     let windows = parse_window_list_payload(payload).expect("parse");
-    let selected = select_capturable_windows(windows);
+    let selected = select_capturable_windows(windows, WindowScope::OnScreen);
 
     assert_eq!(selected.len(), 1);
     assert_eq!(selected[0].window_id, 1);
@@ -150,7 +151,7 @@ fn select_capturable_windows_sorts_frontmost_windows_first() {
     ]"#;
 
     let windows = parse_window_list_payload(payload).expect("parse");
-    let selected = select_capturable_windows(windows);
+    let selected = select_capturable_windows(windows, WindowScope::OnScreen);
 
     assert_eq!(selected[0].window_id, 11);
     assert_eq!(selected[1].window_id, 10);
@@ -172,7 +173,10 @@ fn select_capturable_windows_can_find_window_id() {
       }
     ]"#;
 
-    let windows = select_capturable_windows(parse_window_list_payload(payload).expect("parse"));
+    let windows = select_capturable_windows(
+        parse_window_list_payload(payload).expect("parse"),
+        WindowScope::OnScreen,
+    );
 
     assert!(windows.iter().any(|window| window.window_id == 88));
 }
@@ -193,8 +197,59 @@ fn find_capturable_window_rejects_missing_id() {
       }
     ]"#;
 
-    let windows = select_capturable_windows(parse_window_list_payload(payload).expect("parse"));
+    let windows = select_capturable_windows(
+        parse_window_list_payload(payload).expect("parse"),
+        WindowScope::OnScreen,
+    );
     let err = find_capturable_window(&windows, 999).expect_err("missing id should fail");
 
     assert_eq!(err.to_string(), "window id not found: 999");
+}
+
+#[test]
+fn all_spaces_includes_offscreen_windows_without_admitting_noise() {
+    let bounds = WindowBounds {
+        x: -900,
+        y: 100,
+        width: 800,
+        height: 600,
+    };
+    let visible = WindowCatalogEntry {
+        window_id: 1,
+        app: "Fixture".into(),
+        title: "Visible".into(),
+        owner_pid: 100,
+        layer: 0,
+        alpha: 1.0,
+        is_onscreen: true,
+        is_frontmost: false,
+        bounds,
+    };
+    let mut hidden = visible.clone();
+    hidden.window_id = 2;
+    hidden.title = "Other desktop".into();
+    hidden.is_onscreen = false;
+    let mut overlay = hidden.clone();
+    overlay.window_id = 3;
+    overlay.layer = 25;
+    let mut empty = hidden.clone();
+    empty.window_id = 4;
+    empty.title.clear();
+    let mut transparent = hidden.clone();
+    transparent.window_id = 5;
+    transparent.alpha = 0.0;
+    let entries = vec![visible, hidden, overlay, empty, transparent];
+    let default = select_capturable_windows(entries.clone(), WindowScope::OnScreen);
+    assert_eq!(
+        default.iter().map(|w| w.window_id).collect::<Vec<_>>(),
+        vec![1]
+    );
+    let all = select_capturable_windows(entries, WindowScope::AllSpaces);
+    assert_eq!(
+        all.iter().map(|w| w.window_id).collect::<Vec<_>>(),
+        vec![2, 1]
+    );
+    assert!(!all[0].is_onscreen);
+    assert!(all[1].is_onscreen);
+    assert_eq!(all[0].bounds.x, -900);
 }

@@ -8,10 +8,13 @@ use crate::screenshot::{
 mod actions;
 mod bridge;
 mod process;
+mod snapshot;
 mod target;
 
+pub use crate::screenshot::{WindowScope, list_windows};
 pub use actions::{ActionStatus, WindowActionResult, press, set_value};
 use bridge::run_ax;
+pub use snapshot::{SnapshotImage, WindowSnapshot, snapshot_window};
 use target::{Target, WindowIdentity, now_seconds};
 
 #[cfg(test)]
@@ -19,6 +22,9 @@ mod tests;
 
 #[cfg(test)]
 mod ax_tests;
+
+#[cfg(test)]
+mod snapshot_live_tests;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccessibilityNode {

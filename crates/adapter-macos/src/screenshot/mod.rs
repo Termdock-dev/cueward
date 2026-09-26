@@ -2,10 +2,13 @@ mod capture;
 mod windows;
 
 pub use capture::{
-    capture, capture_window, ensure_screenshot_file_exists, validate_display, validate_user_output_path,
-    ScreenshotResult,
+    ScreenshotResult, capture, capture_window, ensure_screenshot_file_exists, validate_display,
+    validate_user_output_path,
 };
-pub use windows::{list_capturable_windows, CapturableWindow, WindowBounds};
+pub(crate) use capture::{capture_window_frame, ensure_cache_dir};
+pub use windows::{
+    CapturableWindow, WindowBounds, WindowScope, list_capturable_windows, list_windows,
+};
 
 #[cfg(test)]
 mod tests;

@@ -521,7 +521,7 @@ cueward screenshot --output ~/Desktop/shot.png --ocr
 
 ### Window inspection and actions (PoC)
 
-Inspect an on-screen window in any macOS app that exposes Accessibility elements:
+For window discovery and image snapshots across Spaces, see [Window discovery and snapshots](docs/window-observation.md). Inspect an on-screen window in any macOS app that exposes Accessibility elements:
 
 ```bash
 # Find the window id

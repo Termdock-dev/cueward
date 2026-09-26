@@ -56,7 +56,7 @@ pub fn ensure_screenshot_file_exists(path: &Path) -> Result<(), String> {
     }
 }
 
-fn ensure_cache_dir() -> Result<String, MacosError> {
+pub(crate) fn ensure_cache_dir() -> Result<String, MacosError> {
     let home = std::env::var("HOME").map_err(|_| MacosError::Other("HOME not set".into()))?;
     let dir = format!("{home}/{CACHE_DIR}");
     fs::create_dir_all(&dir)
@@ -108,7 +108,11 @@ fn capture_to_path(
     let ocr_text = if ocr {
         match crate::ocr::capture(&path) {
             Ok(cues) => {
-                let text = cues.into_iter().map(|c| c.content).collect::<Vec<_>>().join("\n");
+                let text = cues
+                    .into_iter()
+                    .map(|c| c.content)
+                    .collect::<Vec<_>>()
+                    .join("\n");
                 if text.is_empty() { None } else { Some(text) }
             }
             Err(e) => {
@@ -151,5 +155,15 @@ pub fn capture_window(
 ) -> Result<ScreenshotResult, MacosError> {
     capture_to_path(ocr, output, &format!("-w{window_id}"), |cmd| {
         cmd.args(["-l", &window_id.to_string()]);
+    })
+}
+
+pub(crate) fn capture_window_frame(
+    ocr: bool,
+    output: &str,
+    window_id: u32,
+) -> Result<ScreenshotResult, MacosError> {
+    capture_to_path(ocr, Some(output), "", |cmd| {
+        cmd.args(["-t", "png", "-o", "-a", "-l", &window_id.to_string()]);
     })
 }

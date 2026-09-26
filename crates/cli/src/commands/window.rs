@@ -6,6 +6,24 @@ use super::helpers::print_external;
 
 #[derive(Subcommand)]
 pub(crate) enum WindowAction {
+    /// List titled application windows without activating them.
+    List {
+        /// Include off-screen windows, such as other Spaces or minimized windows.
+        #[arg(long)]
+        all_spaces: bool,
+    },
+    /// Capture a window, including another Space, with image coordinate metadata.
+    Snapshot {
+        /// Window id from `cueward window list --all-spaces`.
+        #[arg(long)]
+        id: u32,
+        /// Run OCR on the captured window.
+        #[arg(long)]
+        ocr: bool,
+        /// Save the PNG here after the window identity has been rechecked.
+        #[arg(long)]
+        output: Option<String>,
+    },
     /// Inspect one window from `cueward screenshot windows` through Accessibility.
     Inspect {
         /// Window id from `cueward screenshot windows`.
@@ -43,6 +61,23 @@ pub(crate) enum WindowAction {
 
 pub(crate) fn dispatch(action: WindowAction) {
     match action {
+        WindowAction::List { all_spaces } => {
+            use cueward_adapter_macos::window::{WindowScope, list_windows};
+            let scope = if all_spaces {
+                WindowScope::AllSpaces
+            } else {
+                WindowScope::OnScreen
+            };
+            output("window/list", list_windows(scope));
+        }
+        WindowAction::Snapshot {
+            id,
+            ocr,
+            output: destination,
+        } => output(
+            "window/snapshot",
+            cueward_adapter_macos::window::snapshot_window(id, ocr, destination.as_deref()),
+        ),
         WindowAction::Inspect {
             id,
             limit,

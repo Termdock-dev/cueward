@@ -19,6 +19,7 @@ pub struct CapturableWindow {
     pub title: String,
     pub owner_pid: i32,
     pub is_frontmost: bool,
+    pub is_onscreen: bool,
     pub bounds: WindowBounds,
 }
 
@@ -35,18 +36,30 @@ pub(crate) struct WindowCatalogEntry {
     pub bounds: WindowBounds,
 }
 
-pub(crate) fn parse_window_list_payload(payload: &str) -> Result<Vec<WindowCatalogEntry>, MacosError> {
+pub(crate) fn parse_window_list_payload(
+    payload: &str,
+) -> Result<Vec<WindowCatalogEntry>, MacosError> {
     serde_json::from_str(payload)
         .map_err(|error| MacosError::Other(format!("failed to parse window list: {error}")))
 }
 
-pub(crate) fn select_capturable_windows(entries: Vec<WindowCatalogEntry>) -> Vec<CapturableWindow> {
+/// Which window visibility states to include in the catalog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowScope {
+    OnScreen,
+    AllSpaces,
+}
+
+pub(crate) fn select_capturable_windows(
+    entries: Vec<WindowCatalogEntry>,
+    scope: WindowScope,
+) -> Vec<CapturableWindow> {
     let mut windows = entries
         .into_iter()
         .filter(|entry| !entry.app.trim().is_empty())
         .filter(|entry| !entry.title.trim().is_empty())
         .filter(|entry| entry.bounds.width > 0 && entry.bounds.height > 0)
-        .filter(|entry| entry.is_onscreen)
+        .filter(|entry| scope == WindowScope::AllSpaces || entry.is_onscreen)
         .filter(|entry| entry.alpha > 0.0)
         .filter(|entry| entry.layer == 0)
         .filter(|entry| !is_noise_window(entry))
@@ -56,6 +69,7 @@ pub(crate) fn select_capturable_windows(entries: Vec<WindowCatalogEntry>) -> Vec
             title: entry.title,
             owner_pid: entry.owner_pid,
             is_frontmost: entry.is_frontmost,
+            is_onscreen: entry.is_onscreen,
             bounds: entry.bounds,
         })
         .collect::<Vec<_>>();
@@ -64,8 +78,16 @@ pub(crate) fn select_capturable_windows(entries: Vec<WindowCatalogEntry>) -> Vec
         right
             .is_frontmost
             .cmp(&left.is_frontmost)
-            .then_with(|| left.app.to_ascii_lowercase().cmp(&right.app.to_ascii_lowercase()))
-            .then_with(|| left.title.to_ascii_lowercase().cmp(&right.title.to_ascii_lowercase()))
+            .then_with(|| {
+                left.app
+                    .to_ascii_lowercase()
+                    .cmp(&right.app.to_ascii_lowercase())
+            })
+            .then_with(|| {
+                left.title
+                    .to_ascii_lowercase()
+                    .cmp(&right.title.to_ascii_lowercase())
+            })
             .then_with(|| left.window_id.cmp(&right.window_id))
     });
 
@@ -75,8 +97,7 @@ pub(crate) fn select_capturable_windows(entries: Vec<WindowCatalogEntry>) -> Vec
 fn is_noise_window(entry: &WindowCatalogEntry) -> bool {
     matches!(
         (entry.app.as_str(), entry.title.as_str()),
-        ("WindowManager", "App Icon Window")
-            | ("WindowManager", "Gesture Blocking Overlay")
+        ("WindowManager", "App Icon Window") | ("WindowManager", "Gesture Blocking Overlay")
     )
 }
 
@@ -93,50 +114,14 @@ pub(crate) fn find_capturable_window(
 
 /// List on-screen windows that can be captured, sorted with frontmost first.
 pub fn list_capturable_windows() -> Result<Vec<CapturableWindow>, MacosError> {
-    let script = r#"import AppKit
-import CoreGraphics
-import Foundation
-
-let frontmostPid = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
-let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
-guard let raw = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
-    fputs("failed to read window list\n", stderr)
-    exit(1)
+    list_windows(WindowScope::OnScreen)
 }
 
-let payload: [[String: Any]] = raw.compactMap { item in
-    guard let windowId = item[kCGWindowNumber as String] as? NSNumber else { return nil }
-    let ownerPid = (item[kCGWindowOwnerPID as String] as? NSNumber)?.intValue ?? 0
-    let layer = (item[kCGWindowLayer as String] as? NSNumber)?.intValue ?? -1
-    let alpha = (item[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1.0
-    let isOnscreen = (item[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue ?? false
-    let owner = (item[kCGWindowOwnerName as String] as? String) ?? ""
-    let title = (item[kCGWindowName as String] as? String) ?? ""
-    let boundsDict = (item[kCGWindowBounds as String] as? NSDictionary) ?? [:]
-    let rect = CGRect(dictionaryRepresentation: boundsDict) ?? .zero
-
-    return [
-        "window_id": windowId.uint32Value,
-        "app": owner,
-        "title": title,
-        "owner_pid": ownerPid,
-        "layer": layer,
-        "alpha": alpha,
-        "is_onscreen": isOnscreen,
-        "is_frontmost": ownerPid == frontmostPid,
-        "bounds": [
-            "x": Int(rect.origin.x),
-            "y": Int(rect.origin.y),
-            "width": Int(rect.size.width),
-            "height": Int(rect.size.height),
-        ],
-    ]
-}
-
-let data = try JSONSerialization.data(withJSONObject: payload, options: [])
-if let text = String(data: data, encoding: .utf8) {
-    print(text)
-}"#;
+/// List titled application window candidates, optionally including non-visible windows.
+/// Off-screen windows may belong to another Space, be hidden, or be minimized;
+/// their presence in this catalog does not guarantee capture is available.
+pub fn list_windows(scope: WindowScope) -> Result<Vec<CapturableWindow>, MacosError> {
+    let script = include_str!("window_catalog.swift");
 
     let mut file = tempfile::NamedTempFile::with_suffix(".swift")
         .map_err(|error| MacosError::Other(format!("failed to create swift temp file: {error}")))?;
@@ -145,15 +130,22 @@ if let text = String(data: data, encoding: .utf8) {
 
     let output = Command::new("swift")
         .arg(file.path())
+        .arg(if scope == WindowScope::AllSpaces {
+            "all"
+        } else {
+            "onscreen"
+        })
         .output()
         .map_err(|error| MacosError::Other(format!("swift: {error}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(MacosError::Other(format!("failed to list windows: {stderr}")));
+        return Err(MacosError::Other(format!(
+            "failed to list windows: {stderr}"
+        )));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed = parse_window_list_payload(&stdout)?;
-    Ok(select_capturable_windows(parsed))
+    Ok(select_capturable_windows(parsed, scope))
 }
