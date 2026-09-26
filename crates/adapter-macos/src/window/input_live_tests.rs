@@ -21,7 +21,7 @@ impl Drop for Receiver {
 }
 
 impl Receiver {
-    fn start(interrupt: bool) -> Self {
+    pub(super) fn start(interrupt: bool) -> Self {
         Self::with_source(
             include_str!("input_fixture.swift"),
             if interrupt { "interrupt" } else { "normal" },

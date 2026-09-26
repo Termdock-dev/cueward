@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
 use super::bridge::run_ax;
-use super::input_lock::lock_input;
+use super::input_lock::input_lock_path;
 use super::input_target::InputTarget;
 use super::target::{WindowIdentity, now_seconds};
 use crate::MacosError;
@@ -44,7 +44,6 @@ pub struct BackgroundInputStatus {
 }
 
 fn send<T: DeserializeOwned>(target: InputTarget, mut request: Value) -> Result<T, MacosError> {
-    let _lock = lock_input(target.window.owner_pid)?;
     let current = list_windows(WindowScope::AllSpaces)?
         .into_iter()
         .find(|window| window.window_id == target.window.window_id)
@@ -55,6 +54,13 @@ fn send<T: DeserializeOwned>(target: InputTarget, mut request: Value) -> Result<
         ));
     }
     request["issued_at"] = json!(target.issued_at);
+    request["caller_pid"] = json!(std::process::id());
+    let lock_path = input_lock_path(target.window.owner_pid)?;
+    request["lock_path"] = json!(
+        lock_path
+            .to_str()
+            .ok_or_else(|| MacosError::Other("input lock path must be valid UTF-8".into()))?
+    );
     run_ax(
         &target.window,
         include_str!("background_input.swift"),
