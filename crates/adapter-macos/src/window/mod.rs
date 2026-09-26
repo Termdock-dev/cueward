@@ -23,6 +23,9 @@ mod tests;
 #[cfg(test)]
 mod ax_tests;
 
+#[cfg(test)]
+mod snapshot_live_tests;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccessibilityNode {
     pub r#ref: String,
