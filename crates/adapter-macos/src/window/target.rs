@@ -3,6 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
 
+use super::AccessibilitySurface;
 use crate::MacosError;
 use crate::screenshot::{CapturableWindow, WindowBounds};
 
@@ -30,6 +31,8 @@ pub(super) struct Target {
     pub version: u8,
     pub issued_at: u64,
     pub window: WindowIdentity,
+    #[serde(default)]
+    pub surface: AccessibilitySurface,
     pub r#ref: String,
     pub fingerprint: String,
 }
@@ -51,7 +54,11 @@ impl Target {
         let target: Self = serde_json::from_slice(&bytes)
             .map_err(|_| MacosError::Other("invalid window target token".into()))?;
         let age = now.checked_sub(target.issued_at);
-        if target.version != 1 || age.is_none_or(|age| age > 300) {
+        let supported = matches!(
+            (target.version, target.surface),
+            (1, AccessibilitySurface::Window) | (2, AccessibilitySurface::Menu)
+        );
+        if !supported || age.is_none_or(|age| age > 300) {
             return Err(MacosError::Other(
                 "window target expired or unsupported; inspect again".into(),
             ));
@@ -87,6 +94,7 @@ mod tests {
         Target {
             version: 1,
             issued_at: 1_000,
+            surface: AccessibilitySurface::Window,
             window: WindowIdentity {
                 window_id: 42,
                 owner_pid: 123,
@@ -124,5 +132,28 @@ mod tests {
         let mut target = target();
         target.version = 2;
         assert!(Target::decode(&target.encode().expect("token"), 1_000).is_err());
+    }
+
+    #[test]
+    fn menu_targets_require_their_own_version_and_preserve_legacy_window_tokens() {
+        let mut legacy = serde_json::to_value(target()).expect("legacy target");
+        legacy.as_object_mut().expect("object").remove("surface");
+        let encoded = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&legacy).expect("legacy JSON"));
+        assert_eq!(
+            Target::decode(&encoded, 1000).expect("legacy").surface,
+            AccessibilitySurface::Window
+        );
+        let mut menu = target();
+        menu.surface = AccessibilitySurface::Menu;
+        assert!(Target::decode(&menu.encode().expect("v1 menu"), 1000).is_err());
+        menu.version = 2;
+        assert_eq!(
+            Target::decode(&menu.encode().expect("menu"), 1000)
+                .expect("v2")
+                .surface,
+            AccessibilitySurface::Menu
+        );
+        menu.surface = AccessibilitySurface::Window;
+        assert!(Target::decode(&menu.encode().expect("v2 window"), 1000).is_err());
     }
 }

@@ -521,11 +521,11 @@ cueward screenshot --output ~/Desktop/shot.png --ocr
 
 ### Window inspection and actions (PoC)
 
-For window discovery and image snapshots across Spaces, see [Window discovery and snapshots](docs/window-observation.md). For background Unicode input, keys, scrolling, clicks, drags, and dispatch readiness checks, see [Background input](docs/background-input.md). Inspect an on-screen window in any macOS app that exposes Accessibility elements:
+For window discovery and image snapshots across Spaces, see [Window discovery and snapshots](docs/window-observation.md). For background Unicode input, keys, scrolling, clicks, drags, and dispatch readiness checks, see [Background input](docs/background-input.md). Inspect a window, including another Space when the app exposes the relevant Accessibility elements:
 
 ```bash
-# Find the window id
-cueward screenshot windows
+# Find the window id, including other Spaces
+cueward window list --all-spaces
 
 # Read its Accessibility element tree
 cueward window inspect --id 12345
@@ -536,12 +536,15 @@ cueward window inspect --id 12345 --limit 100 --depth 6 --ocr
 # Explore a group using an element ref from the current inspection
 cueward window inspect --id 12345 --root 0.1 --depth 2
 
+# Explore the app menu using its main window as context
+cueward window inspect --id 12345 --surface menu
+
 # Use a node's target token from the inspection result
 cueward window press --target '<target token>'
 cueward window set-value --target '<text field target token>' --value 'Draft text'
 ```
 
-These commands require the Swift toolchain (`swift` on PATH), Accessibility access, and permission to read window metadata. Inspection returns window identity, element roles, names, values, actions, element refs, child counts, and available bounds. Password fields omit values and action targets. `truncated` reports when the node or depth limit omitted elements. See [Exploring app interfaces](docs/window-exploration.md) for subtree navigation, coordinates, and result verification.
+These commands require the Swift toolchain (`swift` on PATH), Accessibility access, and permission to read window metadata. Inspection returns window identity, element roles, names, values, actions, element refs, child counts, and available bounds. Password fields omit values and action targets. `truncated` reports when the node or depth limit omitted elements. See [Exploring app interfaces](docs/window-exploration.md) for subtree navigation, menus, sheets, coordinates, and result verification.
 
 Actionable nodes include a `target` token valid for five minutes. Actions recheck the window's process, title, and bounds, then the element's path, attributes, and ancestors. Changed or ambiguous targets return an error and require a fresh inspection. These checks use observable attributes; they cannot distinguish a replacement with identical attributes at the same location. Tokens are snapshot references, not authorization credentials.
 

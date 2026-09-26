@@ -18,7 +18,7 @@ pub use input::{
     BackgroundInputResult, BackgroundInputStatus, InputDelivery, InputRouteStatus, click, drag,
     input_status, key, scroll, type_text,
 };
-pub use inspection::{inspect_window, inspect_window_subtree};
+pub use inspection::{inspect_window, inspect_window_subtree, inspect_window_surface};
 pub use snapshot::{SnapshotImage, WindowSnapshot, snapshot_window};
 
 #[cfg(test)]
@@ -38,6 +38,9 @@ mod pointer_live_tests;
 
 #[cfg(test)]
 mod input_lifetime_tests;
+
+#[cfg(test)]
+mod menu_live_tests;
 
 /// Element frame in global macOS screen points, with a top-left origin.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -76,9 +79,28 @@ pub struct AccessibilityNode {
 pub struct AccessibilitySnapshot {
     pub window_id: u32,
     pub owner_pid: i32,
+    pub surface: AccessibilitySurface,
     pub root_ref: String,
     pub nodes: Vec<AccessibilityNode>,
     pub truncated: bool,
+}
+
+/// Accessibility tree to explore using a verified window as context.
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AccessibilitySurface {
+    #[default]
+    Window,
+    Menu,
+}
+
+impl AccessibilitySurface {
+    pub(super) fn as_str(self) -> &'static str {
+        match self {
+            Self::Window => "window",
+            Self::Menu => "menu",
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]

@@ -1,8 +1,9 @@
-guard CommandLine.arguments.count == 11,
+guard (11...12).contains(CommandLine.arguments.count),
       let limit = Int(CommandLine.arguments[8]),
       let maxDepth = Int(CommandLine.arguments[9]) else { fail("invalid inspection arguments") }
 
-let window = bindWindow()
+let surface = CommandLine.arguments.count == 12 ? CommandLine.arguments[11] : "window"
+let window = bindInspectionRoot(surface)
 let rootRef = CommandLine.arguments[10]
 let parts = rootRef.split(separator: ".", omittingEmptySubsequences: false)
 let path = parts.compactMap { Int($0) }
@@ -51,5 +52,5 @@ func walk(_ element: AXUIElement, ref: String, parent: String?, parentFingerprin
 
 let parentRef = path.count > 1 ? parts.dropLast().joined(separator: ".") : nil
 walk(root, ref: rootRef, parent: parentRef, parentFingerprint: rootParentFingerprint, depth: 0)
-validateCatalogWindow()
-emit(["window_id": windowID, "owner_pid": pid, "root_ref": rootRef, "nodes": nodes, "truncated": truncated])
+validateCatalogWindow(allowOffscreen: true)
+emit(["window_id": windowID, "owner_pid": pid, "surface": surface, "root_ref": rootRef, "nodes": nodes, "truncated": truncated])

@@ -97,8 +97,15 @@ func validateCatalogWindow(allowOffscreen: Bool = false, exactBounds: Bool = fal
 }
 
 func bindWindow() -> AXUIElement {
-    validateCatalogWindow()
-    let matches = elements(application, kAXWindowsAttribute).filter { element in
+    validateCatalogWindow(allowOffscreen: true)
+    var candidates = elements(application, kAXWindowsAttribute)
+    for name in [kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
+        if let raw = attribute(application, name), CFGetTypeID(raw) == AXUIElementGetTypeID() {
+            let element = raw as! AXUIElement
+            if !candidates.contains(where: { CFEqual($0, element) }) { candidates.append(element) }
+        }
+    }
+    let matches = candidates.filter { element in
         guard text(attribute(element, kAXTitleAttribute)) == expectedTitle,
               let frame = bounds(element) else { return false }
         return sameBounds(frame, expectedBounds)
@@ -106,7 +113,34 @@ func bindWindow() -> AXUIElement {
     guard matches.count == 1 else {
         fail("window binding is unproven: \(matches.count) AX windows match window \(windowID)")
     }
+    // A focused/main fallback must not hide another catalog window with the same identity.
+    let rows = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    let catalogMatches = rows.filter { row in
+        guard (row[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid,
+              row[kCGWindowName as String] as? String == expectedTitle,
+              let raw = row[kCGWindowBounds as String] as? NSDictionary,
+              let frame = CGRect(dictionaryRepresentation: raw) else { return false }
+        return sameBounds(frame, expectedBounds)
+    }
+    guard catalogMatches.count == 1 else { fail("window binding is ambiguous in the system catalog") }
     return matches[0]
+}
+
+func bindInspectionRoot(_ surface: String) -> AXUIElement {
+    let window = bindWindow()
+    if surface == "window" { return window }
+    guard surface == "menu",
+          let main = attribute(application, kAXMainWindowAttribute),
+          CFGetTypeID(main) == AXUIElementGetTypeID(), CFEqual(main, window) else {
+        fail("menu context is not the verified main window; inspect again")
+    }
+    guard let focused = attribute(application, kAXFocusedWindowAttribute),
+          CFGetTypeID(focused) == AXUIElementGetTypeID(), CFEqual(focused, window) else {
+        fail("menu context is not the verified focused window; inspect the current dialog or window")
+    }
+    guard let raw = attribute(application, kAXMenuBarAttribute),
+          CFGetTypeID(raw) == AXUIElementGetTypeID() else { fail("app menu bar is unavailable") }
+    return raw as! AXUIElement
 }
 
 func actionNames(_ element: AXUIElement) -> [String] {

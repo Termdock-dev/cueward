@@ -54,6 +54,7 @@ fn parses_window_inspection_with_image_options() {
             action:
                 WindowAction::Inspect {
                     id,
+                    surface,
                     root,
                     limit,
                     depth,
@@ -62,6 +63,7 @@ fn parses_window_inspection_with_image_options() {
                 },
         } => {
             assert_eq!(id, 123);
+            assert_eq!(surface, "window");
             assert_eq!(root, "0");
             assert_eq!(limit, 40);
             assert_eq!(depth, 4);
@@ -70,6 +72,37 @@ fn parses_window_inspection_with_image_options() {
         }
         _ => panic!("wrong command"),
     }
+}
+
+#[test]
+fn parses_menu_inspection_and_rejects_unknown_surfaces() {
+    let cli = Cli::try_parse_from([
+        "cueward",
+        "window",
+        "inspect",
+        "--id",
+        "42",
+        "--surface",
+        "menu",
+        "--root",
+        "0.1",
+    ])
+    .expect("menu inspection");
+    assert!(matches!(cli.command, Command::Window {
+        action: WindowAction::Inspect { surface, root, .. }
+    } if surface == "menu" && root == "0.1"));
+    assert!(
+        Cli::try_parse_from([
+            "cueward",
+            "window",
+            "inspect",
+            "--id",
+            "42",
+            "--surface",
+            "desktop",
+        ])
+        .is_err()
+    );
 }
 
 #[test]
