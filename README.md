@@ -533,12 +533,15 @@ cueward window inspect --id 12345
 # Limit the tree and include a window screenshot with OCR
 cueward window inspect --id 12345 --limit 100 --depth 6 --ocr
 
+# Explore a group using an element ref from the current inspection
+cueward window inspect --id 12345 --root 0.1 --depth 2
+
 # Use a node's target token from the inspection result
 cueward window press --target '<target token>'
 cueward window set-value --target '<text field target token>' --value 'Draft text'
 ```
 
-These commands require the Swift toolchain (`swift` on PATH), Accessibility access, and permission to read window metadata. Inspection returns window identity, element roles, names, values, actions, and element refs. Password fields omit values and action targets. `truncated` reports when the node or depth limit omitted elements.
+These commands require the Swift toolchain (`swift` on PATH), Accessibility access, and permission to read window metadata. Inspection returns window identity, element roles, names, values, actions, element refs, child counts, and available bounds. Password fields omit values and action targets. `truncated` reports when the node or depth limit omitted elements. See [Exploring app interfaces](docs/window-exploration.md) for subtree navigation, coordinates, and result verification.
 
 Actionable nodes include a `target` token valid for five minutes. Actions recheck the window's process, title, and bounds, then the element's path, attributes, and ancestors. Changed or ambiguous targets return an error and require a fresh inspection. These checks use observable attributes; they cannot distinguish a replacement with identical attributes at the same location. Tokens are snapshot references, not authorization credentials.
 

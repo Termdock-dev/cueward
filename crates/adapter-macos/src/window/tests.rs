@@ -4,7 +4,9 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use super::target::{Target, now_seconds};
-use super::{ActionStatus, WindowInspectResult, inspect_window, press, set_value};
+use super::{
+    ActionStatus, WindowInspectResult, inspect_window, inspect_window_subtree, press, set_value,
+};
 use crate::screenshot::list_capturable_windows;
 
 struct Fixture {
@@ -100,6 +102,7 @@ fn target(result: &WindowInspectResult, name: &str) -> String {
 fn check_inspection(fixture: &Fixture, result: &WindowInspectResult) {
     assert_eq!(result.window.owner_pid, fixture.child.id() as i32);
     assert!(!result.accessibility.truncated);
+    assert_eq!(result.accessibility.root_ref, "0");
     assert!(
         result
             .accessibility
@@ -120,6 +123,59 @@ fn check_inspection(fixture: &Fixture, result: &WindowInspectResult) {
         inspect_window(fixture.window_id, 1, 6, false, false).expect("limited inspection");
     assert_eq!(limited.accessibility.nodes.len(), 1);
     assert!(limited.accessibility.truncated);
+}
+
+#[test]
+#[ignore = "requires a logged-in macOS desktop and Accessibility permission"]
+fn window_subtree_inspection_preserves_action_targets() {
+    let fixture = Fixture::launch();
+    let overview = inspect_window(fixture.window_id, 100, 1, false, false).expect("shallow view");
+    assert!(overview.accessibility.truncated);
+    let group = overview
+        .accessibility
+        .nodes
+        .iter()
+        .find(|node| node.role == "AXGroup" && node.name == "Editor")
+        .expect("discover editor group");
+    assert!(group.child_count > 0);
+    let frame = group.bounds.as_ref().expect("group geometry");
+    assert!(frame.width > 0.0 && frame.height > 0.0);
+    let detail = inspect_window_subtree(fixture.window_id, &group.r#ref, 100, 6, false, false)
+        .expect("explore group");
+    assert_eq!(detail.accessibility.root_ref, group.r#ref);
+    assert!(!detail.accessibility.truncated);
+    assert!(
+        detail
+            .accessibility
+            .nodes
+            .iter()
+            .all(|node| node.r#ref == group.r#ref
+                || node.r#ref.starts_with(&format!("{}.", group.r#ref)))
+    );
+    let full = fixture.inspect();
+    for node in &detail.accessibility.nodes {
+        let original = full
+            .accessibility
+            .nodes
+            .iter()
+            .find(|n| n.r#ref == node.r#ref)
+            .expect("absolute ref");
+        assert_eq!(node.fingerprint, original.fingerprint);
+    }
+    press(&target(&detail, "Increment")).expect("press a subtree target");
+    fixture.wait_for_state(1, "draft");
+    let fresh = inspect_window_subtree(fixture.window_id, &group.r#ref, 100, 6, false, false)
+        .expect("observe after action");
+    assert!(
+        fresh
+            .accessibility
+            .nodes
+            .iter()
+            .any(|node| node.value.as_deref() == Some("pressed 1"))
+    );
+    let result = set_value(&target(&fresh, "Draft"), "explored").expect("set a subtree target");
+    assert_eq!(result.status, ActionStatus::Confirmed);
+    fixture.wait_for_state(1, "explored");
 }
 
 #[test]

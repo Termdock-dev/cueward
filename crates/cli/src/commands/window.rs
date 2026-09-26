@@ -29,10 +29,13 @@ pub(crate) enum WindowAction {
         /// Window id from `cueward screenshot windows`.
         #[arg(long)]
         id: u32,
+        /// Absolute element ref to explore in the current tree; defaults to the window root.
+        #[arg(long, default_value = "0")]
+        root: String,
         /// Maximum number of accessibility nodes to return.
         #[arg(long, default_value_t = 200)]
         limit: usize,
-        /// Maximum depth below the window element.
+        /// Depth below the selected root, capped at 12 levels from the window.
         #[arg(long, default_value_t = 8)]
         depth: usize,
         /// Capture the same window after reading its accessibility elements.
@@ -80,13 +83,16 @@ pub(crate) fn dispatch(action: WindowAction) {
         ),
         WindowAction::Inspect {
             id,
+            root,
             limit,
             depth,
             screenshot,
             ocr,
         } => output(
             "window/inspect",
-            cueward_adapter_macos::window::inspect_window(id, limit, depth, screenshot, ocr),
+            cueward_adapter_macos::window::inspect_window_subtree(
+                id, &root, limit, depth, screenshot, ocr,
+            ),
         ),
         WindowAction::Press { target } => output(
             "window/press",
