@@ -1,17 +1,12 @@
-#[cfg(test)]
 use std::fs::{File, OpenOptions};
-#[cfg(test)]
 use std::os::fd::AsRawFd;
-#[cfg(test)]
 use std::os::unix::fs::OpenOptionsExt;
-#[cfg(test)]
 use std::path::Path;
 use std::path::PathBuf;
 
 use crate::MacosError;
 use crate::screenshot::ensure_cache_dir;
 
-#[cfg(test)]
 unsafe extern "C" {
     fn flock(fd: std::ffi::c_int, operation: std::ffi::c_int) -> std::ffi::c_int;
 }
@@ -25,20 +20,20 @@ pub(super) fn lock_input(pid: i32) -> Result<File, MacosError> {
     lock_path(&input_lock_path(pid)?)
 }
 
-#[cfg(test)]
-fn lock_path(path: &Path) -> Result<File, MacosError> {
+pub(super) fn lock_path(path: &Path) -> Result<File, MacosError> {
     let file = OpenOptions::new()
         .create(true)
         .truncate(false)
         .read(true)
         .write(true)
         .mode(0o600)
+        .custom_flags(0x100) // Darwin O_NOFOLLOW; std opens with O_CLOEXEC.
         .open(path)
-        .map_err(|error| MacosError::Other(format!("input lock: {error}")))?;
+        .map_err(|error| MacosError::Other(format!("operation lock: {error}")))?;
     // Darwin LOCK_EX | LOCK_NB. Closing the file releases the kernel-held lock.
     if unsafe { flock(file.as_raw_fd(), 0x02 | 0x04) } != 0 {
         return Err(MacosError::Other(
-            "another input action is running for this app; observe before retrying".into(),
+            "another operation is running; observe before retrying".into(),
         ));
     }
     Ok(file)

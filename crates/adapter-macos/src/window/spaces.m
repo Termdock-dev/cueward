@@ -11,6 +11,8 @@ typedef CFArrayRef (*WindowSpaces)(int, int, CFArrayRef);
 static DisplaySpaces displaySpaces;
 static WindowSpaces windowSpaces;
 static int connection;
+static Class createClass(void);
+static void createSpace(NSDictionary *request);
 static NSNumber *boolean(BOOL value) { return value ? @YES : @NO; }
 
 static void fail(NSString *message) {
@@ -61,7 +63,8 @@ static void listSpaces(void) {
             @"id": row[@"Display Identifier"] ?: @"", @"current_space": current, @"spaces": spaces
         }];
     }
-    emit(@{@"displays": result, @"move_window_available": boolean(moveClass() != Nil)});
+    emit(@{@"displays": result, @"move_window_available": boolean(moveClass() != Nil),
+           @"create_space_available": boolean(createClass() != Nil)});
 }
 static void submitMove(uint32_t windowID, NSDictionary *expected, NSNumber *destination, id expectedSpaces) {
     Class cls = moveClass();
@@ -142,6 +145,7 @@ int main(void) { @autoreleasepool {
     connection = getConnection();
     NSString *action = request[@"action"];
     if ([action isEqual:@"list"]) { listSpaces(); return 0; }
+    if ([action isEqual:@"create"]) { createSpace(request); return 0; }
     NSDictionary *expected = request[@"window"];
     uint32_t windowID = [expected[@"window_id"] unsignedIntValue];
     if (!windowID || !catalogIdentityMatches(windowRow(windowID), expected)) fail(@"window changed; observe again");

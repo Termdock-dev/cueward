@@ -5,8 +5,10 @@ use super::helpers::print_external;
 
 #[derive(Subcommand)]
 pub(crate) enum SpaceAction {
-    /// List existing macOS Spaces and background window-move availability.
+    /// List existing macOS Spaces and desktop-creation/window-move availability.
     List,
+    /// Create an inactive native desktop on a display selected by macOS.
+    Create,
     /// Read Space membership and a move target without capturing an image.
     Window {
         #[arg(long)]
@@ -24,9 +26,12 @@ pub(crate) enum SpaceAction {
 }
 
 pub(crate) fn dispatch(action: SpaceAction) {
-    use cueward_adapter_macos::window::{list_spaces, move_window_to_space, window_spaces};
+    use cueward_adapter_macos::window::{
+        create_space, list_spaces, move_window_to_space, window_spaces,
+    };
     match action {
         SpaceAction::List => output("space/list", list_spaces()),
+        SpaceAction::Create => output("space/create", create_space()),
         SpaceAction::Window { id } => output("space/window", window_spaces(id)),
         SpaceAction::MoveWindow { target, space } => {
             output("space/move-window", move_window_to_space(&target, space))
@@ -52,6 +57,20 @@ mod tests {
     use super::*;
     use crate::commands::{Cli, Command};
     use clap::Parser;
+    #[test]
+    fn parses_native_space_creation_without_implicit_display_selection_flags() {
+        assert!(matches!(
+            Cli::try_parse_from(["cueward", "space", "create"])
+                .expect("create")
+                .command,
+            Command::Space {
+                action: SpaceAction::Create
+            }
+        ));
+        assert!(
+            Cli::try_parse_from(["cueward", "space", "create", "--display", "unknown"]).is_err()
+        );
+    }
     #[test]
     fn parses_space_discovery_membership_and_guarded_move() {
         assert!(matches!(

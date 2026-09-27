@@ -15,6 +15,10 @@ use crate::MacosError;
 mod move_target;
 use move_target::MoveTarget;
 
+#[path = "space_create.rs"]
+mod create;
+pub use create::{SpaceCreateResult, create_space};
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SpaceInfo {
     pub id: u64,
@@ -33,6 +37,8 @@ pub struct SpaceDisplay {
 pub struct SpaceCatalog {
     pub displays: Vec<SpaceDisplay>,
     pub move_window_available: bool,
+    #[serde(default)]
+    pub create_space_available: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -62,9 +68,10 @@ pub struct SpaceMoveResult {
 
 fn run<T: DeserializeOwned>(request: Value) -> Result<T, MacosError> {
     let source = format!(
-        "{}\n{}",
+        "{}\n{}\n{}",
         include_str!("space_guards.m"),
-        include_str!("spaces.m")
+        include_str!("spaces.m"),
+        include_str!("space_create.m")
     );
     let output = run_objc(
         &source,
