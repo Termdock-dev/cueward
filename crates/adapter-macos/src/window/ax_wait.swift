@@ -20,19 +20,29 @@ struct WaitScan {
         guard visited < 500, ProcessInfo.processInfo.systemUptime < deadline else { complete = false; return }
         visited += 1
         guard let role = text(checkedAttribute(element, kAXRoleAttribute)) else { fail("wait element has no role") }
-        let title = text(checkedAttribute(element, kAXTitleAttribute))
-        let description = text(checkedAttribute(element, kAXDescriptionAttribute))
-        let name = [title, description].compactMap { $0 }.first { !$0.isEmpty } ?? ""
-        var node: [String: Any] = ["role": role, "ref": ref,
-            "name": String(name.prefix(512))]
-        if let id = text(checkedAttribute(element, kAXIdentifierAttribute)) { node["identifier"] = id }
-        if selectorMatches(node, selector) {
-            if condition == "enabled", let enabled = checkedAttribute(element, kAXEnabledAttribute) as? Bool {
-                node["enabled"] = enabled
+        if role == selector["role"] as? String {
+            var node: [String: Any] = ["role": role, "ref": ref]
+            if selector["name"] is String {
+                let title = text(checkedAttribute(element, kAXTitleAttribute))
+                // Match the same first nonempty title/description used by inspect.
+                let name = title.flatMap { $0.isEmpty ? nil : $0 }
+                    ?? text(checkedAttribute(element, kAXDescriptionAttribute)) ?? ""
+                node["name"] = String(name.prefix(512))
             }
-            let secure = role == "AXSecureTextField" || text(checkedAttribute(element, kAXSubroleAttribute)) == "AXSecureTextField"
-            if condition == "value-equals" && !secure, let value = text(checkedAttribute(element, kAXValueAttribute)) { node["value"] = value }
-            matches.append(node)
+            if selector["identifier"] is String {
+                node["identifier"] = text(checkedAttribute(element, kAXIdentifierAttribute))
+            }
+            if selectorMatches(node, selector) {
+                if condition == "enabled", let enabled = checkedAttribute(element, kAXEnabledAttribute) as? Bool {
+                    node["enabled"] = enabled
+                }
+                if condition == "value-equals" {
+                    let secure = role == "AXSecureTextField"
+                        || text(checkedAttribute(element, kAXSubroleAttribute)) == "AXSecureTextField"
+                    if !secure, let value = text(checkedAttribute(element, kAXValueAttribute)) { node["value"] = value }
+                }
+                matches.append(node)
+            }
         }
         let children = elements(element, kAXChildrenAttribute)
         if depth >= 12 { if !children.isEmpty { complete = false }; return }

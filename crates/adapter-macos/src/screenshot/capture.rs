@@ -3,13 +3,13 @@ use std::path::{Component, Path};
 use std::process::Command;
 
 use chrono::Local;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::MacosError;
 
 const CACHE_DIR: &str = ".cueward/cache/screenshots";
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ScreenshotResult {
     pub path: String,
     pub timestamp: String,

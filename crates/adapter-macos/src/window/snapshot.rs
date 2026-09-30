@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::input_target::InputTarget;
 use super::target::WindowIdentity;
@@ -22,7 +22,31 @@ pub struct SnapshotImage {
     pub origin: &'static str,
 }
 
-#[derive(Debug, Serialize)]
+impl<'de> Deserialize<'de> for SnapshotImage {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Image {
+            width: u32,
+            height: u32,
+            scale_x: f64,
+            scale_y: f64,
+            origin: String,
+        }
+        let image = Image::deserialize(deserializer)?;
+        if image.origin != "window_frame_top_left" {
+            return Err(serde::de::Error::custom("unsupported snapshot origin"));
+        }
+        Ok(Self {
+            width: image.width,
+            height: image.height,
+            scale_x: image.scale_x,
+            scale_y: image.scale_y,
+            origin: "window_frame_top_left",
+        })
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WindowSnapshot {
     pub window: CapturableWindow,
     pub screenshot: ScreenshotResult,

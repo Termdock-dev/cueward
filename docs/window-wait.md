@@ -26,6 +26,8 @@ Secure text values are not read. Duplicate matches for a value or enabled check 
 
 A node without a readable AX role also returns an error. This preserves the observation failure for the caller; it is not interpreted as absence or a normal timeout. Rediscover before continuing after an AX error.
 
+Waiting reads name and identifier attributes only when the selector requires them, and only on nodes with the selected role. A nonempty AXTitle supplies the displayed name; AXDescription is read as its fallback. Enabled state and security/value attributes are read only for their corresponding conditions. An irrelevant optional attribute failure does not stop a role-only query; a required attribute read failure still returns an error.
+
 ## Results and recovery
 
 Results report `matched`, `timed_out`, `window_gone`, `window_changed`, or `ambiguous`, along with poll count, elapsed time, observed match count, traversal completeness, and an optional current element ref. Text values are not echoed. `matched` establishes only the selected condition; it does not prove that a save, submission, or broader task succeeded.
