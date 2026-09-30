@@ -6,6 +6,12 @@ use super::helpers::print_external;
 
 #[derive(Subcommand)]
 pub(crate) enum WindowAction {
+    /// Compare a saved snapshot with a fresh observation of the same window.
+    Diff {
+        /// JSON or wrapped stdout from a previous window snapshot.
+        #[arg(long)]
+        previous: String,
+    },
     /// Wait for an observed window or element condition without replaying an action.
     Wait {
         #[command(flatten)]
@@ -139,6 +145,10 @@ pub(crate) enum WindowAction {
 
 pub(crate) fn dispatch(action: WindowAction) {
     match action {
+        WindowAction::Diff { previous } => output(
+            "window/diff",
+            cueward_adapter_macos::window::diff_window_snapshot(&previous),
+        ),
         WindowAction::Wait { args } => super::window_wait::dispatch(args),
         WindowAction::List { all_spaces } => {
             use cueward_adapter_macos::window::{WindowScope, list_windows};
@@ -239,7 +249,10 @@ pub(crate) fn dispatch(action: WindowAction) {
     }
 }
 
-pub(super) fn output<T: Serialize>(source: &str, result: Result<T, cueward_adapter_macos::MacosError>) {
+pub(super) fn output<T: Serialize>(
+    source: &str,
+    result: Result<T, cueward_adapter_macos::MacosError>,
+) {
     match result {
         Ok(result) => match serde_json::to_string_pretty(&result) {
             Ok(payload) => print_external(source, &payload),

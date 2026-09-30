@@ -4,6 +4,7 @@ use crate::screenshot::{CapturableWindow, ScreenshotResult};
 
 mod actions;
 mod bridge;
+mod diff;
 mod input;
 mod input_lock;
 mod input_target;
@@ -18,6 +19,9 @@ pub(crate) use bridge::AX_SUPPORT;
 
 pub use crate::screenshot::{WindowScope, list_windows};
 pub use actions::{ActionStatus, WindowActionResult, press, set_value};
+pub use diff::{
+    PixelBounds, SnapshotDiff, SnapshotDiffStatus, SnapshotPixelDiff, diff_window_snapshot,
+};
 pub use input::{
     BackgroundInputResult, BackgroundInputStatus, InputDelivery, InputRouteStatus, click, drag,
     input_status, key, scroll, type_text,

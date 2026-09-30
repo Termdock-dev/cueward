@@ -12,7 +12,7 @@ pub struct WindowBounds {
     pub height: i32,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CapturableWindow {
     pub window_id: u32,
     pub app: String,
