@@ -64,6 +64,59 @@ fn wait_reports_missing_role_for_named_or_unqualified_element_queries() {
 }
 
 #[test]
+fn wait_reads_only_selector_attributes_and_preserves_required_read_failures() {
+    let source = include_str!("ax_wait.swift");
+    let scan = source
+        .split_once("struct WaitScan {")
+        .expect("scan entry")
+        .1
+        .split_once("\nfunc windowState()")
+        .expect("scan end")
+        .0;
+    let directory = tempfile::tempdir().expect("fixture");
+    let script = directory.path().join("wait.swift");
+    fs::write(&script, format!("{}\n{}\nstruct WaitScan {{{scan}\n{}",
+        include_str!("wait_selector_fixture.swift"),
+        include_str!("wait_logic.swift"),
+        r#"
+var selector: [String: Any] = ["role": "AXTextArea"]
+if scenario.hasPrefix("name") { selector["name"] = "Editor" }
+if scenario == "identifier-failure" { selector["identifier"] = "editor" }
+var scan = WaitScan(deadline: ProcessInfo.processInfo.systemUptime + 1, selector: selector, condition: "element-exists")
+scan.walk(AXUIElement("AXTextArea"), ref: "0", depth: 0)
+guard scan.matches.count == 1 else { fail("expected one matching node") }
+print("matched")
+"#)).expect("write fixture");
+    for (scenario, expected) in [
+        ("role-only", "matched"),
+        ("name-title", "matched"),
+        ("name-description-failure", "description failed"),
+        ("identifier-failure", "identifier failed"),
+        ("role-failure", "required role failed"),
+    ] {
+        let output = Command::new("swift")
+            .arg(&script)
+            .arg(scenario)
+            .output()
+            .expect("run selector fixture");
+        if expected == "matched" {
+            assert!(
+                output.status.success(),
+                "{scenario}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "matched");
+        } else {
+            assert!(
+                !output.status.success(),
+                "required attribute failure must not match"
+            );
+            assert!(String::from_utf8_lossy(&output.stderr).contains(expected));
+        }
+    }
+}
+
+#[test]
 fn wait_classifies_window_lifecycle_from_consistent_catalog_observations() {
     let directory = tempfile::tempdir().expect("wait catalog fixture");
     let path = directory.path().join("wait.swift");
