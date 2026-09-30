@@ -4,6 +4,16 @@ use super::{Cli, Command};
 use crate::commands::window::WindowAction;
 
 #[test]
+fn parses_window_diff_and_requires_previous_observation() {
+    assert!(Cli::try_parse_from(["cueward", "window", "diff"]).is_err());
+    let cli = Cli::try_parse_from(["cueward", "window", "diff", "--previous", "previous.json"])
+        .expect("diff");
+    assert!(
+        matches!(cli.command, Command::Window { action: WindowAction::Diff { previous } } if previous == "previous.json")
+    );
+}
+
+#[test]
 fn parses_window_list_visibility_scope() {
     let default = Cli::try_parse_from(["cueward", "window", "list"]).expect("default list");
     assert!(matches!(

@@ -1,6 +1,20 @@
 use super::tests::Fixture;
 use super::*;
 
+#[test]
+#[ignore = "requires an unlocked desktop and Accessibility/Screen Recording permissions"]
+fn wait_finds_native_text_area_despite_unrequested_description_failures() {
+    let receiver = super::input_live_tests::Receiver::start(false);
+    let snapshot = receiver.snapshot(1);
+    let options = query(WaitCondition::ElementExists, "AXTextArea", None, None);
+    assert_eq!(
+        wait_for_window(&snapshot.input_target, &options)
+            .expect("role-only wait")
+            .status,
+        WaitStatus::Matched
+    );
+}
+
 fn query(
     condition: WaitCondition,
     role: &str,
