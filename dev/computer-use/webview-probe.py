@@ -113,7 +113,7 @@ def main():
     parser.add_argument("--inactive-space", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    session = subprocess.run(["swift", "-e", 'import CoreGraphics; let s = CGSessionCopyCurrentDictionary() as? [String:Any]; print(s?["CGSSessionScreenIsLocked"] as? Bool == true ? "locked" : "unlocked")'], capture_output=True, check=True, timeout=10)
+    session = subprocess.run(["swift", "-e", 'import CoreGraphics; guard let s = CGSessionCopyCurrentDictionary() as? [String:Any] else { exit(1) }; print(s["CGSSessionScreenIsLocked"] as? Bool == true ? "locked" : "unlocked")'], capture_output=True, check=True, timeout=10)
     if session.stdout.decode().strip() != "unlocked":
         raise RuntimeError("desktop is locked; no fixture or input trial was started")
     report = probe(args.cli.resolve(), args.inactive_space)
