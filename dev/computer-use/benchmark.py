@@ -241,6 +241,9 @@ def main():
         parser.error("samples must be between 2 and 50")
     if platform.system() != "Darwin":
         parser.error("requires a logged-in macOS desktop")
+    _, session, _ = run(["swift", "-e", 'import CoreGraphics; guard let s = CGSessionCopyCurrentDictionary() as? [String:Any] else { exit(1) }; print(s["CGSSessionScreenIsLocked"] as? Bool == true ? "locked" : "unlocked")'])
+    if session.decode().strip() != "unlocked":
+        parser.error("desktop is locked; no fixture or input workload was started")
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     with tempfile.TemporaryDirectory(prefix="cueward-benchmark-") as temporary:
         results = measure(args.cli.resolve(), Path(temporary), args.samples)
