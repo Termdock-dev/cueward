@@ -61,11 +61,47 @@ Task-specific observer fields:
 | `new_document` | `save_requests` exactly 1; disk artifact exactly matches supplied content. |
 | `existing_document` | Receiver identity plus disk edit, preserved original/bystander hashes, and no extra files in this task workspace. |
 | `cross_app` | Observer `file` exactly identifies `work/new_document/result.txt` and `content` matches. Task `producer_pid` must match the passed `new_document` task's observer PID and be distinct from the reader PID. A missing/unverified producer leaves this task unverified. Both reader content and disk bytes are checked. |
-| `window_dialog` | `window_observations` for phases `initial`, `dialog`, `resumed`; three distinct nonempty `snapshot_id` values and each `target_file` identifies this task's `target.txt`. Disk edit and unchanged bystander are checked separately. Preserve actual observations alongside these identities. |
+| `window_dialog` | Two concrete `owned_windows` plus three ordered `window_observations` for `initial`, `dialog`, `resumed`, with current document/dialog root identities. See the window/dialog contract below. Disk edit and unchanged bystander are checked separately. |
 | `calculation` | Receiver identity plus independently calculated exact Decimal result on disk. |
 | `webview_first_click` | `dispatch_count: 1`, `initial.clicks: 0`, `final.clicks: 1`; no double click or replay. |
 | `canvas_drag` | `dispatch_count: 1`; initial state `object: {x: 100, y: 80}`, `events: []`, `releases: 0`, `dragging: false`; final displacement exactly 80 × 40, `releases: 1`, `dragging: false`. `final.events` contains one trusted `mousedown`, then one trusted `mouseup` with `buttons: 0`. Extra move events are permitted. |
 | `canvas_interrupted` | Same fresh initial canvas and paired release checks; `controlled_interruption: true` and a `dispatch_interrupted` receipt. No full displacement is required after interruption; the receiver must release without replay. |
+
+### Window/dialog identity contract
+
+The operator's independent receiver observer records two newly owned document windows in `observer.owned_windows`. Each has `pid`, positive native `window_id`, and `file` identifying this run's `target.txt` or `bystander.txt`. Native window IDs must differ and PIDs must be in `receiver_pids`; the target window's PID must match `observer.pid`. Obtain these bindings from the receiver/window observation, not from a window title or AX root index alone.
+
+Each of the three `window_observations` includes:
+
+- `phase`, a distinct nonempty `snapshot_id`, `observed_ms` in the execution timebase, and the exact `target_file`. Times increase strictly within the execution interval.
+- `windows`: both document identities above, each extended with its current AX `root`: `{receiver_pid, ref, role}`. Document roots have role `AXWindow` and top-level refs such as `w0`. The observer correlates these roots to native window IDs and retains the underlying observations locally. Native identities stay stable across phases; AX refs may reorder in a fresh snapshot. Two documents cannot share the same `(receiver_pid, ref)` in one observation.
+- `active_root`: the root actually inspected/used in this phase, matching the target document root in `initial`/`resumed` and the save-dialog root in `dialog`.
+- `dialog`: explicitly `null` in `initial` and `resumed`; in the middle phase it identifies an independently observed save dialog, with `kind: "save"`, `mode`, `owner_window: {pid, window_id}` for the target document, and its AX `root`.
+
+For a same-receiver sheet, use `mode: "sheet"`, role `AXSheet`, and `parent_root` matching the target's current root. Its AX ref must be a descendant of that root. For a standalone save panel, use `mode: "window"`, a distinct positive native `window_id`, and a separate top-level root with role `AXWindow` or `AXDialog`. A dialog cannot reuse either document root. Obtain the save purpose and owning document association from independent receiver observations; a changed label or arbitrary generic modal is not save evidence.
+
+Example middle-phase observation (synthetic IDs; the matching owned inventory and other two phases are also required):
+
+```json
+{
+  "phase": "dialog", "snapshot_id": "fresh-dialog", "observed_ms": 500,
+  "target_file": "/RUN/work/window_dialog/target.txt",
+  "windows": [
+    {"pid": 203, "window_id": 501, "file": "/RUN/work/window_dialog/target.txt",
+     "root": {"receiver_pid": 203, "ref": "w0", "role": "AXWindow"}},
+    {"pid": 203, "window_id": 502, "file": "/RUN/work/window_dialog/bystander.txt",
+     "root": {"receiver_pid": 203, "ref": "w1", "role": "AXWindow"}}
+  ],
+  "active_root": {"receiver_pid": 203, "ref": "w0.0", "role": "AXSheet"},
+  "dialog": {
+    "kind": "save", "mode": "sheet", "owner_window": {"pid": 203, "window_id": 501},
+    "root": {"receiver_pid": 203, "ref": "w0.0", "role": "AXSheet"},
+    "parent_root": {"receiver_pid": 203, "ref": "w0", "role": "AXWindow"}
+  }
+}
+```
+
+Missing window/root/time fields, including older snapshot-label-only records, are `unverified`. Contradictory identities, no dialog in the dialog phase, an unrelated owner/parent, or a dialog still present when resuming are `failed`. This validates supplied relationships; the framework still does not collect observations or authenticate their provenance. Product app/window APIs are unchanged.
 
 Failure categories accepted from the operator are `prerequisite_unavailable`, `tool_observation_failure`, `tool_dispatch_failure`, `application_rejection`, `partial_observation`, `stale_target`, `missing_artifact`, `interference_observed`, `agent_decision_error`, and `unknown`. Raw personal desktop data stays local; publish only reviewed synthetic/aggregate evidence.
 

@@ -9,6 +9,7 @@ import stat
 
 from .setup import CONTENT, EDITED, TASKS
 from .trace import check_trace, number
+from .window_dialog import check_window_dialog
 
 MAX_BYTES = 1024 * 1024
 MAX_JSON_BYTES = 64 * 1024 * 1024
@@ -111,15 +112,8 @@ def effect_checks(root, task_id, evidence):
                 and observer.get("content") == CONTENT)
         return [check("reader", "passed" if good else "failed", "recipient file identity and exact content")]
     if task_id == "window_dialog":
-        if "window_observations" not in observer:
-            return [check("fresh_window_observations", "unverified", "missing dialog/window observations")]
-        identities = observer.get("window_observations", [])
-        phases = [o.get("phase") for o in identities if isinstance(o, dict)]
-        good = (phases == ["initial", "dialog", "resumed"]
-                and all(isinstance(o.get("snapshot_id"), str) and o["snapshot_id"] for o in identities)
-                and len({o["snapshot_id"] for o in identities}) == 3
-                and all(o.get("target_file") == str(root / "work/window_dialog/target.txt") for o in identities))
-        return [check("fresh_window_observations", "passed" if good else "failed", "three fresh snapshots identify the intended target through the dialog")]
+        status, reason = check_window_dialog(root, evidence, observer)
+        return [check("fresh_window_observations", status, reason)]
     if task_id in ("existing_document", "calculation"):
         return [check("receiver", "passed", "independent receiver identity supplied; result checked from disk")]
     return pointer_checks(task_id, evidence, observer)
