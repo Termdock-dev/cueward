@@ -22,6 +22,7 @@ pub enum FileAction {
     Info,
     List(ListOptions),
     Read(ReadOptions),
+    Search(super::SearchOptions),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,6 +135,7 @@ pub enum FileResponse {
     Info(FileInfo),
     List(FileListing),
     Read(FileRead),
+    Search(super::FileSearch),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

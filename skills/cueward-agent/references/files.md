@@ -1,6 +1,6 @@
-# Scoped file reads
+# Scoped file search and reads
 
-The initial `files list/info/read` implementation is in [PR #44](https://github.com/Termdock-dev/cueward/pull/44), pending merge as of 2026-10-01. Use this reference only if `cueward files --help` exposes these commands. Installing this skill does not install that implementation. Do not infer that the latest crates.io release contains main or an open PR.
+The initial `files list/info/read` implementation was merged in [PR #44](https://github.com/Termdock-dev/cueward/pull/44). This reference also describes the subsequent `files search` source revision. Check `cueward files --help` and `cueward files search --help` before relying on these capabilities. Installing a skill does not install a binary; documentation can describe a newer source revision than main or the latest published release.
 
 ## Choose the scope and range
 
@@ -16,6 +16,22 @@ cueward files read --root /absolute/directory --path data.bin --encoding hex --o
 Always choose an explicit absolute root within the user's scope. Paths are relative to root without `..`; do not expand into home or another volume to work around a denial. List is one level, not recursive. Dot hidden names are optional; package directories and Finder alias files have no special handling yet.
 
 Default symlink behavior is no traversal. Info can report a leaf link, including a broken/outside link, without following it. Explicit `--follow-links` allows an operation path to resolve only within canonical root; listing child links still describes those links. Root itself may be an explicitly selected directory link. Paths must be valid UTF-8.
+
+## Find names and metadata
+
+```bash
+cueward files search --root /absolute/directory --name report --kind file --max-depth 3
+cueward files search --root /absolute/directory --path Reports --min-size 1024 --max-size 1048576
+cueward files search --root /absolute/directory --modified-after 2026-10-01T00:00:00+08:00 --hidden --max-depth 2 --max-entries 500
+```
+
+Search matches a nonempty case-sensitive literal substring of each basename, with AND-combined kind, inclusive size and inclusive RFC3339 modification-time filters. It does not read contents or use Spotlight; unknown modification times do not match a time filter. Kind is file/directory/symlink/other, not UTType. The default max-depth is 1, direct children only; choose 1..32 explicitly for deeper traversal. Dot directories are excluded unless hidden is enabled. Filters do not prune other directories. Deeper traversal treats packages as ordinary directories; Finder alias files remain ordinary files.
+
+Search observes at most max-entries (1..10,000, default 10,000) across the whole scan, including hidden and nonmatching entries. On success, source is filesystem, query reports the applied scope/options, total is the full matching count within that scope and entries are sorted by root-relative path. Each entry has relative_path plus file metadata; use the same root with relative_path for info/read. enumeration_complete only covers the selected depth/hidden/symlink policy; depth_boundary_directories counts visible directories whose children were not searched. A small page limit does not reduce scanning. scan_limit, permission_denied, unavailable and timeout are errors with no successful partial page, not zero matches.
+
+Search never follows discovered child symlinks; follow-links only resolves the explicitly selected starting path within canonical root. This avoids duplicate/cyclic/outside-root traversal while still returning symlink metadata.
+
+Search pages require the previous version and next_offset. Keep filters, depth, hidden and max-entries; these options are bound into the token along with all observed metadata, including hidden/nonmatching entries. Page size may change. Metadata changes inside the eligible scope invalidate the token; excluded hidden/deeper descendants were not observed. On changed, restart at offset 0.
 
 ## Page and resume
 
@@ -35,4 +51,4 @@ Dataless placeholders are distinct from empty files. The macOS worker denies dat
 
 The worker deadline defaults to 10 seconds, configurable with --timeout-ms 1..30000. The operation does not edit the source file or request Finder/app activation. On change/error/timeout, reobserve before resuming; it discards detected changed-file results, but is not a sandbox against malicious concurrent path swaps.
 
-Search, Spotlight, UTType/Finder tags, package/alias enrichment, Finder selection/reveal and provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image preview and file-management actions are separate work.
+Spotlight content search, UTType/Finder tags, package/alias enrichment, Finder selection/reveal and provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image preview and file-management actions are separate work.

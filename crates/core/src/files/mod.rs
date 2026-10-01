@@ -3,8 +3,10 @@ mod listing;
 mod model;
 mod reading;
 mod scope;
+mod search;
 
 pub use model::*;
+pub use search::{FileSearch, MAX_SEARCH_DEPTH, SearchEntry, SearchOptions, SearchSource};
 
 use std::fs::{File, Metadata};
 use std::io;
@@ -30,7 +32,7 @@ pub fn execute(
         matches!(request.action, FileAction::Info),
     )?;
     let before = scope.info(&resolved)?;
-    if !matches!(request.action, FileAction::List(_)) {
+    if !matches!(request.action, FileAction::List(_) | FileAction::Search(_)) {
         check_version(&request.expected_version, &before.version)?;
     }
     let response = match &request.action {
@@ -44,6 +46,12 @@ pub fn execute(
         FileAction::Read(options) => {
             FileResponse::Read(reading::read(&scope, &resolved, before.clone(), options)?)
         }
+        FileAction::Search(options) => FileResponse::Search(search::search(
+            &scope,
+            &resolved,
+            options,
+            &request.expected_version,
+        )?),
     };
     let after = scope.resolve(
         &request.path,

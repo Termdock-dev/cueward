@@ -3,6 +3,9 @@ use cueward_core::files::*;
 use std::io::Read;
 use std::path::PathBuf;
 
+#[path = "files_search.rs"]
+mod search;
+
 #[derive(Args)]
 pub(crate) struct ScopeArgs {
     /// Absolute directory to scope this operation to.
@@ -14,7 +17,7 @@ pub(crate) struct ScopeArgs {
     /// Follow symlinks whose resolved targets stay within root.
     #[arg(long)]
     follow_links: bool,
-    /// Require the version from an earlier result (required for later list pages).
+    /// Require the version from an earlier result (required for later list/search pages).
     #[arg(long)]
     expected_version: Option<String>,
     /// Deadline for the filesystem worker, including metadata and directory scans.
@@ -51,6 +54,8 @@ pub(crate) enum FilesAction {
     },
     /// Read a bounded byte or UTF-8 line range; use hex for binary data.
     Read(ReadArgs),
+    /// Search filenames and metadata within explicit depth and scan bounds.
+    Search(search::SearchArgs),
 }
 
 #[derive(Args)]
@@ -94,6 +99,7 @@ impl FilesAction {
             Self::Info { scope } => (scope, FileAction::Info),
             Self::List(args) => args.action(),
             Self::Read(args) => args.action(),
+            Self::Search(args) => args.action(),
         };
         (
             FileRequest {

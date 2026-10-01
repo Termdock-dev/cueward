@@ -85,7 +85,7 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
-    /// List, inspect, and read files within an explicitly selected directory.
+    /// List, search, inspect, and read files within an explicitly selected directory.
     Files {
         #[command(subcommand)]
         action: FilesAction,

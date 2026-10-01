@@ -4,6 +4,10 @@ mod protocol;
 #[cfg(test)]
 mod reading_tests;
 #[cfg(test)]
+mod search_safety_tests;
+#[cfg(test)]
+mod search_tests;
+#[cfg(test)]
 mod tests;
 
 use cueward_core::files::*;
