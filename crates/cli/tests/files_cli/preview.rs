@@ -1,5 +1,5 @@
 use super::*;
-fn digest(bytes: &[u8]) -> String {
+pub(super) fn digest(bytes: &[u8]) -> String {
     let mut child = Command::new("/usr/bin/shasum")
         .args(["-a", "256"])
         .stdin(Stdio::piped())

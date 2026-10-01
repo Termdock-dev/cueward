@@ -17,6 +17,8 @@ mod spotlight;
 mod preview;
 #[path = "files_cli/cloud.rs"]
 mod cloud;
+#[path = "files_cli/mutation.rs"]
+mod mutation;
 
 fn command() -> Command {
     Command::new(env!("CARGO_BIN_EXE_cueward"))

@@ -3,6 +3,9 @@ use cueward_core::files::*;
 use std::io::Read;
 use std::path::PathBuf;
 
+#[path = "files_mutation.rs"]
+mod mutation;
+
 #[path = "files_preview.rs"]
 mod preview;
 #[path = "files_cloud.rs"]
@@ -53,6 +56,12 @@ pub(crate) enum EncodingArg {
 
 #[derive(Subcommand)]
 pub(crate) enum FilesAction {
+    /// Create one empty directory without replacing existing entries.
+    Mkdir(mutation::MkdirArgs),
+    /// Copy one regular file and verify bytes/metadata; never overwrite.
+    Copy(mutation::CopyArgs),
+    /// Read saved operation evidence without resuming or retrying a mutation.
+    Receipt(mutation::ReceiptArgs),
     /// Read PDF/image content or request a Quick Look thumbnail.
     Preview {
         #[command(subcommand)]
@@ -129,10 +138,13 @@ impl FilesAction {
             Self::Finder { .. }
             | Self::Spotlight(_)
             | Self::Cloud { .. }
-            | Self::Preview { .. } => {
+            | Self::Preview { .. }
+            | Self::Mkdir(_)
+            | Self::Copy(_)
+            | Self::Receipt(_) => {
                 return Err(FileError::new(
                     FileErrorCode::InvalidOptions,
-                    "Finder, Spotlight, cloud and preview actions use separate native workers",
+                    "native and mutation actions use separate workers",
                 ));
             }
             Self::Info { scope } => (scope, FileAction::Info),
@@ -198,6 +210,9 @@ impl ReadArgs {
 /// Dispatch a user command through a deadline-controlled worker.
 pub(crate) fn dispatch(action: FilesAction) {
     let action = match action {
+        FilesAction::Mkdir(args) => return mutation::mkdir(args),
+        FilesAction::Copy(args) => return mutation::copy(args),
+        FilesAction::Receipt(args) => return mutation::receipt(args),
         FilesAction::Preview { action } => return preview::dispatch(action),
         FilesAction::Cloud { action } => return cloud::dispatch(action),
         FilesAction::Finder { action } => return finder::dispatch(action),
@@ -260,6 +275,7 @@ pub(super) fn output<T: serde::Serialize>(source: &str, result: Result<T, FileEr
 
 pub(crate) use cloud::worker as cloud_worker;
 pub(crate) use finder::worker as finder_worker;
+pub(crate) use mutation::worker as mutation_worker;
 pub(crate) use preview::worker as preview_worker;
 pub(crate) use spotlight::worker as spotlight_worker;
 

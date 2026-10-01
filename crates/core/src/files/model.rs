@@ -157,6 +157,8 @@ pub enum FileErrorCode {
     ScanLimit,
     Unavailable,
     Changed,
+    Conflict,
+    VerificationFailed,
     Timeout,
     Io,
     Internal,
@@ -184,6 +186,7 @@ impl From<io::Error> for FileError {
             io::ErrorKind::NotFound => FileErrorCode::NotFound,
             io::ErrorKind::PermissionDenied => FileErrorCode::PermissionDenied,
             io::ErrorKind::TimedOut => FileErrorCode::Timeout,
+            io::ErrorKind::AlreadyExists => FileErrorCode::Conflict,
             _ => FileErrorCode::Io,
         };
         Self::new(code, error.to_string())
