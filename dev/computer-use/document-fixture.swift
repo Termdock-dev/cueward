@@ -57,7 +57,7 @@ func saveState() {
         "file_created": FileManager.default.fileExists(atPath: destination.appendingPathComponent("artifact.txt").path)]
     if let data = try? JSONSerialization.data(withJSONObject: state) { try? data.write(to: stateURL, options: .atomic) }
 }
-Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { _ in saveState() }
+let observationTimer = startDocumentObserver { _ in saveState() }
 DispatchQueue.main.asyncAfter(deadline: .now() + 180) { app.terminate(nil) }
 saveState()
 app.run()

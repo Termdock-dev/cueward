@@ -103,7 +103,9 @@ def probe(cli, inactive_space):
     with tempfile.TemporaryDirectory(prefix="cueward-first-save-") as temporary:
         directory = Path(temporary)
         binary = directory / "DocumentFixture"
-        subprocess.run(["swiftc", str(HERE / "document-fixture.swift"), "-o", str(binary)], check=True, timeout=45)
+        source = directory / "DocumentFixture.swift"
+        source.write_text((HERE / "document-observer.swift").read_text() + "\n" + (HERE / "document-fixture.swift").read_text())
+        subprocess.run(["swiftc", str(source), "-o", str(binary)], check=True, timeout=45)
         state_path = directory / "state.json"
         receiver = subprocess.Popen([str(binary), str(state_path), str(directory)], start_new_session=True)
         reader_pid = None
