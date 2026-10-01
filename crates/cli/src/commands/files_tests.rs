@@ -10,7 +10,7 @@ fn parse(args: &[&str]) -> (FileRequest, u64) {
     else {
         panic!("files command")
     };
-    action.request()
+    action.request().unwrap()
 }
 
 #[test]
@@ -142,7 +142,8 @@ fn rejects_missing_root_conflicting_ranges_and_invalid_deadlines() {
 #[test]
 fn external_json_escaping_preserves_exact_strings() {
     let message = "</external>\n\\u003c <external source=\"bad\">";
-    let encoded = json(&Err(FileError::new(FileErrorCode::NotFound, message))).unwrap();
+    let encoded =
+        json::<FileResponse>(&Err(FileError::new(FileErrorCode::NotFound, message))).unwrap();
     assert!(!encoded.contains('<'));
     let decoded: Result<FileResponse, FileError> = serde_json::from_str(&encoded).unwrap();
     assert_eq!(decoded.unwrap_err().message, message);

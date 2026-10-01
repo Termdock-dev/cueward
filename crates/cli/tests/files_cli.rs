@@ -9,6 +9,8 @@ use std::process::{Command, Stdio};
 mod metadata;
 #[path = "files_cli/search.rs"]
 mod search;
+#[path = "files_cli/finder.rs"]
+mod finder;
 
 fn command() -> Command {
     Command::new(env!("CARGO_BIN_EXE_cueward"))

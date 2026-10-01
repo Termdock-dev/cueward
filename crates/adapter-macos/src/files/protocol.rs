@@ -1,4 +1,5 @@
 use cueward_core::files::*;
+use serde::{Serialize, de::DeserializeOwned};
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
@@ -14,21 +15,19 @@ pub fn run(
     request: &FileRequest,
     timeout_ms: u64,
 ) -> Result<FileResponse, FileError> {
-    if !(1..=30000).contains(&timeout_ms) {
-        return Err(FileError::new(
-            FileErrorCode::InvalidOptions,
-            "timeout-ms must be 1..30000",
-        ));
-    }
-    let payload = serde_json::to_vec(request).map_err(internal)?;
-    if payload.len() > MAX_REQUEST_BYTES {
-        return Err(FileError::new(
-            FileErrorCode::InvalidOptions,
-            "request exceeds 16 KiB",
-        ));
-    }
+    run_typed(executable, "files-worker", request, timeout_ms)
+}
+
+/// Share bounded process supervision and external JSON across file workers.
+pub(super) fn run_typed<T: DeserializeOwned>(
+    executable: &Path,
+    worker: &str,
+    request: &impl Serialize,
+    timeout_ms: u64,
+) -> Result<T, FileError> {
+    let payload = payload(request, timeout_ms)?;
     let output = crate::window::process::run_with_timeout(
-        Command::new(executable).arg("files-worker"),
+        Command::new(executable).arg(worker),
         &payload,
         Duration::from_millis(timeout_ms),
     )
@@ -52,11 +51,28 @@ pub fn run(
     result
 }
 
+fn payload(request: &impl Serialize, timeout_ms: u64) -> Result<Vec<u8>, FileError> {
+    if !(1..=30000).contains(&timeout_ms) {
+        return Err(FileError::new(
+            FileErrorCode::InvalidOptions,
+            "timeout-ms must be 1..30000",
+        ));
+    }
+    let payload = serde_json::to_vec(request).map_err(internal)?;
+    if payload.len() > MAX_REQUEST_BYTES {
+        return Err(FileError::new(
+            FileErrorCode::InvalidOptions,
+            "request exceeds 16 KiB",
+        ));
+    }
+    Ok(payload)
+}
+
 fn internal(error: impl std::fmt::Display) -> FileError {
     FileError::new(FileErrorCode::Internal, error.to_string())
 }
 
-fn parse(bytes: &[u8]) -> Result<Result<FileResponse, FileError>, FileError> {
+fn parse<T: DeserializeOwned>(bytes: &[u8]) -> Result<Result<T, FileError>, FileError> {
     if bytes.len() > MAX_RESPONSE_BYTES {
         return Err(internal("worker response exceeds 16 MiB"));
     }
@@ -103,7 +119,7 @@ mod tests {
             "<external source=\"cueward/files/worker\">\n{}",
         ] {
             assert_eq!(
-                parse(value.as_bytes()).unwrap_err().code,
+                parse::<FileResponse>(value.as_bytes()).unwrap_err().code,
                 FileErrorCode::Internal
             );
         }
@@ -111,7 +127,10 @@ mod tests {
             "{PREFIX}{{\"Err\":{{\"code\":\"permission_denied\",\"message\":\"denied\"}}}}{SUFFIX}"
         );
         assert_eq!(
-            parse(payload.as_bytes()).unwrap().unwrap_err().code,
+            parse::<FileResponse>(payload.as_bytes())
+                .unwrap()
+                .unwrap_err()
+                .code,
             FileErrorCode::PermissionDenied
         );
     }
