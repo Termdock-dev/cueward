@@ -1,5 +1,6 @@
 """Synthetic regression evidence is not an actual fresh-agent desktop run."""
 
+import copy
 import json
 from pathlib import Path
 import subprocess
@@ -11,6 +12,25 @@ from task_acceptance.evaluate import evaluate, read_scoped
 from task_acceptance.setup import CONTENT, EDITED, TASKS, prepare
 
 CLI = Path(__file__).with_name("task-acceptance.py")
+
+
+def window_evidence(root, pid):
+    """Independent synthetic observations of two windows and a real sheet."""
+    windows = [{"pid": pid, "window_id": 501 + index,
+                "file": str(root / "work/window_dialog" / name),
+                "root": {"receiver_pid": pid, "ref": f"w{index}", "role": "AXWindow"}}
+               for index, name in enumerate(("target.txt", "bystander.txt"))]
+    target = windows[0]
+    dialog = {"kind": "save", "mode": "sheet", "owner_window": {"pid": pid, "window_id": 501},
+              "root": {"receiver_pid": pid, "ref": "w0.0", "role": "AXSheet"},
+              "parent_root": copy.deepcopy(target["root"])}
+    observations = [{"phase": phase, "snapshot_id": f"fresh-{phase}", "observed_ms": ms,
+                     "target_file": target["file"], "windows": copy.deepcopy(windows),
+                     "active_root": copy.deepcopy(dialog["root"] if phase == "dialog" else target["root"]),
+                     "dialog": copy.deepcopy(dialog) if phase == "dialog" else None}
+                    for phase, ms in (("initial", 100), ("dialog", 500), ("resumed", 900))]
+    return {"owned_windows": [{k: w[k] for k in ("pid", "window_id", "file")} for w in windows],
+            "window_observations": observations}
 
 
 class AcceptanceTests(unittest.TestCase):
@@ -40,10 +60,7 @@ class AcceptanceTests(unittest.TestCase):
             name = "existing.txt" if task == "existing_document" else "target.txt"
             (self.root / "work" / task / name).write_text(EDITED, encoding="utf-8")
             if task == "window_dialog":
-                observer["window_observations"] = [
-                    {"phase": phase, "snapshot_id": f"fresh-{phase}",
-                     "target_file": str(self.root / "work/window_dialog/target.txt")}
-                    for phase in ("initial", "dialog", "resumed")]
+                observer.update(window_evidence(self.root, pid))
         elif task == "cross_app":
             self.record("new_document")
             record["producer_pid"] = 200
@@ -215,6 +232,89 @@ class AcceptanceTests(unittest.TestCase):
     def test_window_dialog_requires_fresh_observation_identities(self):
         record = self.record("window_dialog")
         record["observer"]["window_observations"][1]["snapshot_id"] = "fresh-initial"
+        self.assertEqual(self.result("window_dialog")["status"], "failed")
+
+    def test_window_dialog_snapshot_labels_alone_are_unverified(self):
+        record = self.record("window_dialog")
+        record["observer"].pop("owned_windows")
+        record["observer"]["window_observations"] = [
+            {k: observation[k] for k in ("phase", "snapshot_id", "target_file")}
+            for observation in record["observer"]["window_observations"]]
+        self.assertEqual(self.result("window_dialog")["status"], "unverified")
+
+    def test_window_dialog_labels_cannot_replace_a_hierarchy_transition(self):
+        record = self.record("window_dialog")
+        middle = record["observer"]["window_observations"][1]
+        middle["dialog"] = None
+        middle["active_root"] = copy.deepcopy(middle["windows"][0]["root"])
+        self.assertEqual(self.result("window_dialog")["status"], "failed")
+
+    def test_window_dialog_needs_two_distinct_owned_windows(self):
+        for mutation in (lambda r: r["observer"]["owned_windows"].pop(),
+                         lambda r: r["observer"]["owned_windows"][1].update(window_id=501),
+                         lambda r: r["observer"]["owned_windows"][1].update(pid=999)):
+            record = self.record("window_dialog")
+            mutation(record)
+            self.assertEqual(self.result("window_dialog")["status"], "failed")
+
+    def test_window_dialog_rejects_wrong_parent_or_receiver(self):
+        for field, value in (("owner_window", {"pid": 203, "window_id": 502}),
+                             ("parent_root", {"receiver_pid": 203, "ref": "w1", "role": "AXWindow"}),
+                             ("root", {"receiver_pid": 999, "ref": "w0.0", "role": "AXSheet"}),
+                             ("root", {"receiver_pid": 203, "ref": "w1.0", "role": "AXSheet"}),
+                             ("kind", "open")):
+            record = self.record("window_dialog")
+            record["observer"]["window_observations"][1]["dialog"][field] = value
+            self.assertEqual(self.result("window_dialog")["status"], "failed", field)
+
+    def test_window_dialog_rejects_changed_window_or_ambiguous_root(self):
+        for mutation in (lambda o: o["windows"][0].update(window_id=777),
+                         lambda o: o["windows"][0]["root"].update(ref="w1"),
+                         lambda o: o["windows"][0]["root"].update(receiver_pid=999),
+                         lambda o: o.update(active_root=copy.deepcopy(o["windows"][1]["root"]))):
+            record = self.record("window_dialog")
+            mutation(record["observer"]["window_observations"][2])
+            self.assertEqual(self.result("window_dialog")["status"], "failed")
+
+    def test_window_dialog_must_disappear_before_resuming(self):
+        record = self.record("window_dialog")
+        observations = record["observer"]["window_observations"]
+        observations[2]["dialog"] = copy.deepcopy(observations[1]["dialog"])
+        self.assertEqual(self.result("window_dialog")["status"], "failed")
+
+    def test_window_dialog_requires_ordered_observations_in_execution_interval(self):
+        for time in (50, 100, 1100):
+            record = self.record("window_dialog")
+            record["observer"]["window_observations"][1]["observed_ms"] = time
+            self.assertEqual(self.result("window_dialog")["status"], "failed")
+
+    def test_window_dialog_missing_identity_is_unverified(self):
+        for mutation in (lambda o: o.pop("active_root"), lambda o: o["windows"][0].pop("root"),
+                         lambda o: o["dialog"].pop("parent_root"), lambda o: o.pop("observed_ms")):
+            record = self.record("window_dialog")
+            mutation(record["observer"]["window_observations"][1])
+            self.assertEqual(self.result("window_dialog")["status"], "unverified")
+
+    def test_window_dialog_accepts_separate_save_panel_and_reordered_document_roots(self):
+        record = self.record("window_dialog")
+        observations = record["observer"]["window_observations"]
+        dialog = observations[1]["dialog"]
+        dialog.update(mode="window", window_id=503,
+                      root={"receiver_pid": 203, "ref": "w2", "role": "AXWindow"})
+        dialog.pop("parent_root")
+        observations[1]["active_root"] = copy.deepcopy(dialog["root"])
+        # Root paths belong to each fresh snapshot, not to the window forever.
+        observations[2]["windows"][0]["root"]["ref"] = "w1"
+        observations[2]["windows"][1]["root"]["ref"] = "w0"
+        observations[2]["active_root"] = copy.deepcopy(observations[2]["windows"][0]["root"])
+        self.assertEqual(self.result("window_dialog")["status"], "passed")
+
+    def test_window_dialog_standalone_panel_cannot_reuse_a_document_root(self):
+        record = self.record("window_dialog")
+        observations = record["observer"]["window_observations"]
+        dialog = observations[1]["dialog"]
+        dialog.update(mode="window", window_id=501, root=copy.deepcopy(observations[1]["windows"][0]["root"]))
+        observations[1]["active_root"] = copy.deepcopy(dialog["root"])
         self.assertEqual(self.result("window_dialog")["status"], "failed")
 
     def test_calculation_wrong_rounding_fails(self):
