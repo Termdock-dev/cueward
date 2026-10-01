@@ -96,7 +96,7 @@ pub(super) fn receipt(args: ReceiptArgs) {
 pub(crate) fn worker() {
     output(
         "files/worker",
-        read_request().and_then(|request| mutation::execute_worker(&request)),
+        mutation::read_supervised_request().and_then(|request| mutation::execute_worker(&request)),
     );
 }
 

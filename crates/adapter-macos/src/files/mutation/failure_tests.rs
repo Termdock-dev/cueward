@@ -106,9 +106,7 @@ fn stopped_worker_produces_persistent_uncertain_receipt_and_never_retries() {
     let quoted = destination.to_str().unwrap().replace('\'', "'\\''");
     fs::write(
         &executable,
-        format!(
-            "#!/bin/sh\n/bin/cat >/dev/null\nprintf partial > '{quoted}'\nexec /bin/sleep 30\n"
-        ),
+        format!("#!/bin/sh\nIFS= read -r input\nprintf partial > '{quoted}'\nexec /bin/sleep 30\n"),
     )
     .unwrap();
     fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();

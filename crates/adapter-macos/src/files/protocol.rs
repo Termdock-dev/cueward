@@ -1,7 +1,7 @@
 use cueward_core::files::*;
 use serde::{Serialize, de::DeserializeOwned};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output};
 use std::time::Duration;
 
 pub const MAX_REQUEST_BYTES: usize = 16384;
@@ -31,16 +31,24 @@ pub(super) fn run_typed<T: DeserializeOwned>(
         &payload,
         Duration::from_millis(timeout_ms),
     )
-    .map_err(|error| {
-        if error.kind() == std::io::ErrorKind::TimedOut {
-            FileError::new(
-                FileErrorCode::Timeout,
-                "file worker exceeded its deadline and was stopped",
-            )
-        } else {
-            FileError::from(error)
-        }
-    })?;
+    .map_err(transport_error)?;
+    decode_output(output)
+}
+
+/// Preserve structured transport errors across read-only and mutation supervision.
+pub(super) fn transport_error(error: std::io::Error) -> FileError {
+    if error.kind() == std::io::ErrorKind::TimedOut {
+        FileError::new(
+            FileErrorCode::Timeout,
+            "file worker exceeded its deadline and was stopped",
+        )
+    } else {
+        FileError::from(error)
+    }
+}
+
+/// Validate the external response envelope and agreement with the process exit status.
+pub(super) fn decode_output<T: DeserializeOwned>(output: Output) -> Result<T, FileError> {
     let result = parse(&output.stdout)?;
     if output.status.success() != result.is_ok() {
         return Err(FileError::new(
@@ -51,7 +59,8 @@ pub(super) fn run_typed<T: DeserializeOwned>(
     result
 }
 
-fn payload(request: &impl Serialize, timeout_ms: u64) -> Result<Vec<u8>, FileError> {
+/// Serialize a bounded request after validating the worker deadline.
+pub(super) fn payload(request: &impl Serialize, timeout_ms: u64) -> Result<Vec<u8>, FileError> {
     if !(1..=30000).contains(&timeout_ms) {
         return Err(FileError::new(
             FileErrorCode::InvalidOptions,

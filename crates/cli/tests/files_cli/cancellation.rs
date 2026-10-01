@@ -18,6 +18,20 @@ fn cancellation_parent_helper() {
     );
 }
 
+#[test]
+fn cancellation_worker_helper() {
+    let Some(config) = std::env::var_os("CUEWARD_TEST_CANCELLATION_CONFIG") else {
+        return;
+    };
+    let config = Path::new(&config);
+    let directory = config.parent().unwrap();
+    let request = mutation::read_supervised_request().unwrap();
+    fs::write(directory.join("ready"), std::process::id().to_string()).unwrap();
+    wait_for(|| directory.join("release").exists());
+    // If the lifetime monitor fails, this would perform the actual filesystem mutation.
+    mutation::execute_worker(&request).unwrap();
+}
+
 struct Processes {
     parent: Option<std::process::Child>,
     worker: Option<String>,
@@ -42,6 +56,9 @@ fn wait_for(mut predicate: impl FnMut() -> bool) {
         std::thread::sleep(Duration::from_millis(10));
     }
 }
+fn nonempty(path: &Path) -> bool {
+    fs::metadata(path).is_ok_and(|metadata| metadata.len() > 0)
+}
 fn prepare(root: &Path, action: &str) -> MutationRequest {
     fs::write(root.join("source"), b"owned source bytes").unwrap();
     let parent = super::mutation::version(root, ".");
@@ -61,16 +78,29 @@ fn prepare(root: &Path, action: &str) -> MutationRequest {
         action,
     }
 }
-fn launch(directory: &Path, request: &MutationRequest) -> Processes {
-    let wrapper = directory.join("worker");
-    // Delay exec, leaving the actual worker's stdin untouched, including its lifeline.
-    fs::write(
-        &wrapper,
+fn worker_script(directory: &Path, armed: bool) -> String {
+    let body = if armed {
         format!(
-            "#!/bin/sh\nprintf '%s' \"$$\" > '{0}/ready'\nwhile [ ! -e '{0}/release' ]; do /bin/sleep 0.01; done\nexec '{1}' files-mutation-worker\n",
-            directory.display(), env!("CARGO_BIN_EXE_cueward")
-        ),
-    ).unwrap();
+            "'{}' --exact cancellation::cancellation_worker_helper --nocapture",
+            std::env::current_exe().unwrap().display()
+        )
+    } else {
+        format!(
+            "printf '%s' \"$$\" > '{0}/ready'\nwhile [ ! -e '{0}/release' ]; do /bin/sleep 0.01; done\n'{1}' files-mutation-worker",
+            directory.display(),
+            env!("CARGO_BIN_EXE_cueward")
+        )
+    };
+    format!(
+        "#!/bin/sh\nprintf '%s' \"$$\" > '{}/group'\n{body}\nprintf '%s' \"$?\" > '{}/finished'\n",
+        directory.display(),
+        directory.display()
+    )
+}
+fn launch(directory: &Path, request: &MutationRequest, armed: bool) -> Processes {
+    let wrapper = directory.join("worker");
+    // Keep stdin intact; the wrapper reports completion so an unscheduled worker cannot pass.
+    fs::write(&wrapper, worker_script(directory, armed)).unwrap();
     fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o700)).unwrap();
     let config = directory.join("config.json");
     fs::write(
@@ -112,14 +142,14 @@ fn receipt_for(root: &Path) -> Value {
     assert_eq!(receipts.len(), 1, "one owned operation receipt expected");
     receipts.into_iter().next().unwrap()
 }
-fn interrupt_delayed(action: &str, signal: &str) {
+fn interrupt_delayed(action: &str, signal: &str, armed: bool) {
     let fixture = tempfile::tempdir().unwrap();
     let root = fixture.path().join("root");
     fs::create_dir(&root).unwrap();
     let request = prepare(&root, action);
-    let mut processes = launch(fixture.path(), &request);
-    wait_for(|| fixture.path().join("ready").exists());
-    processes.worker = Some(fs::read_to_string(fixture.path().join("ready")).unwrap());
+    let mut processes = launch(fixture.path(), &request, armed);
+    wait_for(|| nonempty(&fixture.path().join("ready")));
+    processes.worker = Some(fs::read_to_string(fixture.path().join("group")).unwrap());
     let parent = processes.parent.as_mut().unwrap();
     assert!(
         Command::new("/bin/kill")
@@ -131,10 +161,28 @@ fn interrupt_delayed(action: &str, signal: &str) {
     assert!(!parent.wait().unwrap().success());
     processes.parent = None;
     fs::write(fixture.path().join("release"), b"").unwrap();
-    // Allow the delayed worker to run and prove that parent death prevents its mutation.
-    std::thread::sleep(Duration::from_millis(500));
-    let receipt = receipt_for(&root);
+    wait_for(|| nonempty(&fixture.path().join("finished")));
+    processes.worker = None; // The wrapper has reaped the worker; do not signal a recycled PID.
+    assert_ne!(
+        fs::read_to_string(fixture.path().join("finished")).unwrap(),
+        "0"
+    );
+    verify_interrupted(&root, fixture.path(), action, signal);
+}
+fn verify_interrupted(root: &Path, fixture: &Path, action: &str, signal: &str) {
+    let receipt = receipt_for(root);
     let created = root.join("destination").exists();
+    let output = command()
+        .args([
+            "files",
+            "receipt",
+            "--operation-id",
+            receipt["operation_id"].as_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(envelope(&output.stdout, "files")["Ok"]["result"], receipt);
     super::mutation::cleanup(&receipt);
     assert!(!created, "{action} worker wrote after parent {signal}");
     assert_eq!(receipt["status"], "uncertain");
@@ -143,7 +191,7 @@ fn interrupt_delayed(action: &str, signal: &str) {
         fs::read(root.join("source")).unwrap(),
         b"owned source bytes"
     );
-    let progress = fs::read_to_string(fixture.path().join("progress")).unwrap();
+    let progress = fs::read_to_string(fixture.join("progress")).unwrap();
     assert!(
         progress.contains(receipt["operation_id"].as_str().unwrap()),
         "operation ID must be published before dispatch"
@@ -153,7 +201,16 @@ fn interrupt_delayed(action: &str, signal: &str) {
 fn parent_interruption_prevents_delayed_mkdir_and_copy() {
     for action in ["mkdir", "copy"] {
         for signal in ["-INT", "-TERM", "-KILL"] {
-            interrupt_delayed(action, signal);
+            interrupt_delayed(action, signal, false);
+        }
+    }
+}
+
+#[test]
+fn parent_death_stops_an_armed_mutation_worker() {
+    for action in ["mkdir", "copy"] {
+        for signal in ["-INT", "-TERM", "-KILL"] {
+            interrupt_delayed(action, signal, true);
         }
     }
 }

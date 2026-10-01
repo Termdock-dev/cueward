@@ -2,6 +2,7 @@
 mod attributes;
 mod journal;
 mod native;
+mod supervision;
 #[cfg(test)]
 mod tests;
 
@@ -46,7 +47,8 @@ pub fn run(
     let input = MutationWorkerRequest {
         operation_id: prepared.operation_id.clone(),
     };
-    let result = protocol::run_typed(executable, "files-mutation-worker", &input, timeout_ms)
+    supervision::announce(&prepared.operation_id)?;
+    let result = supervision::run(executable, &input, timeout_ms)
         .and_then(|receipt| verify_response(&prepared, receipt));
     match result {
         Ok(receipt) => Ok(receipt),
@@ -113,4 +115,9 @@ pub fn execute_worker(input: &MutationWorkerRequest) -> Result<MutationReceipt, 
     }
     journal::save(&receipt)?;
     Ok(receipt)
+}
+
+/// Read the framed worker request and arm fail-closed parent-lifetime monitoring before writes.
+pub fn read_supervised_request() -> Result<MutationWorkerRequest, FileError> {
+    supervision::read_request()
 }

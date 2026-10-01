@@ -100,21 +100,17 @@ fn verify_saved_receipt(copy: &Value) {
     assert_eq!(&envelope(&output.stdout, "files")["Ok"]["result"], copy);
 }
 fn verify_cannot_replay(value: &Value) {
-    let mut child = command()
+    use std::os::fd::OwnedFd;
+    use std::os::unix::net::UnixStream;
+    let (mut parent, worker) = UnixStream::pair().unwrap();
+    let child = command()
         .arg("files-mutation-worker")
-        .stdin(Stdio::piped())
+        .stdin(Stdio::from(OwnedFd::from(worker)))
         .stdout(Stdio::piped())
         .spawn()
         .unwrap();
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(
-            serde_json::to_vec(&json!({"operation_id":value["operation_id"]}))
-                .unwrap()
-                .as_slice(),
-        )
+    parent
+        .write_all(format!("{}\n", json!({"operation_id":value["operation_id"]})).as_bytes())
         .unwrap();
     let output = child.wait_with_output().unwrap();
     assert!(!output.status.success());

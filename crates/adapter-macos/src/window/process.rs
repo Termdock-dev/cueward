@@ -51,13 +51,22 @@ pub(crate) fn run_with_timeout(
     let mut input = tempfile::tempfile()?;
     input.write_all(payload)?;
     input.seek(SeekFrom::Start(0))?;
+    run_with_input(command, Stdio::from(input), timeout)
+}
+
+/// Supervise an owned process group using caller-provided stdin (including a lifeline).
+pub(crate) fn run_with_input(
+    command: &mut Command,
+    input: Stdio,
+    timeout: Duration,
+) -> io::Result<Output> {
     let stdout = tempfile::tempfile()?;
     let stderr = tempfile::tempfile()?;
     let deadline = Instant::now() + timeout;
     let mut child = HelperProcess(
         command
             .process_group(0)
-            .stdin(Stdio::from(input))
+            .stdin(input)
             .stdout(Stdio::from(stdout.try_clone()?))
             .stderr(Stdio::from(stderr.try_clone()?))
             .spawn()?,
