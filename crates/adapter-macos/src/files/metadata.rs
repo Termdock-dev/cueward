@@ -56,7 +56,8 @@ fn content_type_key() -> Option<&'static NSURLResourceKey> {
     }
 }
 
-fn read<T>(
+/// Read one native field, retaining absence and native failures.
+pub(super) fn read<T>(
     url: &NSURL,
     key: &NSURLResourceKey,
     decode: impl Fn(&AnyObject) -> Result<T, String>,
@@ -95,7 +96,8 @@ fn decode_resource<T>(
 #[path = "metadata_decode_tests.rs"]
 mod tests;
 
-fn native_error(error: &NSError) -> MetadataError {
+/// Preserve the NSError domain, code and diagnostic.
+pub(super) fn native_error(error: &NSError) -> MetadataError {
     MetadataError {
         domain: error.domain().to_string(),
         code: error.code() as i64,
@@ -119,7 +121,8 @@ fn content_type(value: &AnyObject) -> Result<String, String> {
     string(identifier)
 }
 
-fn boolean(value: &AnyObject) -> Result<bool, String> {
+/// Decode a native boolean without treating missing values as false.
+pub(super) fn boolean(value: &AnyObject) -> Result<bool, String> {
     value
         .downcast_ref::<NSNumber>()
         .map(NSNumber::boolValue)
@@ -150,7 +153,8 @@ fn tags(value: &AnyObject) -> Result<Vec<String>, String> {
     Ok(tags)
 }
 
-fn string(value: &NSString) -> Result<String, String> {
+/// Accept bounded native text without loss or truncation.
+pub(super) fn string(value: &NSString) -> Result<String, String> {
     let value = value.to_string();
     if value.len() > MAX_TEXT_BYTES {
         return Err("resource string exceeds the 64 KiB metadata limit".into());

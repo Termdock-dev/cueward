@@ -3,6 +3,8 @@ use cueward_core::files::*;
 use std::io::Read;
 use std::path::PathBuf;
 
+#[path = "files_cloud.rs"]
+mod cloud;
 #[path = "files_finder.rs"]
 mod finder;
 #[path = "files_search.rs"]
@@ -49,6 +51,11 @@ pub(crate) enum EncodingArg {
 
 #[derive(Subcommand)]
 pub(crate) enum FilesAction {
+    /// Inspect cloud state or explicitly request one iCloud file download.
+    Cloud {
+        #[command(subcommand)]
+        action: cloud::CloudCommand,
+    },
     /// Find content-index candidates; index coverage and freshness are unknown.
     Spotlight(spotlight::SpotlightArgs),
     /// Read scoped Finder context, or explicitly activate Finder and reveal an item.
@@ -112,10 +119,10 @@ pub(crate) struct ReadArgs {
 impl FilesAction {
     fn request(self) -> Result<(FileRequest, u64), FileError> {
         let (scope, action) = match self {
-            Self::Finder { .. } | Self::Spotlight(_) => {
+            Self::Finder { .. } | Self::Spotlight(_) | Self::Cloud { .. } => {
                 return Err(FileError::new(
                     FileErrorCode::InvalidOptions,
-                    "Finder and Spotlight use separate native workers",
+                    "Finder, Spotlight and cloud actions use separate native workers",
                 ));
             }
             Self::Info { scope } => (scope, FileAction::Info),
@@ -181,6 +188,7 @@ impl ReadArgs {
 /// Dispatch a user command through a deadline-controlled worker.
 pub(crate) fn dispatch(action: FilesAction) {
     let action = match action {
+        FilesAction::Cloud { action } => return cloud::dispatch(action),
         FilesAction::Finder { action } => return finder::dispatch(action),
         FilesAction::Spotlight(args) => return spotlight::dispatch(args),
         action => action,
@@ -239,6 +247,7 @@ pub(super) fn output<T: serde::Serialize>(source: &str, result: Result<T, FileEr
     }
 }
 
+pub(crate) use cloud::worker as cloud_worker;
 pub(crate) use finder::worker as finder_worker;
 pub(crate) use spotlight::worker as spotlight_worker;
 

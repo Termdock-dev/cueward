@@ -10,7 +10,7 @@ It is designed for agent workflows first:
 
 - Native macOS reach: SQLite reads, AppleScript, EventKit, Vision OCR, and Shortcuts integration
 - Agent-friendly output: structured JSON instead of chatty terminal prose
-- Local-first privacy: no cloud APIs, no scraping proxy, no third-party data backend
+- Local-first privacy: native macOS APIs, no scraping proxy, no third-party data backend
 - Practical automation: diagnose permissions with `cueward doctor`, then read, capture, search, and act
 
 Common use cases:
@@ -572,7 +572,9 @@ Use `cueward files list --root /absolute/directory` to browse one level, `files 
 
 Use `cueward files spotlight --root /absolute/directory --text invoice --max-depth 3` for indexed content candidates. Index coverage is unknown and current contents are not verified; zero results do not prove absence. See [Spotlight search](docs/files-spotlight.md) for budgets and source/completion semantics.
 
-Use `files metadata --root /absolute/directory --path relative/file.txt` for native UTType, Finder tags and package/alias flags with per-field availability; see [resource metadata](docs/files-metadata.md). Sorting, hidden names, versioned pagination, explicit encoding, and hex output are available. See [file operations](docs/files.md) for root scope, symlink handling, no-download policy, errors, deadlines, and remaining Finder capabilities.
+Use `files cloud status --root /absolute/directory --path relative/file` for per-field iCloud state. `files cloud download` explicitly submits a version-guarded iCloud file download; submission does not verify completion, and other provider state remains unknown. See [cloud state and downloads](docs/files-cloud.md).
+
+Use `files metadata --root /absolute/directory --path relative/file.txt` for native UTType, Finder tags and package/alias flags with per-field availability; see [resource metadata](docs/files-metadata.md). Sorting, hidden names, versioned pagination, explicit encoding, and hex output are available. See [file operations](docs/files.md) for root scope, symlink handling, implicit-download prevention, errors, deadlines, and remaining Finder capabilities.
 
 Use `cueward files finder context --root /absolute/directory` to inspect scoped Finder location/selection without requesting activation. `files finder reveal --root /absolute/directory --path relative/file.txt` explicitly requests Finder activation and selection, reporting `sent_unverified` rather than UI completion. See [Finder context and reveal](docs/files-finder.md) for scope, locks, deadlines and verification.
 
