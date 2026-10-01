@@ -218,7 +218,8 @@ impl<P: MutationPlatform> Context<'_, P> {
         receipt: &mut MutationReceipt,
     ) -> Result<(), FileError> {
         let root = self.post_root(receipt)?;
-        receipt.parent_after = Some(self.post_parent(&root, &receipt.request)?);
+        let parent = self.post_parent(&root, &receipt.request)?;
+        receipt.parent_after = Some(parent.clone());
         let destination = self.post_destination(&root, &receipt.request, file)?;
         if let Some(source) = &self.source {
             receipt.source_after = Some(self.check_source_path(source)?);
@@ -242,8 +243,20 @@ impl<P: MutationPlatform> Context<'_, P> {
         if self.scope.platform.stamp(&file.metadata()?).version != destination.version {
             return Err(changed("destination changed during final verification"));
         }
-        receipt.destination_after = Some(destination);
+        // Read-back descriptors survive parent relocation. Re-resolve both paths only
+        // after verification, and compare against the observations used for read-back.
+        let final_parent = self.post_parent(&root, &receipt.request)?;
+        let final_destination = self.post_destination(&root, &receipt.request, file)?;
+        if final_parent.version != parent.version
+            || final_destination.version != destination.version
+        {
+            return Err(changed(
+                "destination parent or path changed during final verification",
+            ));
+        }
         root.revalidate_root()?;
+        receipt.parent_after = Some(final_parent);
+        receipt.destination_after = Some(final_destination);
         Ok(())
     }
 
