@@ -153,7 +153,11 @@ def probe(cli, inactive_space):
                 if saved["foreground_changed"]:
                     raise RuntimeError("panel Save action changed foreground endpoints")
                 artifact = directory / "artifact.txt"
-                wait_file(artifact)
+                try:
+                    wait_file(artifact)
+                except RuntimeError as error:
+                    report.update(status="artifact_not_created", error=str(error))
+                    return finish_report(report, json.loads(state_path.read_text()))
                 report["file_created"] = True
                 report["file_content_matches"] = artifact.read_bytes() == CONTENT.encode()
                 reader = make_reader(directory)
