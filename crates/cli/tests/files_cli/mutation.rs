@@ -1,6 +1,6 @@
 use super::*;
 
-fn version(root: &Path, path: &str) -> String {
+pub(super) fn version(root: &Path, path: &str) -> String {
     run(root, "info", &["--path", path], true)["Ok"]["result"]["version"]
         .as_str()
         .unwrap()
@@ -9,7 +9,7 @@ fn version(root: &Path, path: &str) -> String {
 fn write(root: &Path, action: &str, args: &[&str], success: bool) -> Value {
     run(root, action, args, success)["Ok"]["result"].clone()
 }
-fn cleanup(value: &Value) {
+pub(super) fn cleanup(value: &Value) {
     let path = Path::new(value["receipt_path"].as_str().unwrap());
     let directory = path.parent().unwrap();
     assert_eq!(
