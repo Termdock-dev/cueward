@@ -5,6 +5,7 @@ pub mod calendar;
 pub mod clipboard;
 pub mod doctor;
 mod error;
+pub mod files;
 mod messages;
 pub mod notes;
 pub mod ocr;
