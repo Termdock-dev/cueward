@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads and Finder context/reveal when the installed CLI supports them. Not for general web research or developing Cueward itself.
+description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads, Spotlight content search, and Finder context/reveal when the installed CLI supports them. Not for general web research or developing Cueward itself.
 ---
 
 # Cueward Agent
@@ -18,13 +18,13 @@ Use `cueward doctor --json` when an available operation reports a permission/pre
 | Request | Read this reference |
 | --- | --- |
 | Current app UI, screenshots, native windows, background input, waits, snapshot differences, app launch/open, or Spaces | [computer-use.md](references/computer-use.md) |
-| Existing files: scoped search/metadata/reads, Finder location/selection, or an explicit Finder reveal | [files.md](references/files.md), then check whether `files` is installed |
+| Existing files: scoped filesystem/Spotlight search, metadata/reads, Finder location/selection, or an explicit Finder reveal | [files.md](references/files.md), then check whether `files` is installed |
 | Past browsing/notes/messages, indexed knowledge, capture or digest | [retrieval.md](references/retrieval.md) |
 | Live Safari tabs, DOM controls, bookmarks, console/network or browser AI state | [safari.md](references/safari.md) |
 | Notes, Quick Notes, Reminders, Calendar, OCR, clipboard, Stickies or Voice Memos | [apple-apps.md](references/apple-apps.md) |
 | Inspect, create, edit or run Apple Shortcuts | [shortcuts.md](references/shortcuts.md) |
 
-Prefer a narrow direct read when it answers the question. `search` queries the Cue index; `files search` finds filesystem names and metadata within an explicit root/depth when installed. Neither command is Spotlight content search. `capture` writes an inbox and scan state; run `triage` when those captures should become searchable. For Quick Notes cleanup, use `quick-notes archive`.
+Prefer a narrow direct read when it answers the question. `search` queries the Cue index; `files search` finds filesystem names and metadata within an explicit root/depth when installed. `files spotlight` separately queries indexed text when installed; unknown index coverage means zero results do not prove absence. `capture` writes an inbox and scan state; run `triage` when those captures should become searchable. For Quick Notes cleanup, use `quick-notes archive`.
 
 ## Interpret and verify
 

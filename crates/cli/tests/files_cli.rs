@@ -11,6 +11,8 @@ mod metadata;
 mod search;
 #[path = "files_cli/finder.rs"]
 mod finder;
+#[path = "files_cli/spotlight.rs"]
+mod spotlight;
 
 fn command() -> Command {
     Command::new(env!("CARGO_BIN_EXE_cueward"))

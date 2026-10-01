@@ -9,7 +9,7 @@ mod protocol_tests;
 mod tests;
 mod workspace;
 
-use super::{MacFiles, policy, protocol};
+use super::{observe, policy, protocol};
 use cueward_core::files::*;
 pub use model::*;
 use std::fs::File;
@@ -103,28 +103,6 @@ fn execute(
         FinderAction::Context { max_items } => context(request, root, *max_items, native),
         FinderAction::Reveal { .. } => reveal(request, root, native, lock_dir),
     }
-}
-
-fn observe(
-    root: &Path,
-    path: &Path,
-    follow_links: bool,
-    expected_version: Option<String>,
-) -> Result<FileInfo, FileError> {
-    let request = FileRequest {
-        root: root.to_owned(),
-        path: path.to_owned(),
-        follow_links,
-        expected_version,
-        action: FileAction::Info,
-    };
-    let FileResponse::Info(file) = cueward_core::files::execute(&MacFiles, &request)? else {
-        return Err(FileError::new(
-            FileErrorCode::Internal,
-            "expected file observation",
-        ));
-    };
-    Ok(file)
 }
 
 fn check_root(request: &FinderRequest, root: &FileInfo) -> Result<(), FileError> {

@@ -7,6 +7,8 @@ use std::path::PathBuf;
 mod finder;
 #[path = "files_search.rs"]
 mod search;
+#[path = "files_spotlight.rs"]
+mod spotlight;
 
 #[derive(Args)]
 pub(crate) struct ScopeArgs {
@@ -47,6 +49,8 @@ pub(crate) enum EncodingArg {
 
 #[derive(Subcommand)]
 pub(crate) enum FilesAction {
+    /// Find content-index candidates; index coverage and freshness are unknown.
+    Spotlight(spotlight::SpotlightArgs),
     /// Read scoped Finder context, or explicitly activate Finder and reveal an item.
     Finder {
         #[command(subcommand)]
@@ -108,10 +112,10 @@ pub(crate) struct ReadArgs {
 impl FilesAction {
     fn request(self) -> Result<(FileRequest, u64), FileError> {
         let (scope, action) = match self {
-            Self::Finder { .. } => {
+            Self::Finder { .. } | Self::Spotlight(_) => {
                 return Err(FileError::new(
                     FileErrorCode::InvalidOptions,
-                    "Finder uses a separate desktop worker",
+                    "Finder and Spotlight use separate native workers",
                 ));
             }
             Self::Info { scope } => (scope, FileAction::Info),
@@ -178,6 +182,7 @@ impl ReadArgs {
 pub(crate) fn dispatch(action: FilesAction) {
     let action = match action {
         FilesAction::Finder { action } => return finder::dispatch(action),
+        FilesAction::Spotlight(args) => return spotlight::dispatch(args),
         action => action,
     };
     let result = action.request().and_then(|(request, timeout)| {
@@ -235,6 +240,7 @@ pub(super) fn output<T: serde::Serialize>(source: &str, result: Result<T, FileEr
 }
 
 pub(crate) use finder::worker as finder_worker;
+pub(crate) use spotlight::worker as spotlight_worker;
 
 #[cfg(test)]
 #[path = "files_tests.rs"]

@@ -1,5 +1,6 @@
 //! Read-only file operations with macOS identity, no-download policy and deadlines.
 pub mod finder;
+pub mod spotlight;
 mod metadata;
 #[cfg(test)]
 mod metadata_tests;
@@ -82,4 +83,27 @@ fn data_state(flags: u32) -> DataState {
 pub fn execute_worker(request: &FileRequest) -> Result<FileResponse, FileError> {
     let _policy = policy::NoMaterialization::enter()?;
     cueward_core::files::execute(&MacFiles, request)
+}
+
+/// Observe one scoped path with the shared identity, symlink and version policy.
+fn observe(
+    root: &Path,
+    path: &Path,
+    follow_links: bool,
+    expected_version: Option<String>,
+) -> Result<FileInfo, FileError> {
+    let request = FileRequest {
+        root: root.to_owned(),
+        path: path.to_owned(),
+        follow_links,
+        expected_version,
+        action: FileAction::Info,
+    };
+    let FileResponse::Info(file) = cueward_core::files::execute(&MacFiles, &request)? else {
+        return Err(FileError::new(
+            FileErrorCode::Internal,
+            "expected file observation",
+        ));
+    };
+    Ok(file)
 }
