@@ -1,0 +1,46 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+body { margin: 0; background: #eee; font: 16px system-ui; }
+button { position: absolute; left: 20px; top: 20px; width: 160px; height: 40px; }
+canvas { position: absolute; left: 20px; top: 90px; background: white; }
+</style>
+<button id="single">Count single clicks</button>
+<canvas id="canvas" width="460" height="220"></canvas>
+<script>
+const button = document.querySelector('#single'), canvas = document.querySelector('#canvas');
+const context = canvas.getContext('2d');
+const state = { clicks: 0, releases: 0, events: [], object: { x: 100, y: 80 }, dragging: false };
+function rect(element) {
+  const r = element.getBoundingClientRect();
+  return { x: r.x, y: r.y, width: r.width, height: r.height };
+}
+function record(event) {
+  state.events.push({ type: event.type, button: event.button, buttons: event.buttons,
+    trusted: event.isTrusted, x: event.clientX, y: event.clientY });
+}
+for (const type of ['mousedown', 'mouseup', 'mousemove', 'click']) {
+  document.addEventListener(type, record);
+}
+button.addEventListener('click', () => { state.clicks += 1; });
+canvas.addEventListener('mousedown', event => {
+  const r = rect(canvas), x = event.clientX - r.x, y = event.clientY - r.y;
+  state.dragging = Math.abs(x - state.object.x) <= 20 && Math.abs(y - state.object.y) <= 20;
+});
+canvas.addEventListener('mousemove', event => {
+  if (!state.dragging || !(event.buttons & 1)) return;
+  const r = rect(canvas);
+  state.object = { x: event.clientX - r.x, y: event.clientY - r.y };
+  draw();
+});
+canvas.addEventListener('mouseup', () => { state.dragging = false; state.releases += 1; });
+function draw() {
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#164faf';
+  context.fillRect(state.object.x - 20, state.object.y - 20, 40, 40);
+}
+draw();
+setInterval(() => {
+  window.webkit.messageHandlers.state.postMessage({ ...state, regions: { button: rect(button), canvas: rect(canvas) } });
+}, 25);
+</script>
