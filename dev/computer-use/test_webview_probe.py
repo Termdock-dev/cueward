@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import subprocess
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -13,7 +14,8 @@ SPEC.loader.exec_module(PROBE)
 
 
 class WebViewTests(unittest.TestCase):
-    def scenario(self, activate_first=False, fail_first=False):
+    def scenario(self, activate_first=False, fail_first=False, fail_second_snapshot=False,
+                 interrupt_first=False, fail_compile=False):
         receivers, actions, checkpoints, cleaned = [], [], [], []
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "report.json"
@@ -34,6 +36,8 @@ class WebViewTests(unittest.TestCase):
             def command(args):
                 path, state = receivers[-1]
                 if args[1:3] == ["window", "snapshot"]:
+                    if fail_second_snapshot and len(actions) == 1 and len(receivers) == 1:
+                        raise RuntimeError("snapshot observation failed")
                     return {"input_target": str(state["window_id"]), "image": {"scale_x": 1, "scale_y": 1},
                             "screenshot": {"path": str(Path(temporary) / "unused.png")}}
                 action = args[2]
@@ -56,14 +60,22 @@ class WebViewTests(unittest.TestCase):
                 state["dom"]["events"].append({"type": action})
                 state["observations"] += 1
                 path.write_text(json.dumps(state))
+                if interrupt_first and len(actions) == 1:
+                    return {"status": "partially_sent", "events_sent": 2, "interruption": "foreground changed"}
                 return {"status": "sent_unverified", "events_sent": 2}
 
+            def compile_or_session(args, **kwargs):
+                if fail_compile and args[0] == "swiftc":
+                    raise subprocess.CalledProcessError(1, args)
+                return SimpleNamespace(stdout=b"unlocked")
+
             with patch("sys.argv", ["probe", "--cli", "/mock/cueward", "--output", str(output)]), \
-                 patch.object(PROBE.subprocess, "run", return_value=SimpleNamespace(stdout=b"unlocked")), \
+                 patch.object(PROBE.subprocess, "run", side_effect=compile_or_session), \
                  patch.object(PROBE.subprocess, "Popen", side_effect=start), \
                  patch.object(PROBE, "run", side_effect=command), patch.object(PROBE.time, "sleep"), \
                  patch.object(PROBE.os, "killpg", side_effect=lambda pid, sig: cleaned.append(pid)):
-                PROBE.main()
+                exit_code = PROBE.main()
+            self.assertEqual(exit_code, 1 if (activate_first or fail_first or fail_second_snapshot or interrupt_first or fail_compile) else 0)
             return json.loads(output.read_text()), actions, checkpoints, cleaned
 
     def test_first_click_activation_is_saved_and_drag_still_runs(self):
@@ -95,6 +107,27 @@ class WebViewTests(unittest.TestCase):
         self.assertEqual([action for action, _ in actions], ["click", "drag"])
         self.assertEqual(report["trials"][-1]["release_effects"], 1)
         self.assertEqual(cleaned, [100, 101])
+
+    def test_later_snapshot_failure_keeps_first_click_and_independent_drag(self):
+        report, actions, _, _ = self.scenario(fail_second_snapshot=True)
+        self.assertEqual(report["trials"][0]["click_effects"], 1)
+        self.assertEqual(report["trials"][1]["status"], "observation_failed")
+        self.assertEqual(report["trials"][-1]["release_effects"], 1)
+        self.assertEqual([action for action, _ in actions], ["click", "drag"])
+
+    def test_interrupted_dispatch_does_not_trigger_second_click(self):
+        report, actions, _, _ = self.scenario(interrupt_first=True)
+        self.assertEqual(report["trials"][0]["status"], "dispatch_interrupted")
+        self.assertEqual(report["trials"][0]["posted_events"], 2)
+        self.assertEqual(report["trials"][1]["status"], "skipped_previous_trial_error")
+        self.assertEqual([action for action, _ in actions], ["click", "drag"])
+
+    def test_compilation_failure_leaves_report_and_starts_no_receiver(self):
+        report, actions, _, cleaned = self.scenario(fail_compile=True)
+        self.assertEqual(report["status"], "recorded_with_errors")
+        self.assertIn("fatal_error", report)
+        self.assertEqual(actions, [])
+        self.assertEqual(cleaned, [])
 
 
 if __name__ == "__main__":
