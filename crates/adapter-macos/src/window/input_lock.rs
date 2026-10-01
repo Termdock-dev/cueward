@@ -15,12 +15,13 @@ pub(super) fn input_lock_path(pid: i32) -> Result<PathBuf, MacosError> {
     Ok(PathBuf::from(ensure_cache_dir()?).join(format!("input-{pid}.lock")))
 }
 
-#[cfg(test)]
-pub(super) fn lock_input(pid: i32) -> Result<File, MacosError> {
+/// Hold the shared per-process input lock until the returned file is dropped.
+pub(crate) fn lock_input(pid: i32) -> Result<File, MacosError> {
     lock_path(&input_lock_path(pid)?)
 }
 
-pub(super) fn lock_path(path: &Path) -> Result<File, MacosError> {
+/// Acquire an existing operation lock without following a leaf symlink.
+pub(crate) fn lock_path(path: &Path) -> Result<File, MacosError> {
     let file = OpenOptions::new()
         .create(true)
         .truncate(false)

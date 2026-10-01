@@ -1,6 +1,6 @@
 # Scoped file search, metadata and reads
 
-The initial `files list/info/read` implementation was merged in [PR #44](https://github.com/Termdock-dev/cueward/pull/44). Filesystem search was merged in [PR #46](https://github.com/Termdock-dev/cueward/pull/46). This reference also describes the subsequent `files metadata` source revision. Check `cueward files --help`, `cueward files search --help` and `cueward files metadata --help` before relying on these capabilities. Installing a skill does not install a binary; documentation can describe a newer source revision than main or the latest published release.
+The initial `files list/info/read` implementation was merged in [PR #44](https://github.com/Termdock-dev/cueward/pull/44). Filesystem search was merged in [PR #46](https://github.com/Termdock-dev/cueward/pull/46). Resource metadata was merged in [PR #47](https://github.com/Termdock-dev/cueward/pull/47). This reference also describes the subsequent Finder source revision. Check `cueward files --help`, `cueward files search --help`, `cueward files metadata --help` and `cueward files finder --help` before relying on these capabilities. Installing a skill does not install a binary; documentation can describe a newer source revision than main or the latest published release.
 
 ## Choose the scope and range
 
@@ -54,6 +54,25 @@ Tags are capped at 256 names and 65,536 UTF-8 bytes total; content-type identifi
 
 Bind a subsequent observation to file.version with --expected-version when appropriate. Before/after file/root checks discard detected changes, but the revision does not bind an atomic resource snapshot or native type-registration/cache state. Sequential resource queries can fail independently. Use available fields to answer only the supported part of the question, and preserve gaps instead of treating partial availability as complete metadata.
 
+## Read Finder context or reveal a chosen item
+
+```bash
+cueward files finder context --root /absolute/directory --max-items 100
+cueward files finder reveal --root /absolute/directory --path Reports/report.txt --expected-version '<previous file version>'
+```
+
+Context reads Finder's front window target and current selection without requesting activation. Root is required; only scoped items receive file information. Window order belongs to Finder even when another app is foreground. The response operation is finder_context; root is FileInfo, front_window is id/location or null, and selection is an array in Finder order or null when Finder is not running. A null finder_pid and false selection_complete mean no queryable process was observed. An available empty selection is [].
+
+Location/selection entries are available (relative_path/file), outside_scope (no item path/name/file information), or error (code/message). Native virtual/remote/non-UTF-8 URLs remain errors. Leaf links are described without following; path traversal through links is rejected. Do not turn excluded/error entries into empty selection. max-items accepts 1..500, defaults to 100; exceeding it returns scan_limit without a partial success. selection_complete covers the query's full array, not metadata availability or an atomic UI snapshot. Root/file versions do not bind Finder UI state.
+
+Context needs Apple Events permission to Finder; a permission_denied failure is not an empty selection. Inspect the invoking host's Automation access. If a location lies outside the chosen root, obtain a permitted scope instead of expanding to home or another volume automatically.
+
+Reveal is an explicit action that can launch/activate Finder, open a window and change selection. Use it only for that requested effect. It requires root and an explicit relative path. An unfollowed symlink/special file or dataless item is rejected; follow-links may resolve only within root. The root bounds the submitted item, not Finder's displayed parent or other windows. Worker no-materialization does not control Finder's own preview/provider behavior.
+
+The response operation is finder_reveal and status is sent_unverified. activation_requested and selection_change_requested are true. foreground contains optional before/after PIDs and foreground_changed; an unchanged immediate PID does not rule out later activation. post_check is Ok(FileInfo) or Err(code/message), checking file/root state after submission rather than UI delivery. An outer Ok with a failed post_check is still a submitted action. Verify the intended selection with fresh context/independent observation; never claim completion from status or post_check alone.
+
+Reveal holds a global operation lock and the running Finder's shared input lock during submission/post-check, then releases them. A busy lock or detected process change blocks submission; asynchronous UI completion is outside that lock period. A timeout/invalid worker response may hide an already delivered reveal. Inspect before retrying; the command neither retries nor restores foreground automatically. Both commands use timeout-ms 1..30000, default 10000. Actual reveal UI delivery and provider/TCC/unmount acceptance remain unverified in this revision.
+
 ## Page and resume
 
 List's limit is 1..500. It observes at most 10,000 entries including hidden ones; scan_limit is not a partial successful sorted page. Later pages require the previous `version` with `--expected-version` and `next_offset` with `--offset`; keep sort, descending and hidden options. Child metadata/name changes, including hidden and unpaged entries, invalidate the version. On changed, restart from the first page.
@@ -70,6 +89,6 @@ Metadata includes requested/resolved paths, kind, identity/revision, size, UTC t
 
 Dataless placeholders are distinct from empty files. The macOS worker denies dataless materialization before filesystem operations; it has no download action. not_dataless does not prove cloud/network/provider availability. Preserve unavailable, permission_denied, not_found, scan_limit, decode_error, changed and timeout as distinct failures; do not call them successful zero bytes/results.
 
-The worker deadline defaults to 10 seconds, configurable with --timeout-ms 1..30000. The operation does not edit the source file or request Finder/app activation. On change/error/timeout, reobserve before resuming; it discards detected changed-file results, but is not a sandbox against malicious concurrent path swaps.
+The worker deadline defaults to 10 seconds, configurable with --timeout-ms 1..30000. List/info/read/search/metadata do not edit the source file or request Finder/app activation. On change/error/timeout, reobserve before resuming; it discards detected changed-file results, but is not a sandbox against malicious concurrent path swaps.
 
-Spotlight content search, UTType/tag search filters, package pruning, alias resolution, Finder selection/reveal and provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image preview and file-management actions are separate work.
+Spotlight content search, UTType/tag search filters, package pruning, alias resolution and provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image preview and file-management actions are separate work.

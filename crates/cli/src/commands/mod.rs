@@ -85,13 +85,15 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
-    /// List, search, inspect, and read files within an explicitly selected directory.
+    /// Browse/read scoped files, or inspect Finder context and explicitly reveal items.
     Files {
         #[command(subcommand)]
         action: FilesAction,
     },
     #[command(hide = true)]
     FilesWorker,
+    #[command(hide = true)]
+    FilesFinderWorker,
     /// Discover, launch, and explore macOS applications without requesting activation.
     App {
         #[command(subcommand)]
@@ -245,6 +247,7 @@ pub(crate) fn dispatch(command: Command) {
     match command {
         Command::Files { action } => files::dispatch(action),
         Command::FilesWorker => files::worker(),
+        Command::FilesFinderWorker => files::finder_worker(),
         Command::App { action } => app::dispatch(action),
         Command::Space { action } => space::dispatch(action),
         Command::Capture { source, since } => capture::dispatch(source, since),

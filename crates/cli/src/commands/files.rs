@@ -3,6 +3,8 @@ use cueward_core::files::*;
 use std::io::Read;
 use std::path::PathBuf;
 
+#[path = "files_finder.rs"]
+mod finder;
 #[path = "files_search.rs"]
 mod search;
 
@@ -45,6 +47,11 @@ pub(crate) enum EncodingArg {
 
 #[derive(Subcommand)]
 pub(crate) enum FilesAction {
+    /// Read scoped Finder context, or explicitly activate Finder and reveal an item.
+    Finder {
+        #[command(subcommand)]
+        action: finder::FinderCommand,
+    },
     /// List one directory with deterministic sorting and versioned pagination.
     List(ListArgs),
     /// Inspect metadata or a leaf symlink without reading its contents.
@@ -99,15 +106,21 @@ pub(crate) struct ReadArgs {
 }
 
 impl FilesAction {
-    fn request(self) -> (FileRequest, u64) {
+    fn request(self) -> Result<(FileRequest, u64), FileError> {
         let (scope, action) = match self {
+            Self::Finder { .. } => {
+                return Err(FileError::new(
+                    FileErrorCode::InvalidOptions,
+                    "Finder uses a separate desktop worker",
+                ));
+            }
             Self::Info { scope } => (scope, FileAction::Info),
             Self::Metadata { scope } => (scope, FileAction::Metadata),
             Self::List(args) => args.action(),
             Self::Read(args) => args.action(),
             Self::Search(args) => args.action(),
         };
-        (
+        Ok((
             FileRequest {
                 root: scope.root,
                 path: scope.path,
@@ -116,7 +129,7 @@ impl FilesAction {
                 action,
             },
             scope.timeout_ms,
-        )
+        ))
     }
 }
 
@@ -163,42 +176,51 @@ impl ReadArgs {
 
 /// Dispatch a user command through a deadline-controlled worker.
 pub(crate) fn dispatch(action: FilesAction) {
-    let (request, timeout) = action.request();
-    let result = std::env::current_exe()
-        .map_err(FileError::from)
-        .and_then(|exe| cueward_adapter_macos::files::run(&exe, &request, timeout));
+    let action = match action {
+        FilesAction::Finder { action } => return finder::dispatch(action),
+        action => action,
+    };
+    let result = action.request().and_then(|(request, timeout)| {
+        std::env::current_exe()
+            .map_err(FileError::from)
+            .and_then(|exe| cueward_adapter_macos::files::run(&exe, &request, timeout))
+    });
     output("files", result);
 }
 
 /// Read exactly one bounded request in the isolated filesystem worker.
 pub(crate) fn worker() {
-    use cueward_adapter_macos::files::{MAX_REQUEST_BYTES, execute_worker};
-    let request = || -> Result<FileRequest, FileError> {
-        let mut bytes = Vec::new();
-        std::io::stdin()
-            .take((MAX_REQUEST_BYTES + 1) as u64)
-            .read_to_end(&mut bytes)?;
-        if bytes.len() > MAX_REQUEST_BYTES {
-            return Err(FileError::new(
-                FileErrorCode::InvalidOptions,
-                "request exceeds 16 KiB",
-            ));
-        }
-        serde_json::from_slice(&bytes)
-            .map_err(|e| FileError::new(FileErrorCode::InvalidOptions, e.to_string()))
-    };
+    use cueward_adapter_macos::files::execute_worker;
     output(
         "files/worker",
-        request().and_then(|request| execute_worker(&request)),
+        read_request().and_then(|request| execute_worker(&request)),
     );
 }
 
-fn json(result: &Result<FileResponse, FileError>) -> Result<String, serde_json::Error> {
+/// Decode one worker request, enforcing the shared size bound before dispatch.
+pub(super) fn read_request<T: serde::de::DeserializeOwned>() -> Result<T, FileError> {
+    use cueward_adapter_macos::files::MAX_REQUEST_BYTES;
+    let mut bytes = Vec::new();
+    std::io::stdin()
+        .take((MAX_REQUEST_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > MAX_REQUEST_BYTES {
+        return Err(FileError::new(
+            FileErrorCode::InvalidOptions,
+            "request exceeds 16 KiB",
+        ));
+    }
+    serde_json::from_slice(&bytes)
+        .map_err(|e| FileError::new(FileErrorCode::InvalidOptions, e.to_string()))
+}
+
+fn json<T: serde::Serialize>(result: &Result<T, FileError>) -> Result<String, serde_json::Error> {
     // JSON escaping preserves decoded content while print_external guards delimiters.
     serde_json::to_string_pretty(result).map(|value| value.replace('<', "\\u003c"))
 }
 
-fn output(source: &str, result: Result<FileResponse, FileError>) {
+/// Emit escaped external JSON with an exit status matching the outer result.
+pub(super) fn output<T: serde::Serialize>(source: &str, result: Result<T, FileError>) {
     let success = result.is_ok();
     match json(&result) {
         Ok(payload) => super::helpers::print_external(source, &payload),
@@ -211,6 +233,8 @@ fn output(source: &str, result: Result<FileResponse, FileError>) {
         std::process::exit(1);
     }
 }
+
+pub(crate) use finder::worker as finder_worker;
 
 #[cfg(test)]
 #[path = "files_tests.rs"]

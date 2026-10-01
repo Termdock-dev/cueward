@@ -16,6 +16,7 @@ mod target;
 mod wait;
 
 pub(crate) use bridge::AX_SUPPORT;
+pub(crate) use input_lock::{lock_input, lock_path};
 
 pub use crate::screenshot::{WindowScope, list_windows};
 pub use actions::{ActionStatus, WindowActionResult, press, set_value};

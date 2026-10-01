@@ -1,4 +1,5 @@
 //! Read-only file operations with macOS identity, no-download policy and deadlines.
+pub mod finder;
 mod metadata;
 #[cfg(test)]
 mod metadata_tests;
