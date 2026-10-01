@@ -1,6 +1,6 @@
 # Scoped file search, metadata and reads
 
-The initial `files list/info/read` implementation was merged in [PR #44](https://github.com/Termdock-dev/cueward/pull/44). Filesystem search was merged in [PR #46](https://github.com/Termdock-dev/cueward/pull/46). Resource metadata was merged in [PR #47](https://github.com/Termdock-dev/cueward/pull/47). Finder context/reveal was merged in [PR #48](https://github.com/Termdock-dev/cueward/pull/48). This reference also describes the subsequent Spotlight source revision. Check `cueward files --help`, `cueward files search --help`, `cueward files metadata --help`, `cueward files finder --help` and `cueward files spotlight --help` before relying on these capabilities. Installing a skill does not install a binary; documentation can describe a newer source revision than main or the latest published release.
+The initial `files list/info/read` implementation was merged in [PR #44](https://github.com/Termdock-dev/cueward/pull/44). Filesystem search was merged in [PR #46](https://github.com/Termdock-dev/cueward/pull/46). Resource metadata was merged in [PR #47](https://github.com/Termdock-dev/cueward/pull/47). Finder context/reveal was merged in [PR #48](https://github.com/Termdock-dev/cueward/pull/48). This reference also describes Spotlight (merged in [PR #49](https://github.com/Termdock-dev/cueward/pull/49)) and the subsequent cloud source revision. Check `cueward files --help`, `cueward files search --help`, `cueward files metadata --help`, `cueward files finder --help`, `cueward files spotlight --help` and `cueward files cloud --help` before relying on these capabilities. Installing a skill does not install a binary; documentation can describe a newer source revision than main or the latest published release.
 
 ## Choose the scope and range
 
@@ -71,6 +71,23 @@ Tags are capped at 256 names and 65,536 UTF-8 bytes total; content-type identifi
 
 Bind a subsequent observation to file.version with --expected-version when appropriate. Before/after file/root checks discard detected changes, but the revision does not bind an atomic resource snapshot or native type-registration/cache state. Sequential resource queries can fail independently. Use available fields to answer only the supported part of the question, and preserve gaps instead of treating partial availability as complete metadata.
 
+## Inspect iCloud state or explicitly request a download
+
+```bash
+cueward files cloud status --root /absolute/directory --path Reports/report.pdf
+cueward files cloud download --root /absolute/directory --path Reports/report.pdf --expected-version '<fresh file version>' --max-bytes 33554432
+```
+
+Check installed cloud capabilities first. Status reads metadata/resource keys without opening contents or requesting downloads. It returns cloud_status with file, resources, provider_coverage=icloud_keys_other_providers_unknown and download_requested_by_operation=false. The keys apply to iCloud, not uniform third-party provider state. An unavailable is_ubiquitous is unknown, not false or local-only. Available/false membership makes dependent fields not_applicable; unavailable/error membership leaves dependent fields unavailable. Leaf links and special files have not_applicable fields; explicit following must stay within root. Leaf placeholders can be observed, but dataless roots/ancestors remain unavailable.
+
+Inspect each resource's status before using value. downloading_status.value.state is not_downloaded, downloaded, current or other (with preserved native value). is_downloading reports an active download; download_requested alone can reflect a past request. is_uploaded/is_uploading, has_unresolved_conflicts, downloading_error and uploading_error retain independent availability/errors. Missing error values do not prove absence of errors. Sequential resource observations are not an atomic snapshot, and file.version does not version provider state.
+
+Download is an explicit user-requested effect, never a silent fallback for failed reads/searches/previews. Select one regular file from fresh status and require its file.version with --expected-version. Membership must be available/true. Directories, unfollowed links, special files and unknown/non-iCloud membership are rejected. max-bytes (default 33554432, range 1..268435456) bounds reported size before submission, not provider transfer bytes or final size; there is no cancellation or directory download.
+
+The cloud_download receipt includes operation_id, before, max_bytes, status, download_requested_by_operation, completion_verified=false and post_check=Ok(CloudStatus) or Err(code/message). sent_unverified means a new native request was accepted; already_current or already_requested means no new request was made. None proves completed readable/current bytes. A failed post_check can coexist with an already submitted request; preserve both facts. Normal download metadata changes are allowed after submission, while scoped item identity/path/root are checked.
+
+timeout-ms (default 10000, range 1..30000) bounds submission/observation, not the asynchronous provider transfer. The operation lock is released after post-check. A timeout or worker failure can hide an accepted request and cannot cancel it. There is no automatic retry. Observe fresh cloud status before retrying, and independently read the requested versioned content before claiming it is readable. Real iCloud transfer/placeholder/TCC/unmount and generic provider acceptance remain unverified.
+
 ## Read Finder context or reveal a chosen item
 
 ```bash
@@ -104,8 +121,8 @@ The external JSON contains `Ok` with operation/result, or `Err` with code/messag
 
 Metadata includes requested/resolved paths, kind, identity/revision, size, UTC timestamps, mode, readonly, data_state and link_target. Directory size is not a recursive total. readonly reflects Unix write bits, not TCC/readability. Identity and version are metadata observations, not content hashes or an atomic filesystem snapshot.
 
-Dataless placeholders are distinct from empty files. The macOS worker denies dataless materialization before filesystem operations; it has no download action. not_dataless does not prove cloud/network/provider availability. Preserve unavailable, permission_denied, not_found, scan_limit, decode_error, changed and timeout as distinct failures; do not call them successful zero bytes/results.
+Dataless placeholders are distinct from empty files. The macOS worker denies dataless materialization before filesystem operations; read-only commands do not request downloads. Use the separate explicit cloud download only for that requested effect. not_dataless does not prove cloud/network/provider availability. Preserve unavailable, permission_denied, not_found, scan_limit, decode_error, changed and timeout as distinct failures; do not call them successful zero bytes/results.
 
 The worker deadline defaults to 10 seconds, configurable with --timeout-ms 1..30000. List/info/read/search/metadata/spotlight do not edit the source file or request Finder/app activation. On change/error/timeout, reobserve before resuming; it discards detected changed-file results, but is not a sandbox against malicious concurrent path swaps.
 
-UTType/tag search filters, package pruning, alias resolution and provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image preview and file-management actions are separate work.
+UTType/tag search filters, package pruning, alias resolution and generic third-party provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image preview and file-management actions are separate work.

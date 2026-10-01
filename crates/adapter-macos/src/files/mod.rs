@@ -1,4 +1,5 @@
-//! Read-only file operations with macOS identity, no-download policy and deadlines.
+//! Scoped file operations with macOS identity, explicit actions and deadlines.
+pub mod cloud;
 pub mod finder;
 pub mod spotlight;
 mod metadata;

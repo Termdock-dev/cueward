@@ -13,6 +13,8 @@ mod search;
 mod finder;
 #[path = "files_cli/spotlight.rs"]
 mod spotlight;
+#[path = "files_cli/cloud.rs"]
+mod cloud;
 
 fn command() -> Command {
     Command::new(env!("CARGO_BIN_EXE_cueward"))
