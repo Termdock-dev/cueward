@@ -4,6 +4,8 @@ Use this reference for Apple Notes, Quick Notes, Reminders, Calendar, OCR, scree
 
 ## Notes
 
+Read recent notes with `cueward capture --source notes --since 7d`; there is no `notes list/read` subcommand. Capture persists inbox/state as described in retrieval.md. Attachment segments can include image, PDF, web preview, map, file-backed, audio or drawing metadata. Inspect has_ocr/ocr_text and available segment fields instead of assuming every attachment has decoded text or every capture contains full source metadata. Standalone `ocr` handles a specifically chosen supported image/PDF.
+
 ```bash
 cueward notes create --title "Title" --body "Body" --folder Cueward
 cueward notes update --title "Title" --body "New content" --folder Cueward

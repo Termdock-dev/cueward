@@ -5,6 +5,9 @@
 
 .codex/*
 .claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/cueward-agent
 .gemini/*
 recall.md
 remember.md
