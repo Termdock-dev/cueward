@@ -151,6 +151,8 @@ pub enum FileErrorCode {
     UnsupportedType,
     UnsupportedPathEncoding,
     DecodeError,
+    Encrypted,
+    CorruptData,
     BinaryData,
     ScanLimit,
     Unavailable,

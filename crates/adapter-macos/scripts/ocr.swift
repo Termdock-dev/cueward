@@ -3,11 +3,6 @@ import Vision
 import AppKit
 import PDFKit
 
-struct OcrResult: Codable {
-    let text: String
-    let confidence: Float
-}
-
 func ocrImage(_ path: String) -> [OcrResult] {
     let url = URL(fileURLWithPath: path)
 
@@ -21,7 +16,7 @@ func ocrImage(_ path: String) -> [OcrResult] {
         return []
     }
 
-    return recognizeText(in: ciImage)
+    return (try? recognizeText(in: ciImage)) ?? []
 }
 
 func ocrPdf(_ url: URL) -> [OcrResult] {
@@ -57,29 +52,10 @@ func ocrPdf(_ url: URL) -> [OcrResult] {
               let cgImage = bitmap.cgImage else { continue }
 
         let ciImage = CIImage(cgImage: cgImage)
-        allResults.append(contentsOf: recognizeText(in: ciImage))
+        allResults.append(contentsOf: (try? recognizeText(in: ciImage)) ?? [])
     }
 
     return allResults
-}
-
-func recognizeText(in ciImage: CIImage) -> [OcrResult] {
-    var results: [OcrResult] = []
-
-    let handler = VNImageRequestHandler(ciImage: ciImage, options: [:])
-    let request = VNRecognizeTextRequest { request, _ in
-        guard let observations = request.results as? [VNRecognizedTextObservation] else { return }
-        for observation in observations {
-            guard let candidate = observation.topCandidates(1).first else { continue }
-            results.append(OcrResult(text: candidate.string, confidence: candidate.confidence))
-        }
-    }
-
-    request.recognitionLanguages = ["zh-Hant", "zh-Hans", "en-US", "ja"]
-    request.usesLanguageCorrection = true
-
-    try? handler.perform([request])
-    return results
 }
 
 // Main

@@ -3,6 +3,8 @@ use cueward_core::files::*;
 use std::io::Read;
 use std::path::PathBuf;
 
+#[path = "files_preview.rs"]
+mod preview;
 #[path = "files_cloud.rs"]
 mod cloud;
 #[path = "files_finder.rs"]
@@ -51,6 +53,11 @@ pub(crate) enum EncodingArg {
 
 #[derive(Subcommand)]
 pub(crate) enum FilesAction {
+    /// Read PDF/image content or request a Quick Look thumbnail.
+    Preview {
+        #[command(subcommand)]
+        action: preview::PreviewCommand,
+    },
     /// Inspect cloud state or explicitly request one iCloud file download.
     Cloud {
         #[command(subcommand)]
@@ -119,10 +126,13 @@ pub(crate) struct ReadArgs {
 impl FilesAction {
     fn request(self) -> Result<(FileRequest, u64), FileError> {
         let (scope, action) = match self {
-            Self::Finder { .. } | Self::Spotlight(_) | Self::Cloud { .. } => {
+            Self::Finder { .. }
+            | Self::Spotlight(_)
+            | Self::Cloud { .. }
+            | Self::Preview { .. } => {
                 return Err(FileError::new(
                     FileErrorCode::InvalidOptions,
-                    "Finder, Spotlight and cloud actions use separate native workers",
+                    "Finder, Spotlight, cloud and preview actions use separate native workers",
                 ));
             }
             Self::Info { scope } => (scope, FileAction::Info),
@@ -188,6 +198,7 @@ impl ReadArgs {
 /// Dispatch a user command through a deadline-controlled worker.
 pub(crate) fn dispatch(action: FilesAction) {
     let action = match action {
+        FilesAction::Preview { action } => return preview::dispatch(action),
         FilesAction::Cloud { action } => return cloud::dispatch(action),
         FilesAction::Finder { action } => return finder::dispatch(action),
         FilesAction::Spotlight(args) => return spotlight::dispatch(args),
@@ -249,6 +260,7 @@ pub(super) fn output<T: serde::Serialize>(source: &str, result: Result<T, FileEr
 
 pub(crate) use cloud::worker as cloud_worker;
 pub(crate) use finder::worker as finder_worker;
+pub(crate) use preview::worker as preview_worker;
 pub(crate) use spotlight::worker as spotlight_worker;
 
 #[cfg(test)]
