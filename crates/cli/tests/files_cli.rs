@@ -5,6 +5,8 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+#[path = "files_cli/metadata.rs"]
+mod metadata;
 #[path = "files_cli/search.rs"]
 mod search;
 

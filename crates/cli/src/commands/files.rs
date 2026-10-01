@@ -52,6 +52,11 @@ pub(crate) enum FilesAction {
         #[command(flatten)]
         scope: ScopeArgs,
     },
+    /// Read platform content type, Finder tags and package/alias resource attributes.
+    Metadata {
+        #[command(flatten)]
+        scope: ScopeArgs,
+    },
     /// Read a bounded byte or UTF-8 line range; use hex for binary data.
     Read(ReadArgs),
     /// Search filenames and metadata within explicit depth and scan bounds.
@@ -97,6 +102,7 @@ impl FilesAction {
     fn request(self) -> (FileRequest, u64) {
         let (scope, action) = match self {
             Self::Info { scope } => (scope, FileAction::Info),
+            Self::Metadata { scope } => (scope, FileAction::Metadata),
             Self::List(args) => args.action(),
             Self::Read(args) => args.action(),
             Self::Search(args) => args.action(),
