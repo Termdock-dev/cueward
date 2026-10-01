@@ -147,3 +147,105 @@ fn external_json_escaping_preserves_exact_strings() {
     let decoded: Result<FileResponse, FileError> = serde_json::from_str(&encoded).unwrap();
     assert_eq!(decoded.unwrap_err().message, message);
 }
+
+#[test]
+fn parses_search_defaults_and_all_metadata_filters() {
+    let (request, timeout) = parse(&["files", "search", "--root", "/tmp"]);
+    assert_eq!(timeout, 10000);
+    assert!(matches!(
+        request.action,
+        FileAction::Search(SearchOptions {
+            max_depth: 1,
+            max_entries: 10000,
+            limit: 100,
+            offset: 0,
+            hidden: false,
+            name: None,
+            ..
+        })
+    ));
+    let (request, _) = parse(&[
+        "files",
+        "search",
+        "--root",
+        "/tmp",
+        "--path",
+        "Reports",
+        "--name",
+        "臺灣",
+        "--kind",
+        "file",
+        "--min-size",
+        "2",
+        "--max-size",
+        "12",
+        "--hidden",
+        "--max-depth",
+        "3",
+        "--max-entries",
+        "100",
+        "--limit",
+        "2",
+        "--offset",
+        "2",
+        "--expected-version",
+        "v",
+        "--modified-after",
+        "2026-10-01T00:00:00+08:00",
+        "--modified-before",
+        "2026-10-02T00:00:00Z",
+    ]);
+    let FileAction::Search(options) = request.action else {
+        panic!("search")
+    };
+    assert_eq!(request.path, PathBuf::from("Reports"));
+    assert_eq!(request.expected_version.as_deref(), Some("v"));
+    assert_eq!(options.name.as_deref(), Some("臺灣"));
+    assert_eq!(options.kind, Some(FileKind::File));
+    assert_eq!((options.min_size, options.max_size), (Some(2), Some(12)));
+    assert_eq!(
+        (
+            options.max_depth,
+            options.max_entries,
+            options.limit,
+            options.offset
+        ),
+        (3, 100, 2, 2)
+    );
+    assert!(options.hidden);
+    assert_eq!(
+        options.modified_after.unwrap().to_rfc3339(),
+        "2026-09-30T16:00:00+00:00"
+    );
+    assert_eq!(
+        options.modified_before.unwrap().to_rfc3339(),
+        "2026-10-02T00:00:00+00:00"
+    );
+}
+
+#[test]
+fn rejects_unscoped_search_unknown_kinds_and_ambiguous_dates() {
+    for args in [
+        vec!["files", "search"],
+        vec!["files", "search", "--root", "/tmp", "--kind", "package"],
+        vec![
+            "files",
+            "search",
+            "--root",
+            "/tmp",
+            "--modified-after",
+            "2026-10-01",
+        ],
+        vec![
+            "files",
+            "search",
+            "--root",
+            "/tmp",
+            "--modified-before",
+            "2026-10-01T00:00:00",
+        ],
+        vec!["files", "search", "--root", "/tmp", "--min-size", "-1"],
+    ] {
+        assert!(Cli::try_parse_from(std::iter::once("cueward").chain(args)).is_err());
+    }
+}

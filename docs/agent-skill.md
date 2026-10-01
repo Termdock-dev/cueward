@@ -41,7 +41,7 @@ A skill installs instructions, not the binary. PATH may still resolve an older c
 cargo install --path crates/cli --locked --force
 ```
 
-Main, published releases and open PRs have different capabilities. As of this update, the initial `files list/info/read` slice remains pending in [PR #44](https://github.com/Termdock-dev/cueward/pull/44). The skill uses it only when the installed CLI supports it; this does not claim availability in main or a published release. See [computer-use progress](computer-use-progress.md) for merged work and outstanding desktop verification.
+Main, published releases and open PRs have different capabilities. The initial `files list/info/read` slice was merged in [PR #44](https://github.com/Termdock-dev/cueward/pull/44). Check `cueward files search --help` before using the subsequent filesystem search reference. The skill uses a documented capability only when the installed CLI supports it; newer source instructions do not establish availability in main or a published release. See [computer-use progress](computer-use-progress.md) for merged work and outstanding desktop verification.
 
 ## Keep the source current
 

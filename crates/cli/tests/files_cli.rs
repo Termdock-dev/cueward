@@ -5,6 +5,9 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+#[path = "files_cli/search.rs"]
+mod search;
+
 fn command() -> Command {
     Command::new(env!("CARGO_BIN_EXE_cueward"))
 }

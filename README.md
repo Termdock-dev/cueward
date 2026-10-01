@@ -564,9 +564,9 @@ Use `cueward app list` to discover running apps. `cueward app launch --bundle or
 
 Use `cueward app inspect --pid 123` to discover an app's AX roots, including menus without a document window and exposed system dialogs. Inspect a returned root with `--root menu` or `--root w0`, then use `app press` or `app set-value` with a fresh node target. See [application interface exploration](docs/app-exploration.md) for process binding, background guards, and limitations.
 
-### File browsing and reading
+### File browsing, search and reading
 
-Use `cueward files list --root /absolute/directory` to browse one level, `files info` to inspect metadata, and `files read --root /absolute/directory --path relative/file.txt` to read a bounded byte or UTF-8 line range. Sorting, hidden names, versioned pagination, explicit encoding, and hex output are available. See [file operations](docs/files.md) for root scope, symlink handling, no-download policy, errors, deadlines, and remaining Finder capabilities.
+Use `cueward files list --root /absolute/directory` to browse one level, `files info` to inspect metadata, and `files read --root /absolute/directory --path relative/file.txt` to read a bounded byte or UTF-8 line range. Use `cueward files search --root /absolute/directory --name report --kind file --max-depth 3` to find names and metadata within an explicit depth, with size/date filters and query-bound pagination. See [filesystem search](docs/files-search.md) for budgets and completeness. Sorting, hidden names, versioned pagination, explicit encoding, and hex output are available. See [file operations](docs/files.md) for root scope, symlink handling, no-download policy, errors, deadlines, and remaining Finder capabilities.
 
 ### Existing macOS Spaces
 

@@ -38,7 +38,7 @@ cueward reddit search "async rust" --subreddit r/rust --limit 25
 
 ## Pitfalls
 
-- `search` returns indexed fields, not full source-specific metadata.
+- `search` returns indexed fields, not full source-specific metadata. For files on disk, use `files search` with explicit root/depth when installed; see [files.md](files.md). It matches basenames/metadata, not file contents or Spotlight.
 - If folder/sender/detail matters, use direct source reads instead of relying on `search`.
 
 Capture persists inbox/state even when only reading from a source. A successful process can still report source warnings; an empty capture with a failed source does not establish an empty history. Repeated source scans may omit data with unchanged/skipped/warning/deleted status; preserve that distinction.
