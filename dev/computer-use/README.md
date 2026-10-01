@@ -1,5 +1,7 @@
 # Computer-use performance measurements
 
+For the separate fresh-agent task preparation and result checker, see the [task acceptance framework](task-acceptance.md). Benchmark/probe outcomes are not fresh-agent task acceptance results.
+
 Run on an unlocked macOS desktop with Accessibility and Screen Recording permissions:
 
 ```sh
