@@ -570,6 +570,8 @@ Use `cueward app inspect --pid 123` to discover an app's AX roots, including men
 
 Use `cueward files list --root /absolute/directory` to browse one level, `files info` to inspect metadata, and `files read --root /absolute/directory --path relative/file.txt` to read a bounded byte or UTF-8 line range. Use `cueward files search --root /absolute/directory --name report --kind file --max-depth 3` to find names and metadata within an explicit depth, with size/date filters and query-bound pagination. See [filesystem search](docs/files-search.md) for budgets and completeness.
 
+Use `cueward files spotlight --root /absolute/directory --text invoice --max-depth 3` for indexed content candidates. Index coverage is unknown and current contents are not verified; zero results do not prove absence. See [Spotlight search](docs/files-spotlight.md) for budgets and source/completion semantics.
+
 Use `files metadata --root /absolute/directory --path relative/file.txt` for native UTType, Finder tags and package/alias flags with per-field availability; see [resource metadata](docs/files-metadata.md). Sorting, hidden names, versioned pagination, explicit encoding, and hex output are available. See [file operations](docs/files.md) for root scope, symlink handling, no-download policy, errors, deadlines, and remaining Finder capabilities.
 
 Use `cueward files finder context --root /absolute/directory` to inspect scoped Finder location/selection without requesting activation. `files finder reveal --root /absolute/directory --path relative/file.txt` explicitly requests Finder activation and selection, reporting `sent_unverified` rather than UI completion. See [Finder context and reveal](docs/files-finder.md) for scope, locks, deadlines and verification.

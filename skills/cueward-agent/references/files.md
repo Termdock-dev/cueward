@@ -1,6 +1,6 @@
 # Scoped file search, metadata and reads
 
-The initial `files list/info/read` implementation was merged in [PR #44](https://github.com/Termdock-dev/cueward/pull/44). Filesystem search was merged in [PR #46](https://github.com/Termdock-dev/cueward/pull/46). Resource metadata was merged in [PR #47](https://github.com/Termdock-dev/cueward/pull/47). This reference also describes the subsequent Finder source revision. Check `cueward files --help`, `cueward files search --help`, `cueward files metadata --help` and `cueward files finder --help` before relying on these capabilities. Installing a skill does not install a binary; documentation can describe a newer source revision than main or the latest published release.
+The initial `files list/info/read` implementation was merged in [PR #44](https://github.com/Termdock-dev/cueward/pull/44). Filesystem search was merged in [PR #46](https://github.com/Termdock-dev/cueward/pull/46). Resource metadata was merged in [PR #47](https://github.com/Termdock-dev/cueward/pull/47). Finder context/reveal was merged in [PR #48](https://github.com/Termdock-dev/cueward/pull/48). This reference also describes the subsequent Spotlight source revision. Check `cueward files --help`, `cueward files search --help`, `cueward files metadata --help`, `cueward files finder --help` and `cueward files spotlight --help` before relying on these capabilities. Installing a skill does not install a binary; documentation can describe a newer source revision than main or the latest published release.
 
 ## Choose the scope and range
 
@@ -33,6 +33,23 @@ Search observes at most max-entries (1..10,000, default 10,000) across the whole
 Search never follows discovered child symlinks; follow-links only resolves the explicitly selected starting path within canonical root. This avoids duplicate/cyclic/outside-root traversal while still returning symlink metadata.
 
 Search pages require the previous version and next_offset. Keep filters, depth, hidden and max-entries; these options are bound into the token along with all observed metadata, including hidden/nonmatching entries. Page size may change. Metadata changes inside the eligible scope invalidate the token; excluded hidden/deeper descendants were not observed. On changed, restart at offset 0.
+
+## Find indexed text with Spotlight
+
+```bash
+cueward files spotlight --root /absolute/directory --text invoice
+cueward files spotlight --root /absolute/directory --text '臺灣 report' --max-depth 3 --limit 20
+```
+
+Use this separate command only when installed and the task asks for indexed content candidates. Root is required; no --path, --follow-links, offset or snapshot cursor is supported. Text is a case-insensitive Spotlight substring pattern, not a raw predicate or current-byte scan. It must contain non-whitespace and fit 1024 UTF-8 bytes, excluding controls and user * or ?. Quotes/backslashes are escaped. Tokenization/importer behavior can differ from literal file bytes; Cueward returns no excerpts and does not verify matching content.
+
+Depth is 1..32 (default 1), hidden includes dot components, max-candidates is 1..10,000 (default 10,000), limit is 1..500 (default 100), and timeout-ms is 1..30,000 (default 10,000). The index query covers root recursively; depth/hidden filters apply before filesystem observation, after the native budget. Oversized queries/candidate sets fail instead of returning partial success. Each candidate path is bounded to 16 KiB, aggregate paths to 4 MiB, and escaped compact result JSON to 8 MiB.
+
+The response operation/source is spotlight. query_completed=true means the bounded native query finished. index_coverage is always unknown; enumeration_complete and content_verified are always false. Disabled/excluded indexes, unsupported importers, stale data, permission/provider gaps and filtering can hide matches. Zero results never establish file/content absence. Preserve candidate_count, excluded counts and errors when explaining a result.
+
+Entries sort by relative_path and have available (current regular-file metadata) or error (relative_path/code/message) status. Missing candidates and ancestor symlinks remain errors; no candidate symlink traversal occurs. Outside scope receives only an exclusion count. Dataless files can retain available metadata without readable contents. eligible_count, available_count and error_count cover the full filtered set before limit; truncated=true means returned entries omit some of that set, possibly including errors. Narrow the scope/text or increase limit; repeated queries are not stable pages.
+
+Use relative_path with the same root for info/read/metadata and file.version for a guarded subsequent read. The version does not bind index state or prove the current content matched. Root changes discard results, while file checks are sequential observations rather than one atomic snapshot. The command neither enables indexing nor requests imports/downloads or Finder activation; worker no-materialization does not control Spotlight/provider processes. Actual provider/TCC/unmount acceptance remains incomplete.
 
 ## Inspect native resource fields
 
@@ -89,6 +106,6 @@ Metadata includes requested/resolved paths, kind, identity/revision, size, UTC t
 
 Dataless placeholders are distinct from empty files. The macOS worker denies dataless materialization before filesystem operations; it has no download action. not_dataless does not prove cloud/network/provider availability. Preserve unavailable, permission_denied, not_found, scan_limit, decode_error, changed and timeout as distinct failures; do not call them successful zero bytes/results.
 
-The worker deadline defaults to 10 seconds, configurable with --timeout-ms 1..30000. List/info/read/search/metadata do not edit the source file or request Finder/app activation. On change/error/timeout, reobserve before resuming; it discards detected changed-file results, but is not a sandbox against malicious concurrent path swaps.
+The worker deadline defaults to 10 seconds, configurable with --timeout-ms 1..30000. List/info/read/search/metadata/spotlight do not edit the source file or request Finder/app activation. On change/error/timeout, reobserve before resuming; it discards detected changed-file results, but is not a sandbox against malicious concurrent path swaps.
 
-Spotlight content search, UTType/tag search filters, package pruning, alias resolution and provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image preview and file-management actions are separate work.
+UTType/tag search filters, package pruning, alias resolution and provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image preview and file-management actions are separate work.
