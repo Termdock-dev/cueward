@@ -13,7 +13,7 @@ SPEC.loader.exec_module(PROBE)
 
 class FirstSaveTests(unittest.TestCase):
     def scenario(self, document=None, reader_activations=0, opened=None, delayed_panel=False,
-                 move_target="observed-token", content=None):
+                 move_target="observed-token", content=None, panel_controls=None):
         state = {"active": False, "activations": 0, "foreground_changes": 0,
                  "save_requests": 1, "window_id": 10}
         paths, calls = {}, []
@@ -35,7 +35,7 @@ class FirstSaveTests(unittest.TestCase):
         observations = [([editor], False), ([save], False)]
         if delayed_panel:
             observations.append(([], False))
-        observations.append(([panel], False))
+        observations.append(([panel] if panel_controls is None else panel_controls, False))
 
         def command(args):
             calls.append(args)
@@ -44,6 +44,7 @@ class FirstSaveTests(unittest.TestCase):
             if args[1:3] == ["space", "window"]:
                 return {"move_target": move_target}
             if args[1:3] == ["space", "move-window"]:
+                self.assertIsNotNone(move_target, "missing target must be rejected before dispatch")
                 return {"status": "confirmed", "foreground_changed": False, "visible_spaces_changed": False}
             if args[1:3] == ["app", "open"]:
                 state.update(document or {})
@@ -99,6 +100,24 @@ class FirstSaveTests(unittest.TestCase):
     def test_missing_move_target_is_rejected_before_dispatch(self):
         with self.assertRaisesRegex(RuntimeError, "move target"):
             self.scenario(move_target=None)
+
+    def test_disabled_or_ambiguous_controls_are_not_pressed(self):
+        disabled = {"role": "AXButton", "name": "Save", "enabled": False, "target": "panel"}
+        enabled = dict(disabled, enabled=True)
+        for controls in ([disabled], [enabled, enabled], [dict(enabled, target=None)]):
+            with self.subTest(controls=controls):
+                report, calls = self.scenario(panel_controls=controls)
+                self.assertEqual(report["status"], "save_control_unavailable")
+                self.assertFalse(any("panel" in args for args in calls))
+                self.assertFalse(any(args[1:3] == ["app", "open"] for args in calls))
+
+    def test_panel_deadline_preserves_incomplete_traversal_evidence(self):
+        with patch.object(PROBE, "explore", side_effect=[([], False), ([], True)]) as observe, \
+             patch.object(PROBE.time, "monotonic", side_effect=[0, 0.1, 3.1]), patch.object(PROBE.time, "sleep"):
+            controls, truncated = PROBE.wait_panel_save(Path("/mock/cueward"), 111)
+        self.assertEqual(controls, [])
+        self.assertTrue(truncated)
+        self.assertEqual(observe.call_count, 2)
 
 
 if __name__ == "__main__":

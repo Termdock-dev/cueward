@@ -58,6 +58,47 @@ def make_reader(directory):
     return bundle
 
 
+def wait_panel_save(cli, pid, timeout=3):
+    deadline = time.monotonic() + timeout
+    truncated = False
+    while True:
+        nodes, incomplete = explore(cli, pid)
+        truncated |= incomplete
+        controls = [node for node in nodes if node.get("identifier") != "save-document"
+                    and node["role"] == "AXButton" and node["name"] in ("Save", "儲存")]
+        # A disabled or ambiguous observed control is evidence, not permission to retry Save.
+        if controls or time.monotonic() >= deadline:
+            return controls, truncated
+        time.sleep(0.05)
+
+
+def finish_report(report, state):
+    report.update({key: state.get(key) for key in ("active", "activations", "foreground_changes", "save_requests")})
+    signals = {"document_active": report["active"], "document_activations": report["activations"],
+               "document_foreground_changes": report["foreground_changes"]}
+    expected = {"document_active": bool, "document_activations": int, "document_foreground_changes": int}
+    if "cross_app_open" in report:
+        opened = report["cross_app_open"]
+        before, after = opened.get("frontmost_pid_before"), opened.get("frontmost_pid_after")
+        signals.update(reader_active=opened.get("is_active"), reader_activations=report.get("cross_app_activations"),
+                       open_foreground_changed=opened.get("foreground_changed"),
+                       open_foreground_pid_changed=before != after if type(before) is int and type(after) is int else None)
+        expected.update(reader_active=bool, reader_activations=int,
+                        open_foreground_changed=bool, open_foreground_pid_changed=bool)
+    report["interference_signals"] = [name for name, value in signals.items()
+                                     if type(value) in (bool, int) and value > 0]
+    report["missing_background_evidence"] = [name for name, value in signals.items()
+                                            if type(value) is not expected[name] or (type(value) is int and value < 0)]
+    report["background_verified"] = not report["interference_signals"] and not report["missing_background_evidence"]
+    if report["interference_signals"]:
+        report["status"] = "background_interference"
+    elif not report["background_verified"]:
+        report["status"] = "background_evidence_incomplete"
+    elif report["file_created"]:
+        report["status"] = "completed" if report["file_content_matches"] and report["cross_app_content_matches"] else "artifact_verification_failed"
+    return report
+
+
 def probe(cli, inactive_space):
     with tempfile.TemporaryDirectory(prefix="cueward-first-save-") as temporary:
         directory = Path(temporary)
@@ -78,7 +119,10 @@ def probe(cli, inactive_space):
                 if not choices:
                     raise RuntimeError("no existing inactive Space; no desktop created")
                 membership = run([str(cli), "space", "window", "--id", str(window_id)])
-                moved = run([str(cli), "space", "move-window", "--target", membership["move_target"], "--space", str(choices[0])])
+                target = membership.get("move_target")
+                if not isinstance(target, str) or not target:
+                    raise RuntimeError("window has no observed move target; no move was requested")
+                moved = run([str(cli), "space", "move-window", "--target", target, "--space", str(choices[0])])
                 if moved["status"] != "confirmed" or moved["foreground_changed"] or moved["visible_spaces_changed"]:
                     raise RuntimeError("Space move did not preserve endpoints")
             nodes, _ = explore(cli, receiver.pid)
@@ -95,16 +139,14 @@ def probe(cli, inactive_space):
             requested = run([str(cli), "app", "press", "--target", buttons[0]["target"]])
             if requested["foreground_changed"]:
                 raise RuntimeError("Save request changed foreground endpoints")
-            time.sleep(0.3)
-            nodes, truncated = explore(cli, receiver.pid)
-            panel_saves = [node for node in nodes if node.get("identifier") != "save-document" and node["role"] == "AXButton" and node["name"] in ("Save", "儲存")]
+            panel_saves, truncated = wait_panel_save(cli, receiver.pid)
             report = {"macos": platform.mac_ver()[0], "architecture": platform.machine(), "inactive_space": inactive_space,
                 "observer_interval_ms": 10, "new_document_edit_confirmed": True,
                 "panel_traversal_truncated": truncated,
                 "save_controls": [{"enabled": n.get("enabled"), "has_target": bool(n.get("target"))} for n in panel_saves],
                 "file_created": False, "file_content_matches": False, "cross_app_content_matches": False,
                 "status": "save_control_unavailable"}
-            if len(panel_saves) == 1 and panel_saves[0].get("target"):
+            if len(panel_saves) == 1 and panel_saves[0].get("enabled") is True and panel_saves[0].get("target"):
                 saved = run([str(cli), "app", "press", "--target", panel_saves[0]["target"]])
                 if saved["foreground_changed"]:
                     raise RuntimeError("panel Save action changed foreground endpoints")
@@ -115,6 +157,9 @@ def probe(cli, inactive_space):
                 reader = make_reader(directory)
                 opened = run([str(cli), "app", "open", "--path", str(reader), "--file", str(artifact), "--new-instance"])
                 reader_pid = opened["app"]["pid"]
+                report["cross_app_open"] = {key: opened.get(key) for key in
+                                            ("foreground_changed", "frontmost_pid_before", "frontmost_pid_after")}
+                report["cross_app_open"]["is_active"] = opened["app"].get("is_active")
                 reader_state = directory / f"state-{reader_pid}.json"
                 deadline = time.monotonic() + 5
                 while time.monotonic() < deadline:
@@ -122,13 +167,11 @@ def probe(cli, inactive_space):
                         loaded = json.loads(reader_state.read_text())
                         if loaded["documents"]:
                             report["cross_app_content_matches"] = loaded["documents"][0].get("content") == CONTENT
-                            report["cross_app_activations"] = loaded["activations"]
+                            report["cross_app_activations"] = loaded.get("activations")
                             break
                     time.sleep(0.05)
-                report["status"] = "completed" if report["file_content_matches"] and report["cross_app_content_matches"] else "artifact_verification_failed"
             state = json.loads(state_path.read_text())
-            report.update({key: state[key] for key in ("active", "activations", "foreground_changes", "save_requests")})
-            return report
+            return finish_report(report, state)
         finally:
             if receiver.poll() is None:
                 os.killpg(receiver.pid, signal.SIGTERM)
