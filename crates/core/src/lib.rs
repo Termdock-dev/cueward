@@ -1,5 +1,6 @@
 mod adapter;
 mod cue;
+pub mod files;
 pub mod inbox;
 pub mod index;
 mod shortcuts;

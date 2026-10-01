@@ -5,6 +5,7 @@ pub(crate) mod calendar;
 pub(crate) mod capture;
 pub(crate) mod clipboard;
 pub(crate) mod doctor;
+pub(crate) mod files;
 pub(crate) mod helpers;
 #[cfg(test)]
 mod help_tests;
@@ -58,6 +59,7 @@ mod window_tests;
 pub(crate) use app::AppAction;
 pub(crate) use calendar::CalendarAction;
 pub(crate) use clipboard::ClipboardAction;
+pub(crate) use files::FilesAction;
 pub(crate) use notes::NotesAction;
 pub(crate) use quick_notes::QuickNotesAction;
 pub(crate) use reddit::RedditAction;
@@ -83,6 +85,13 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Command {
+    /// List, inspect, and read files within an explicitly selected directory.
+    Files {
+        #[command(subcommand)]
+        action: FilesAction,
+    },
+    #[command(hide = true)]
+    FilesWorker,
     /// Discover, launch, and explore macOS applications without requesting activation.
     App {
         #[command(subcommand)]
@@ -234,6 +243,8 @@ pub(crate) enum Source {
 
 pub(crate) fn dispatch(command: Command) {
     match command {
+        Command::Files { action } => files::dispatch(action),
+        Command::FilesWorker => files::worker(),
         Command::App { action } => app::dispatch(action),
         Command::Space { action } => space::dispatch(action),
         Command::Capture { source, since } => capture::dispatch(source, since),
