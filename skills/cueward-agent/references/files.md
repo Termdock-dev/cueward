@@ -1,6 +1,6 @@
 # Scoped file search, metadata and reads
 
-The initial `files list/info/read` implementation was merged in [PR #44](https://github.com/Termdock-dev/cueward/pull/44). Filesystem search was merged in [PR #46](https://github.com/Termdock-dev/cueward/pull/46). Resource metadata was merged in [PR #47](https://github.com/Termdock-dev/cueward/pull/47). Finder context/reveal was merged in [PR #48](https://github.com/Termdock-dev/cueward/pull/48). This reference also describes Spotlight (merged in [PR #49](https://github.com/Termdock-dev/cueward/pull/49)) and the subsequent cloud source revision. Check `cueward files --help`, `cueward files search --help`, `cueward files metadata --help`, `cueward files finder --help`, `cueward files spotlight --help` and `cueward files cloud --help` before relying on these capabilities. Installing a skill does not install a binary; documentation can describe a newer source revision than main or the latest published release.
+The initial `files list/info/read` implementation was merged in [PR #44](https://github.com/Termdock-dev/cueward/pull/44). Filesystem search was merged in [PR #46](https://github.com/Termdock-dev/cueward/pull/46). Resource metadata was merged in [PR #47](https://github.com/Termdock-dev/cueward/pull/47). Finder context/reveal was merged in [PR #48](https://github.com/Termdock-dev/cueward/pull/48). This reference also describes Spotlight (merged in [PR #49](https://github.com/Termdock-dev/cueward/pull/49)), cloud (merged in [PR #50](https://github.com/Termdock-dev/cueward/pull/50)) and the subsequent preview source revision. Check `cueward files --help`, `cueward files search --help`, `cueward files metadata --help`, `cueward files finder --help`, `cueward files spotlight --help`, `cueward files cloud --help` and `cueward files preview --help` before relying on these capabilities. Installing a skill does not install a binary; documentation can describe a newer source revision than main or the latest published release.
 
 ## Choose the scope and range
 
@@ -125,4 +125,32 @@ Dataless placeholders are distinct from empty files. The macOS worker denies dat
 
 The worker deadline defaults to 10 seconds, configurable with --timeout-ms 1..30000. List/info/read/search/metadata/spotlight do not edit the source file or request Finder/app activation. On change/error/timeout, reobserve before resuming; it discards detected changed-file results, but is not a sandbox against malicious concurrent path swaps.
 
-UTType/tag search filters, package pruning, alias resolution and generic third-party provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image preview and file-management actions are separate work.
+UTType/tag search filters, package pruning, alias resolution and generic third-party provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image/Quick Look previews have a separate command below; file-management actions are subsequent work.
+
+
+## Preview PDF pages, images or a Quick Look thumbnail
+
+```bash
+cueward files preview pdf --root /absolute/directory --path report.pdf --start-page 2 --page-count 3
+cueward files preview pdf --root /absolute/directory --path scanned.pdf --ocr --no-render
+cueward files preview image --root /absolute/directory --path photo.png --ocr
+cueward files preview thumbnail --root /absolute/directory --path report.docx
+```
+
+Use installed preview capabilities for one explicitly selected regular file. Root and relative path are required. Default no-follow and in-root explicit follow-links apply; directories/packages are unsupported. Thumbnail additionally rejects Finder aliases without resolving their targets and requires available/false native alias state. Dataless/unknown-availability data is unavailable, never empty; no preview requests a download. Expected-version binds a prior source metadata revision.
+
+PDF rendering includes native page rotation and displayed annotations. PDF uses native text first and applies explicit --ocr only to absent/whitespace-only native page text. Image information/preview/OCR cover only the first oriented frame. Thumbnail is provider-dependent visual content only, with no text/point/page extraction; icons are rejected. Use files read for bounded plain text. No Office/iWork full-text parser is provided, and a thumbnail never establishes whole-document readability.
+
+PDF start-page is 1..1000000 (default 1), page-count is 1..20 (default 10). Max-input-bytes is 1..268435456 (default 67108864); max-text-bytes is an aggregate UTF-8 budget of 1..1048576 (default 65536); max-dimension is 1..2048 (default 1024); max-preview-bytes is an aggregate PNG budget of 1..33554432 (default 8388608). Timeout-ms 1..30000 (default 10000) includes snapshot, Swift startup and processing. No-render suppresses persisted PDF/image PNGs while explicit OCR can still render a bounded transient image. These bound accepted content/output, not native/provider peak allocation or expansion cost.
+
+The preview result includes source file identity/version/timestamps, source_sha256, kind, optional PDF count/encryption and image metadata, pages, selection_truncated, text_truncated and optional cache_directory. Each page has independent text/preview resource statuses, text_source, optional confidence and text_truncated. Available empty text, unavailable native text, an unrequested resource and an error are different. An outer Ok can contain resource failures; preserve them, page range and truncation instead of claiming complete extraction. Thumbnail always has selection_truncated=true.
+
+Text_source is native_pdf, vision_ocr or not_requested. Native text has no confidence. Vision confidence is the mean of top-candidate line scores, not a correctness probability; low-confidence text is retained, and empty recognition has null confidence. Source SHA-256 hashes the guarded private input snapshot. Before/after file/root checks reject detected changes, but do not create an atomic filesystem snapshot or defend against malicious swaps.
+
+Available PNGs report absolute path, actual dimensions/bytes and SHA-256. Private mode-0700 directories under ~/.cueward/cache/file-previews/preview-* retain only successful PNGs; input/helper files are removed, failures/timeouts clean the owned directory, and no previous cache is reused. View the actual reported artifact to confirm visual content. Keep artifacts only as needed; remove only the exact owned cache after consuming it. The command never edits/removes the source.
+
+Preview uses the macOS Swift/Command Line Tools setup; an unavailable helper/toolchain is distinct from a missing source file. Locked PDFs are encrypted errors, recognized undecodable inputs can be corrupt_data, and unsupported formats remain unsupported_type. PDF copy restrictions remain permission_denied. Page OCR/render/thumbnail errors preserve their field diagnostics. PDFKit/ImageIO recognition is not exhaustive validation of every damaged format. Timeout is not an empty document. Worker/helper materialization guards and owned-group termination do not control separate Quick Look provider services.
+
+Native PDF/image/rotation/scanned-text fixtures and the opt-in PDF Quick Look probe passed on macOS 27.0.1. A release probe also produced and decoded content thumbnails for PDF, PNG, plain text and a minimal DOCX; the DOCX thumbnail was visually inspected. Other Office/iWork and Quick Look formats depend on installed providers; use actual field status and artifact evidence rather than assuming all variants work. Real TCC/provider/unmount and older macOS acceptance remain incomplete.
+
+A separate live probe saw an unattributed foreground/Finder change; follow-up snapshots after every preview call remained identical. Do not infer continuous input isolation or all-provider behavior from those discrete checks.

@@ -98,6 +98,8 @@ pub(crate) enum Command {
     FilesSpotlightWorker,
     #[command(hide = true)]
     FilesCloudWorker,
+    #[command(hide = true)]
+    FilesPreviewWorker,
     /// Discover, launch, and explore macOS applications without requesting activation.
     App {
         #[command(subcommand)]
@@ -254,6 +256,7 @@ pub(crate) fn dispatch(command: Command) {
         Command::FilesFinderWorker => files::finder_worker(),
         Command::FilesSpotlightWorker => files::spotlight_worker(),
         Command::FilesCloudWorker => files::cloud_worker(),
+        Command::FilesPreviewWorker => files::preview_worker(),
         Command::App { action } => app::dispatch(action),
         Command::Space { action } => space::dispatch(action),
         Command::Capture { source, since } => capture::dispatch(source, since),

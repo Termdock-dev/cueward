@@ -572,6 +572,8 @@ Use `cueward files list --root /absolute/directory` to browse one level, `files 
 
 Use `cueward files spotlight --root /absolute/directory --text invoice --max-depth 3` for indexed content candidates. Index coverage is unknown and current contents are not verified; zero results do not prove absence. See [Spotlight search](docs/files-spotlight.md) for budgets and source/completion semantics.
 
+Use `files preview pdf/image/thumbnail --root /absolute/directory --path relative/file` for selected PDF page text/images, first-frame image information/preview, or a Quick Look content thumbnail. OCR is explicit with `--ocr` on PDF/image; thumbnail success never means full-text extraction. See [file previews](docs/files-preview.md) for budgets, provenance, cache and format support.
+
 Use `files cloud status --root /absolute/directory --path relative/file` for per-field iCloud state. `files cloud download` explicitly submits a version-guarded iCloud file download; submission does not verify completion, and other provider state remains unknown. See [cloud state and downloads](docs/files-cloud.md).
 
 Use `files metadata --root /absolute/directory --path relative/file.txt` for native UTType, Finder tags and package/alias flags with per-field availability; see [resource metadata](docs/files-metadata.md). Sorting, hidden names, versioned pagination, explicit encoding, and hex output are available. See [file operations](docs/files.md) for root scope, symlink handling, implicit-download prevention, errors, deadlines, and remaining Finder capabilities.

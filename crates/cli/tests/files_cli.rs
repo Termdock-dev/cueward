@@ -13,6 +13,8 @@ mod search;
 mod finder;
 #[path = "files_cli/spotlight.rs"]
 mod spotlight;
+#[path = "files_cli/preview.rs"]
+mod preview;
 #[path = "files_cli/cloud.rs"]
 mod cloud;
 
