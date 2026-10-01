@@ -29,7 +29,7 @@ Filters do not prune visible directories: a directory whose name, size or type d
 
 Search uses metadata without opening file contents. It does not consult Spotlight, read text to find keywords, or request Finder/app activation. The existing top-level `cueward search` still queries the Cue index.
 
-The default depth does not expand packages. When a deeper search is explicitly selected, package directories are treated as ordinary directories; Finder alias files remain ordinary files. Package/alias recognition is a separate remaining #40 capability.
+The default depth does not expand packages. When a deeper search is explicitly selected, package directories are treated as ordinary directories; Finder alias files remain ordinary files. Use [files metadata](files-metadata.md) to inspect native package/alias flags for a selected item; this does not change search traversal.
 
 ## Result and completeness
 
@@ -41,7 +41,7 @@ The external JSON has the existing `Ok`/`Err` envelope. A success is `{"Ok":{"op
 | `source` | `filesystem`. |
 | `query` | Applied filters, depth, hidden policy, scan budget and paging options. |
 | `entries` | Page of `{relative_path, file}` results. `file` uses the existing FileInfo metadata contract. |
-| `relative_path` | Path relative to canonical root, even when search starts in a subdirectory. Use with the same root for `files info/read`. |
+| `relative_path` | Path relative to canonical root, even when search starts in a subdirectory. Use with the same root for `files info/read/metadata`. |
 | `total` | Full matching count inside the selected depth and policy. |
 | `version`, `next_offset` | Metadata/query revision and next page position. |
 | `entries_observed`, `directories_scanned` | Work performed for the complete scan, rather than the number returned in the page. |
@@ -68,4 +68,4 @@ The shared macOS worker denies dataless materialization and enforces `--timeout-
 
 Observed entries, the starting path and root are checked again before success. Detected changes discard results. This is metadata change detection, not an atomic snapshot, content hash or sandbox against malicious concurrent path swaps. It inherits the identity, availability and TCC limitations of [file operations](files.md). True provider/TCC/unmount and foreground/Finder-selection behavior still require controlled desktop verification; synthetic fixtures do not establish those claims.
 
-Spotlight content search, UTType/tags, Finder selection/reveal, richer provider state and package/alias recognition remain in #40. Previews belong to #41 and file-management writes to #42.
+Spotlight content search, Finder selection/reveal and richer provider state remain in #40. UTType/tags and package/alias recognition are available through the separate metadata operation, without adding search filters or package pruning. Previews belong to #41 and file-management writes to #42.

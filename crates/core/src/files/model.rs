@@ -20,6 +20,7 @@ pub struct FileRequest {
 #[serde(tag = "operation", content = "options", rename_all = "snake_case")]
 pub enum FileAction {
     Info,
+    Metadata,
     List(ListOptions),
     Read(ReadOptions),
     Search(super::SearchOptions),
@@ -133,6 +134,7 @@ pub struct FileRead {
 #[serde(tag = "operation", content = "result", rename_all = "snake_case")]
 pub enum FileResponse {
     Info(FileInfo),
+    Metadata(super::FileMetadata),
     List(FileListing),
     Read(FileRead),
     Search(super::FileSearch),

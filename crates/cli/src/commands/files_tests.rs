@@ -249,3 +249,34 @@ fn rejects_unscoped_search_unknown_kinds_and_ambiguous_dates() {
         assert!(Cli::try_parse_from(std::iter::once("cueward").chain(args)).is_err());
     }
 }
+
+#[test]
+fn metadata_parses_explicit_scope_and_keeps_existing_defaults() {
+    let (request, timeout) = parse(&["files", "metadata", "--root", "/tmp"]);
+    assert!(matches!(request.action, FileAction::Metadata));
+    assert_eq!(request.path, PathBuf::from("."));
+    assert!(!request.follow_links);
+    assert_eq!(timeout, 10000);
+    let (request, timeout) = parse(&[
+        "files",
+        "metadata",
+        "--root",
+        "/tmp",
+        "--path",
+        "a",
+        "--follow-links",
+        "--expected-version",
+        "v",
+        "--timeout-ms",
+        "100",
+    ]);
+    assert!(request.follow_links);
+    assert_eq!(request.expected_version.as_deref(), Some("v"));
+    assert_eq!(timeout, 100);
+    for args in [
+        vec!["files", "metadata"],
+        vec!["files", "metadata", "--root", "/tmp", "--timeout-ms", "0"],
+    ] {
+        assert!(Cli::try_parse_from(std::iter::once("cueward").chain(args)).is_err());
+    }
+}

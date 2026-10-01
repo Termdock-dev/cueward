@@ -1,4 +1,7 @@
 //! Read-only file operations with macOS identity, no-download policy and deadlines.
+mod metadata;
+#[cfg(test)]
+mod metadata_tests;
 mod policy;
 mod protocol;
 #[cfg(test)]
@@ -54,6 +57,14 @@ impl FilePlatform for MacFiles {
             .read(true)
             .custom_flags(0x20000000 | 0x00000004)
             .open(path)
+    }
+
+    fn resource_metadata(
+        &self,
+        path: &Path,
+        metadata: &Metadata,
+    ) -> Result<ResourceMetadata, FileError> {
+        self::metadata::inspect(path, metadata)
     }
 }
 

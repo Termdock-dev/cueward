@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/reads when the installed CLI supports them. Not for general web research or developing Cueward itself.
+description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads when the installed CLI supports them. Not for general web research or developing Cueward itself.
 ---
 
 # Cueward Agent
@@ -18,7 +18,7 @@ Use `cueward doctor --json` when an available operation reports a permission/pre
 | Request | Read this reference |
 | --- | --- |
 | Current app UI, screenshots, native windows, background input, waits, snapshot differences, app launch/open, or Spaces | [computer-use.md](references/computer-use.md) |
-| Existing files: find names/metadata, browse directories, bounded text/hex reads | [files.md](references/files.md), then check whether `files` is installed |
+| Existing files: find names/metadata, inspect UTType/tags/package/alias flags, browse directories, bounded text/hex reads | [files.md](references/files.md), then check whether `files` is installed |
 | Past browsing/notes/messages, indexed knowledge, capture or digest | [retrieval.md](references/retrieval.md) |
 | Live Safari tabs, DOM controls, bookmarks, console/network or browser AI state | [safari.md](references/safari.md) |
 | Notes, Quick Notes, Reminders, Calendar, OCR, clipboard, Stickies or Voice Memos | [apple-apps.md](references/apple-apps.md) |
