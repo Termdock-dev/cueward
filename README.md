@@ -2,6 +2,8 @@
 
 Local memory and automation for AI agents on macOS.
 
+For agent setup, start with the included [Cueward skill](skills/cueward-agent/SKILL.md) and [installation/synchronization guide](docs/agent-skill.md).
+
 Cueward is a Unix-style CLI for agents that need structured access to native macOS data and actions. It reads Safari, Notes, Reminders, Calendar, Messages, Voice Memos, Stickies, Quick Notes, and Apple Shortcuts locally, then returns machine-friendly JSON that agents can actually use.
 
 It is designed for agent workflows first:
@@ -689,11 +691,9 @@ cueward capture --source all --since 24h | gemini "Group these by topic and high
 
 ### As a Skill
 
-A reference skill for Claude Code is included in `skills/cueward-agent/`. Copy it to your skills directory to teach Claude how to use Cueward automatically:
+The maintained skill lives in [skills/cueward-agent](skills/cueward-agent/SKILL.md). Repo discovery links in `.agents/skills/` and `.claude/skills/` point to that same source for local Codex and Claude Code sessions. It routes among local data, Safari DOM/diagnostics, app/window/Space operations, Shortcuts, and bounded file reads when the installed CLI supports them.
 
-```bash
-mkdir -p ~/.claude/skills/ && cp -r skills/cueward-agent ~/.claude/skills/
-```
+For use in other projects, see [installation and synchronization](docs/agent-skill.md), including verified backups before updating an existing copy. Updating the skill does not update `cueward`: check `command -v cueward` and subcommand `--help` before using newly documented commands. The file-read slice is pending in [PR #44](https://github.com/Termdock-dev/cueward/pull/44); it is not advertised as available in main or a published release.
 
 ## Architecture
 

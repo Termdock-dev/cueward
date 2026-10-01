@@ -97,3 +97,9 @@ Cross-Space screenshots and targeted keyboard/pointer input are supported. AX in
 Raw-input results can be `sent_unverified` or `partially_sent`. The latter includes an interruption reason and event count; never replay the whole input automatically. Foreground and identity guards are checked between key pairs, not atomically with delivery. If the target becomes the user's foreground app, stop background work on it. Concurrent physical typing isolation is not guaranteed.
 
 AX calls do not explicitly activate apps, but an app may activate itself as a side effect. `foreground_changed` compares only the before-and-after foreground app. When the task requires background operation, do not switch desktops or fall back to global input automatically; report any observed interference and reassess the route.
+
+## Verification coverage and handoff
+
+The offline task acceptance framework merged in PR #43 prepares fresh synthetic goals and independently checks all eight task records; it does not operate apps, run the agent, collect desktop evidence or prove task compatibility. Diagnostic/probe receipts and simulated records cannot count as fresh-agent completion. Native first-save and ordinary WebView desktop results remain unverified; primitive success or dispatch readiness does not override missing artifact, receiver or interference evidence.
+
+For a long task, retain the user's goal/scope, owned process/window identities, completed and uncertain actions, saved artifact paths and observations. After resuming, discover current roots/windows and fresh action/input targets; do not reuse expired tokens or replay uncertain actions. If background operation is required, preserve unavailable/blocked cases and the unresolved physical-input/focus/Space limits in the result.
