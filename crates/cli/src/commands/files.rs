@@ -59,7 +59,7 @@ pub(crate) enum EncodingArg {
 
 #[derive(Subcommand)]
 pub(crate) enum FilesAction {
-    /// Read or explicitly edit exact Finder tag names with saved evidence.
+    /// Read Finder tags, create initial tags or verify no-ops with saved evidence.
     Tags {
         #[command(subcommand)]
         action: tags::TagsCommand,

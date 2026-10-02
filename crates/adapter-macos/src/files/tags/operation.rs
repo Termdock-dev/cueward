@@ -154,6 +154,12 @@ fn prepare(receipt: &TagsReceipt) -> Result<Plan, FileError> {
         return Err(changed("expected tag revision no longer matches"));
     }
     let planned = edit_tags(&context.stored.tags, &request.edit)?;
+    if context.stored.raw.is_some() && planned != context.stored.tags {
+        return Err(FileError::new(
+            FileErrorCode::UnsupportedType,
+            "existing tag attributes cannot be edited safely: atomic value revision checks are unavailable; use Finder",
+        ));
+    }
     if planned.is_empty() && native::has_legacy_label(&context.file)? {
         return Err(FileError::new(
             FileErrorCode::UnsupportedType,

@@ -42,7 +42,7 @@ pub(super) fn refresh(request: &mut TagsRequest) {
     request.expected_tags_version = value.tags_version;
 }
 #[test]
-fn exact_add_remove_preserves_colors_payload_inode_permissions_and_mtime() {
+fn read_and_noop_preserve_colors_payload_inode_permissions_and_mtime() {
     let (root, mut request) = fixture();
     let path = root.path().join(&request.path);
     fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
@@ -60,19 +60,20 @@ fn exact_add_remove_preserves_colors_payload_inode_permissions_and_mtime() {
         },
     ];
     native::write(&file, &codec::encode(&initial).unwrap(), false).unwrap();
+    request.edit = TagEdit::Add(vec!["Keep".into()]);
     refresh(&mut request);
     let before = file.metadata().unwrap();
     let payload = fs::read(&path).unwrap();
     let receipt = direct(&request, &mut |_| Ok(()));
     assert_eq!(receipt.status, TagsStatus::Completed, "{:?}", receipt.error);
     assert!(receipt.completion_verified && receipt.original_attribute_base64.is_some());
-    let added = receipt.after.unwrap().tags;
-    assert_eq!(&added[..2], initial);
-    request.edit = TagEdit::Remove(vec!["新增 <external> 臺灣".into()]);
+    assert!(!receipt.mutation_attempted);
+    assert_eq!(receipt.after.unwrap().tags, initial);
+    request.edit = TagEdit::Remove(vec!["Other".into()]);
     refresh(&mut request);
     assert_eq!(
         direct(&request, &mut |_| Ok(())).status,
-        TagsStatus::Completed
+        TagsStatus::NotStarted
     );
     assert_eq!(
         read(root.path(), &request.path, None).unwrap().tags,
@@ -341,7 +342,7 @@ fn unrelated_xattrs_finder_info_and_existing_color_entries_are_unchanged() {
     let unrelated = attrs("com.cueward.owned");
     assert_eq!(
         direct(&request, &mut |_| Ok(())).status,
-        TagsStatus::Completed
+        TagsStatus::NotStarted
     );
     assert_eq!(attrs("com.apple.FinderInfo"), finder);
     assert_eq!(attrs("com.cueward.owned"), unrelated);
@@ -352,7 +353,7 @@ fn unrelated_xattrs_finder_info_and_existing_color_entries_are_unchanged() {
     assert_eq!(rejected.error.unwrap().code, FileErrorCode::UnsupportedType);
     assert_eq!(
         read(root.path(), &request.path, None).unwrap().tags.len(),
-        2
+        1
     );
 }
 

@@ -1,4 +1,4 @@
-//! Observed-inode tag edits with durable recovery evidence and parent-bound workers.
+//! Tag observations, atomic initial tagging and no-ops with parent-bound receipts.
 mod codec;
 mod context;
 mod model;

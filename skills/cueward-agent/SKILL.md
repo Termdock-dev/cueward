@@ -19,7 +19,7 @@ Use `cueward doctor --json` when an available operation reports a permission/pre
 | --- | --- |
 | Current app UI, screenshots, native windows, background input, waits, snapshot differences, app launch/open, or Spaces | [computer-use.md](references/computer-use.md) |
 | Existing files: scoped filesystem/Spotlight search, metadata/reads, Finder location/selection, an explicit Finder reveal, iCloud state, a requested cloud download, or PDF/image/Quick Look preview | [files.md](references/files.md), then check whether `files` is installed |
-| Requested Finder tag names, add/remove, or tag-edit receipts | [file-tags.md](references/file-tags.md), then check installed command help |
+| Finder tag names, initial tagging, no-op checks, or receipts | [file-tags.md](references/file-tags.md), then check installed command help |
 | Requested empty directory creation, single-file copy, or saved write receipts | [file-mutations.md](references/file-mutations.md), then check installed command help |
 | Past browsing/notes/messages, indexed knowledge, capture or digest | [retrieval.md](references/retrieval.md) |
 | Live Safari tabs, DOM controls, bookmarks, console/network or browser AI state | [safari.md](references/safari.md) |
