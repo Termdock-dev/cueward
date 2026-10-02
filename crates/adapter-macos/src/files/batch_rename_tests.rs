@@ -237,6 +237,8 @@ fn batch_rename_timeout_stops_readonly_worker_without_names_changing() {
 
 #[path = "batch_rename_safety_tests.rs"]
 mod safety;
+#[path = "batch_rename_root_tests.rs"]
+mod roots;
 
 #[test]
 fn batch_rename_core_accepts_count_boundary_and_retains_all_failed_items() {
