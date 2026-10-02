@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads, Spotlight content search, Finder context/reveal, explicit iCloud status/downloads, PDF/image/Quick Look previews, and authorized no-overwrite directory/file creation, single-file duplication, same-volume rename/move or explicit independent batch rename planning/execution when the installed CLI supports them. Not for general web research or developing Cueward itself.
+description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads, Spotlight content search, Finder context/reveal, explicit iCloud status/downloads, PDF/image/Quick Look previews, and authorized no-overwrite directory/file creation, single-file duplication, read-only recursive-copy planning, same-volume rename/move or explicit independent batch rename planning/execution when the installed CLI supports them. Not for general web research or developing Cueward itself.
 ---
 
 # Cueward Agent
@@ -22,6 +22,7 @@ Use `cueward doctor --json` when an available operation reports a permission/pre
 | Finder tag names, initial tagging, no-op checks, or receipts | [file-tags.md](references/file-tags.md), then check installed command help |
 | Explicit batch rename plans and authorized independent execution/receipts | [file-batch-rename.md](references/file-batch-rename.md), then check installed command help |
 | Requested same-volume rename/move or their saved receipts | [file-relocation.md](references/file-relocation.md), then check installed command help |
+| Read-only recursive directory copy proposals | [file-copy-tree.md](references/file-copy-tree.md), then check installed command help |
 | Requested empty directory creation, single-file copy/duplicate, or saved write receipts | [file-mutations.md](references/file-mutations.md), then check installed command help |
 | Past browsing/notes/messages, indexed knowledge, capture or digest | [retrieval.md](references/retrieval.md) |
 | Live Safari tabs, DOM controls, bookmarks, console/network or browser AI state | [safari.md](references/safari.md) |

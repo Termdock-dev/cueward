@@ -331,6 +331,7 @@ dependencies = [
  "block2",
  "chrono",
  "cueward-core",
+ "libc",
  "objc2",
  "objc2-event-kit",
  "objc2-foundation",

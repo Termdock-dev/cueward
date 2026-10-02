@@ -8,6 +8,8 @@ mod tags;
 
 #[path = "files_mutation.rs"]
 mod mutation;
+#[path = "files_copy_tree.rs"]
+mod copy_tree;
 #[path = "files_duplicate.rs"]
 mod duplicate;
 #[path = "files_batch_rename.rs"]
@@ -83,6 +85,11 @@ pub(crate) enum FilesAction {
     Mkdir(mutation::MkdirArgs),
     /// Copy one regular file and verify bytes/metadata; never overwrite.
     Copy(mutation::CopyArgs),
+    /// Inspect a recursive directory copy proposal without writing anything.
+    CopyTree {
+        #[command(subcommand)]
+        action: copy_tree::CopyTreeCommand,
+    },
     /// Create an independent regular-file sibling under an explicit new name; never overwrite.
     Duplicate(duplicate::DuplicateArgs),
     /// Observe a bounded batch of explicit sibling renames; execution is not supported.
@@ -174,6 +181,7 @@ impl FilesAction {
             | Self::Cloud { .. }
             | Self::Preview { .. }
             | Self::Mkdir(_)
+            | Self::CopyTree { .. }
             | Self::Copy(_)
             | Self::Duplicate(_)
             | Self::RenameBatch { .. }
@@ -251,6 +259,7 @@ pub(crate) fn dispatch(action: FilesAction) {
         FilesAction::Relocation { action } => return relocation::receipt(action),
         FilesAction::Tags { action } => return tags::dispatch(action),
         FilesAction::Mkdir(args) => return mutation::mkdir(args),
+        FilesAction::CopyTree { action } => return copy_tree::dispatch(action),
         FilesAction::Copy(args) => return mutation::copy(args),
         FilesAction::Duplicate(args) => return duplicate::dispatch(args),
         FilesAction::RenameBatch { action } => return batch_rename::dispatch(action),
@@ -318,11 +327,12 @@ pub(super) fn output<T: serde::Serialize>(source: &str, result: Result<T, FileEr
 pub(crate) use batch_rename::execute_worker as batch_rename_execute_worker;
 pub(crate) use batch_rename::worker as batch_rename_plan_worker;
 pub(crate) use cloud::worker as cloud_worker;
+pub(crate) use copy_tree::worker as copy_tree_plan_worker;
 pub(crate) use finder::worker as finder_worker;
 pub(crate) use mutation::worker as mutation_worker;
-pub(crate) use relocation::worker as relocation_worker;
-pub(crate) use relocation::plan_worker as relocation_plan_worker;
 pub(crate) use preview::worker as preview_worker;
+pub(crate) use relocation::plan_worker as relocation_plan_worker;
+pub(crate) use relocation::worker as relocation_worker;
 pub(crate) use spotlight::worker as spotlight_worker;
 pub(crate) use tags::read_worker as tags_read_worker;
 pub(crate) use tags::worker as tags_worker;
