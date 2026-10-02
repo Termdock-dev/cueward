@@ -5,7 +5,7 @@ mod model;
 mod tests;
 use super::{RelocationAction, RelocationPlatform, RelocationRequest};
 use crate::files::scope::Scope;
-use crate::files::{FileError, FileErrorCode};
+use crate::files::{FileError, FileErrorCode, FileInfo};
 pub use model::*;
 use std::path::Path;
 
@@ -32,9 +32,9 @@ pub fn plan(
         .entries
         .iter()
         .enumerate()
-        .map(|(index, entry)| observe_item(platform, request, index, entry))
+        .map(|(index, entry)| observe_item(platform, &root, index, entry))
         .collect();
-    revalidate(platform, request, &items)?;
+    revalidate(platform, &root, request, &items)?;
     scope.revalidate_root()?;
     if scope
         .info(&scope.resolve(Path::new("."), false, false)?)?
@@ -57,11 +57,11 @@ pub fn plan(
 
 fn observe_item(
     platform: &impl BatchRenamePlatform,
-    request: &BatchRenameRequest,
+    root: &FileInfo,
     index: usize,
     entry: &BatchRenameEntry,
 ) -> BatchRenameItem {
-    match observe(platform, request, entry) {
+    match observe(platform, root, entry) {
         Ok(proposal) => BatchRenameItem {
             index,
             proposal: Some(proposal),
@@ -77,25 +77,35 @@ fn observe_item(
 
 fn observe(
     platform: &impl BatchRenamePlatform,
-    request: &BatchRenameRequest,
+    root: &FileInfo,
     entry: &BatchRenameEntry,
 ) -> Result<super::RelocationPlan, FileError> {
     let destination = super::rename_destination(&entry.path, Path::new(&entry.name))?;
-    super::plan(
+    let proposal = super::plan(
         platform,
         &RelocationRequest {
-            root: request.root.clone(),
+            // The original spelling may be a mutable alias. Every item and
+            // recheck resolves from the same initially observed canonical root.
+            root: root.path.clone().into(),
             path: entry.path.clone(),
             destination,
             expected_version: entry.expected_version.clone(),
             expected_parent_version: entry.expected_parent_version.clone(),
             action: RelocationAction::Rename,
         },
-    )
+    )?;
+    if proposal.root.path != root.path
+        || proposal.root.identity != root.identity
+        || proposal.root.version != root.version
+    {
+        return Err(changed());
+    }
+    Ok(proposal)
 }
 
 fn revalidate(
     platform: &impl BatchRenamePlatform,
+    root: &FileInfo,
     request: &BatchRenameRequest,
     items: &[BatchRenameItem],
 ) -> Result<(), FileError> {
@@ -103,7 +113,7 @@ fn revalidate(
         let Some(before) = &item.proposal else {
             continue;
         };
-        let after = observe(platform, request, &request.entries[item.index])?;
+        let after = observe(platform, root, &request.entries[item.index])?;
         if before.root.version != after.root.version
             || before.source.version != after.source.version
             || before.source_parent.version != after.source_parent.version

@@ -75,6 +75,28 @@ fn batch_rename_cli_preserves_exact_external_names_versions_and_all_sources() {
     assert_eq!(fs::read(root.path().join("a")).unwrap(), b"OWNED a\0");
 }
 #[test]
+fn batch_rename_cli_keeps_root_alias_but_anchors_each_proposal() {
+    let root = fixture();
+    let aliases = tempfile::tempdir().unwrap();
+    let alias = aliases.path().join("臺灣\n<external>");
+    std::os::unix::fs::symlink(root.path(), &alias).unwrap();
+    let value = plan(&alias, &[entry(&alias, "a", "new")], true);
+    let result = &value["Ok"]["result"];
+    let proposal = &result["items"][0]["proposal"];
+    assert_eq!(result["has_conflicts"], false);
+    assert_eq!(result["request"]["root"], alias.to_str().unwrap());
+    assert_eq!(
+        proposal["request"]["root"],
+        root.path().canonicalize().unwrap().to_str().unwrap()
+    );
+    for field in ["path", "identity", "version"] {
+        assert_eq!(proposal["root"][field], result["root"][field]);
+    }
+    assert_eq!(fs::read(root.path().join("a")).unwrap(), b"OWNED a\0");
+    assert_eq!(fs::read_dir(root.path()).unwrap().count(), 2);
+    assert!(!root.path().join("new").exists());
+}
+#[test]
 fn batch_rename_cli_returns_conflicts_and_stale_item_errors_as_observations() {
     let root = fixture();
     let mut stale: Value = serde_json::from_str(&entry(root.path(), "b", "new")).unwrap();
