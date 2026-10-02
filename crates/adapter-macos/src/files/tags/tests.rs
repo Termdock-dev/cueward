@@ -4,7 +4,7 @@ use cueward_core::files::tags::TagEdit;
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 
-fn fixture() -> (tempfile::TempDir, TagsRequest) {
+pub(super) fn fixture() -> (tempfile::TempDir, TagsRequest) {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("owned.txt"), b"OWNED\0tag fixture").unwrap();
     let original = read(root.path(), Path::new("owned.txt"), None).unwrap();
@@ -17,7 +17,7 @@ fn fixture() -> (tempfile::TempDir, TagsRequest) {
     };
     (root, request)
 }
-fn direct(
+pub(super) fn direct(
     request: &TagsRequest,
     checkpoint: &mut impl FnMut(&TagsReceipt) -> Result<(), FileError>,
 ) -> TagsReceipt {
@@ -36,7 +36,7 @@ fn direct(
     fs::remove_dir_all(STORE.directory(&receipt.operation_id).unwrap()).unwrap();
     loaded
 }
-fn refresh(request: &mut TagsRequest) {
+pub(super) fn refresh(request: &mut TagsRequest) {
     let value = read(&request.root, &request.path, None).unwrap();
     request.expected_version = value.file.version;
     request.expected_tags_version = value.tags_version;

@@ -6,6 +6,8 @@ mod native;
 mod operation;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod safety_tests;
 use super::{mutation::supervision, policy, protocol, store::Store};
 use cueward_core::files::tags::{FileTag, TagSnapshot, edit_tags};
 use cueward_core::files::*;
