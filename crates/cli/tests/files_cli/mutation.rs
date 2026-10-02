@@ -86,7 +86,7 @@ fn mkdir_copy_and_saved_receipts_preserve_sources_hashes_and_external_strings() 
     cleanup(&mkdir);
     cleanup(&copy);
 }
-fn verify_saved_receipt(copy: &Value) {
+pub(super) fn verify_saved_receipt(copy: &Value) {
     let output = command()
         .args([
             "files",
@@ -99,7 +99,7 @@ fn verify_saved_receipt(copy: &Value) {
     assert!(output.status.success());
     assert_eq!(&envelope(&output.stdout, "files")["Ok"]["result"], copy);
 }
-fn verify_cannot_replay(value: &Value) {
+pub(super) fn verify_cannot_replay(value: &Value) {
     use std::os::fd::OwnedFd;
     use std::os::unix::net::UnixStream;
     let (mut parent, worker) = UnixStream::pair().unwrap();

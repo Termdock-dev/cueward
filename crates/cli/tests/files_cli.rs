@@ -19,6 +19,8 @@ mod preview;
 mod cloud;
 #[path = "files_cli/mutation.rs"]
 mod mutation;
+#[path = "files_cli/duplicate.rs"]
+mod duplicate;
 #[path = "files_cli/tags.rs"]
 mod tags;
 #[path = "files_cli/cancellation.rs"]

@@ -105,6 +105,7 @@ fn prepare_destination<P: MutationPlatform>(
 }
 
 fn validate(request: &MutationRequest) -> Result<(), FileError> {
+    super::duplication::validate_sibling(request)?;
     let parts: Vec<_> = request.destination.components().collect();
     if parts.is_empty()
         || parts.iter().any(|p| !matches!(p, Component::Normal(_)))
@@ -120,12 +121,17 @@ fn validate(request: &MutationRequest) -> Result<(), FileError> {
         expected_version,
         max_bytes,
         ..
+    }
+    | MutationAction::Duplicate {
+        expected_version,
+        max_bytes,
+        ..
     } = &request.action
     {
         if expected_version.is_empty() || !(1..=256 * 1024 * 1024).contains(max_bytes) {
             return Err(FileError::new(
                 FileErrorCode::InvalidOptions,
-                "copy requires expected-version and max-bytes 1..268435456",
+                "copy/duplicate require expected-version and max-bytes 1..268435456",
             ));
         }
     }
@@ -136,40 +142,50 @@ fn source<P: MutationPlatform>(
     scope: &Scope<'_, P>,
     action: &MutationAction,
 ) -> Result<Option<Source>, FileError> {
-    let MutationAction::Copy {
+    let (MutationAction::Copy {
         path,
         expected_version,
         max_bytes,
-    } = action
+    }
+    | MutationAction::Duplicate {
+        path,
+        expected_version,
+        max_bytes,
+    }) = action
     else {
         return Ok(None);
     };
     let resolved = scope.resolve(path, false, true)?;
     let info = scope.info(&resolved)?;
     check_version(&Some(expected_version.clone()), &info.version)?;
-    if info.kind != FileKind::File {
-        return Err(FileError::new(
-            FileErrorCode::UnsupportedType,
-            "copy accepts one regular file, not directories/packages/links",
-        ));
-    }
-    if info.data_state != DataState::NotDataless {
-        return Err(FileError::new(
-            FileErrorCode::Unavailable,
-            "copy never downloads placeholder data",
-        ));
-    }
-    if info.size > *max_bytes {
-        return Err(FileError::new(
-            FileErrorCode::ScanLimit,
-            "source exceeds max-bytes",
-        ));
-    }
+    validate_source_info(&info, *max_bytes)?;
     let file = scope.platform.open_regular(&resolved.path)?;
     check_source(scope.platform, &file, &info)?;
     scope.platform.validate_copy_source(&file, &info)?;
     check_source(scope.platform, &file, &info)?;
     Ok(Some(Source { file, info }))
+}
+
+fn validate_source_info(info: &FileInfo, maximum: u64) -> Result<(), FileError> {
+    if info.kind != FileKind::File {
+        return Err(FileError::new(
+            FileErrorCode::UnsupportedType,
+            "copy/duplicate accept one regular file, not directories/packages/links",
+        ));
+    }
+    if info.data_state != DataState::NotDataless {
+        return Err(FileError::new(
+            FileErrorCode::Unavailable,
+            "copy/duplicate never download placeholder data",
+        ));
+    }
+    if info.size > maximum {
+        return Err(FileError::new(
+            FileErrorCode::ScanLimit,
+            "source exceeds max-bytes",
+        ));
+    }
+    Ok(())
 }
 
 pub(super) fn check_source(
