@@ -1,6 +1,5 @@
 use super::*;
 use crate::files::scope::{Resolved, Scope, text};
-use std::ffi::OsString;
 use std::fs;
 use std::path::{Component, PathBuf};
 
@@ -10,9 +9,9 @@ pub(super) struct Source {
 }
 pub(super) struct Context<'a, P: MutationPlatform> {
     pub scope: Scope<'a, P>,
+    pub root: File,
     pub parent: File,
     pub parent_info: FileInfo,
-    pub name: OsString,
     pub path: PathBuf,
     pub source: Option<Source>,
 }
@@ -24,14 +23,25 @@ pub(super) fn prepare<'a, P: MutationPlatform>(
     validate(&receipt.request)?;
     let scope = Scope::new(platform, &receipt.request.root)?;
     receipt.root_before = Some(scope.info(&scope.resolve(Path::new("."), false, false)?)?);
+    let root = platform.open_directory(&scope.root)?;
+    scope.revalidate_root()?;
+    if platform.stamp(&root.metadata()?).version
+        != receipt
+            .root_before
+            .as_ref()
+            .ok_or_else(|| changed("missing root observation"))?
+            .version
+    {
+        return Err(changed("opened root changed"));
+    }
     let destination = prepare_destination(&scope, receipt)?;
     let source = source(&scope, &receipt.request.action)?;
     receipt.source_before = source.as_ref().map(|s| s.info.clone());
     Ok(Context {
         scope,
+        root,
         parent: destination.parent,
         parent_info: destination.info,
-        name: destination.name,
         path: destination.path,
         source,
     })
@@ -40,7 +50,6 @@ pub(super) fn prepare<'a, P: MutationPlatform>(
 struct Destination {
     parent: File,
     info: FileInfo,
-    name: OsString,
     path: PathBuf,
 }
 fn parent_path(request: &MutationRequest) -> &Path {
@@ -92,12 +101,7 @@ fn prepare_destination<P: MutationPlatform>(
             ));
         }
     }
-    Ok(Destination {
-        parent,
-        info,
-        name,
-        path,
-    })
+    Ok(Destination { parent, info, path })
 }
 
 fn validate(request: &MutationRequest) -> Result<(), FileError> {

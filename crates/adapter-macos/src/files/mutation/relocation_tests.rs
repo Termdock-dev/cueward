@@ -40,6 +40,17 @@ impl FilePlatform for RelocatingParent {
     }
 }
 impl MutationPlatform for RelocatingParent {
+    fn prepare_staging(
+        &self,
+        receipt: &MutationReceipt,
+        root: &File,
+    ) -> Result<Staging, FileError> {
+        MacFiles.prepare_staging(receipt, root)
+    }
+    fn publish(&self, root: &File, staging: &Staging, destination: &Path) -> Publication {
+        MacFiles.publish(root, staging, destination)
+    }
+
     fn open_directory(&self, path: &Path) -> Result<File, FileError> {
         MacFiles.open_directory(path)
     }

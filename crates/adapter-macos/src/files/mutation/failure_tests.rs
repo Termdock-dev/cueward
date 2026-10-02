@@ -6,11 +6,13 @@ fn direct(
     request: &MutationRequest,
     checkpoint: &mut impl FnMut(&MutationReceipt) -> Result<(), FileError>,
 ) -> MutationReceipt {
-    let mut receipt = MutationReceipt::new("test".into(), request.clone(), "not-persisted".into());
+    let mut receipt = journal::create(request).unwrap();
     if let Err(error) = cueward_core::files::mutation::execute(&MacFiles, &mut receipt, checkpoint)
     {
         record_error(&mut receipt, error);
     }
+    journal::save(&receipt).unwrap();
+    fs::remove_dir_all(journal::directory(&receipt.operation_id).unwrap()).unwrap();
     receipt
 }
 #[test]
@@ -31,7 +33,7 @@ fn destination_appearing_after_preflight_is_not_overwritten() {
     );
 }
 #[test]
-fn checkpoint_failure_leaves_known_partial_file_and_preserves_source() {
+fn checkpoint_failure_after_publication_leaves_verified_bytes_and_preserves_source() {
     let (root, request) = fixture();
     let original = fs::read(root.path().join("source.txt")).unwrap();
     let receipt = direct(&request, &mut |r| {
@@ -46,7 +48,7 @@ fn checkpoint_failure_leaves_known_partial_file_and_preserves_source() {
     assert_eq!(receipt.status, MutationStatus::Incomplete);
     assert!(!receipt.completion_verified);
     assert_eq!(fs::read(root.path().join("source.txt")).unwrap(), original);
-    assert_eq!(fs::read(root.path().join("copy.txt")).unwrap(), b"");
+    assert_eq!(fs::read(root.path().join("copy.txt")).unwrap(), original);
 }
 
 struct ChangingSource {
@@ -61,6 +63,17 @@ impl FilePlatform for ChangingSource {
     }
 }
 impl MutationPlatform for ChangingSource {
+    fn prepare_staging(
+        &self,
+        receipt: &MutationReceipt,
+        root: &File,
+    ) -> Result<Staging, FileError> {
+        MacFiles.prepare_staging(receipt, root)
+    }
+    fn publish(&self, root: &File, staging: &Staging, destination: &Path) -> Publication {
+        MacFiles.publish(root, staging, destination)
+    }
+
     fn open_directory(&self, p: &Path) -> Result<File, FileError> {
         MacFiles.open_directory(p)
     }
@@ -85,17 +98,20 @@ fn external_source_change_after_copy_does_not_claim_completed_or_delete_anything
     let native = ChangingSource {
         path: root.path().join("source.txt"),
     };
-    let mut receipt = MutationReceipt::new("test".into(), request, "test".into());
+    let mut receipt = journal::create(&request).unwrap();
     let error =
         cueward_core::files::mutation::execute(&native, &mut receipt, &mut |_| Ok(())).unwrap_err();
     record_error(&mut receipt, error);
-    assert_eq!(receipt.status, MutationStatus::Incomplete);
-    assert_eq!(receipt.error.unwrap().code, FileErrorCode::Changed);
+    assert_eq!(receipt.status, MutationStatus::NotStarted);
+    assert_eq!(receipt.error.as_ref().unwrap().code, FileErrorCode::Changed);
     assert_eq!(
         fs::read(&native.path).unwrap(),
         b"external modified content"
     );
-    assert!(root.path().join("copy.txt").is_file());
+    assert!(!root.path().join("copy.txt").exists());
+    assert!(Path::new(receipt.staging_path.as_ref().unwrap()).is_file());
+    journal::save(&receipt).unwrap();
+    fs::remove_dir_all(journal::directory(&receipt.operation_id).unwrap()).unwrap();
 }
 
 #[test]

@@ -17,6 +17,16 @@ const CLOEXEC: i32 = 0x01000000;
 const NONBLOCK: i32 = 4;
 
 impl MutationPlatform for MacFiles {
+    fn prepare_staging(
+        &self,
+        receipt: &MutationReceipt,
+        root: &File,
+    ) -> Result<Staging, FileError> {
+        publication::prepare(receipt, root)
+    }
+    fn publish(&self, root: &File, staging: &Staging, destination: &Path) -> Publication {
+        publication::publish(root, staging, destination)
+    }
     fn open_directory(&self, path: &Path) -> Result<File, FileError> {
         Ok(OpenOptions::new()
             .read(true)

@@ -38,6 +38,8 @@ pub enum MutationStatus {
 #[serde(rename_all = "snake_case")]
 pub enum MutationStage {
     Preflight,
+    Staging,
+    Staged,
     Creating,
     Copying,
     Verifying,
@@ -63,6 +65,10 @@ pub struct MutationReceipt {
     pub status: MutationStatus,
     pub stage: MutationStage,
     pub mutation_attempted: bool,
+    #[serde(default)]
+    pub staging_path: Option<String>,
+    #[serde(default)]
+    pub staging_verified: bool,
     pub destination_created: Option<bool>,
     pub root_before: Option<FileInfo>,
     pub root_after: Option<FileInfo>,
@@ -97,6 +103,8 @@ impl MutationReceipt {
             status: MutationStatus::Uncertain,
             stage: MutationStage::Preflight,
             mutation_attempted: false,
+            staging_path: None,
+            staging_verified: false,
             destination_created: None,
             root_before: None,
             root_after: None,

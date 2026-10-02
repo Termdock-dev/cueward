@@ -2,6 +2,7 @@
 mod attributes;
 mod journal;
 mod native;
+mod publication;
 mod supervision;
 #[cfg(test)]
 mod tests;
@@ -10,7 +11,7 @@ use super::{MacFiles, policy, protocol};
 use cueward_core::files::mutation::record_error;
 pub use cueward_core::files::mutation::{
     CopyVerification, Creation, MutationAction, MutationPlatform, MutationReceipt, MutationRequest,
-    MutationStage, MutationStatus,
+    MutationStage, MutationStatus, Publication, Staging,
 };
 use cueward_core::files::*;
 use serde::{Deserialize, Serialize};

@@ -7,6 +7,8 @@ mod failures;
 mod relocation;
 #[path = "boundary_tests.rs"]
 mod boundary;
+#[path = "publication_tests.rs"]
+mod publication_guards;
 
 fn fixture() -> (tempfile::TempDir, MutationRequest) {
     let root = tempfile::tempdir().unwrap();

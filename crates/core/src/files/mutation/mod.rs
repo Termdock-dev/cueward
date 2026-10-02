@@ -2,25 +2,43 @@
 mod context;
 mod copying;
 mod model;
+mod staging;
 use crate::files::*;
 pub use model::*;
 use std::ffi::OsStr;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-/// A creation error can occur after mkdir succeeded but before its descriptor opened.
+/// A private staging creation error can occur after mkdir but before opening its descriptor.
 pub struct Creation {
     pub file: Result<File, FileError>,
     pub destination_created: Option<bool>,
 }
 
+/// Private staging storage remains recoverable when publication fails.
+pub struct Staging {
+    pub directory: File,
+    pub path: PathBuf,
+}
+
+/// Atomic publication can fail without delivery, or return an uncertain filesystem error.
+pub struct Publication {
+    pub result: Result<(), FileError>,
+    pub destination_created: Option<bool>,
+}
+
 /// Guarded descriptor-relative creation and native metadata hooks; no platform API in core.
 pub trait MutationPlatform: FilePlatform {
+    /// Prepare private same-filesystem storage and fail closed without guarded publication.
+    fn prepare_staging(&self, receipt: &MutationReceipt, root: &File)
+    -> Result<Staging, FileError>;
+    /// Publish a fully prepared object beneath the root descriptor; never use a cached parent.
+    fn publish(&self, root: &File, staging: &Staging, destination: &Path) -> Publication;
     /// Open a directory without following any symlink component.
     fn open_directory(&self, path: &Path) -> Result<File, FileError>;
-    /// Atomically create a new read/write file relative to an opened parent, never replacing.
+    /// Exclusively create a new read/write file in the private staging directory.
     fn create_file(&self, parent: &File, name: &OsStr) -> Creation;
-    /// Create one directory (not parents) and return its opened descriptor.
+    /// Create one private staging directory (not parents) and return its descriptor.
     fn create_directory(&self, parent: &File, name: &OsStr) -> Creation;
     /// Reject unsupported alias/security/metadata cases before creating a destination.
     fn validate_copy_source(&self, file: &File, info: &FileInfo) -> Result<(), FileError>;
@@ -40,23 +58,17 @@ pub fn execute(
 ) -> Result<(), FileError> {
     let context = context::prepare(platform, receipt)?;
     context.revalidate_before(receipt)?;
+    let (staging, mut destination) = staging::prepare(platform, &context, receipt, checkpoint)?;
+    staging::populate(platform, &context, &mut destination, receipt, checkpoint)?;
+    context.revalidate_before(receipt)?;
     receipt.stage = MutationStage::Creating;
     receipt.mutation_attempted = true;
     checkpoint(receipt)?;
-    let created = match &receipt.request.action {
-        MutationAction::Mkdir => platform.create_directory(&context.parent, &context.name),
-        MutationAction::Copy { .. } => platform.create_file(&context.parent, &context.name),
-    };
-    receipt.destination_created = created.destination_created;
-    let mut destination = created.file?;
+    let publication = platform.publish(&context.root, &staging, &receipt.request.destination);
+    receipt.destination_created = publication.destination_created;
+    publication.result?;
     receipt.destination_created_observation = Some(context.destination_info(&destination)?);
     checkpoint(receipt)?;
-    if let MutationAction::Copy { max_bytes, .. } = &receipt.request.action {
-        receipt.stage = MutationStage::Copying;
-        checkpoint(receipt)?;
-        let verification = copying::copy(platform, &context, &mut destination, *max_bytes)?;
-        receipt.verification = Some(verification);
-    }
     receipt.stage = MutationStage::Verifying;
     checkpoint(receipt)?;
     context.finish(&destination, receipt)?;
