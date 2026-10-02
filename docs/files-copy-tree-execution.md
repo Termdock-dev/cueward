@@ -1,6 +1,6 @@
 # Verified recursive directory copy execution
 
-`cueward files copy-tree execute` adds the bounded directory-copy slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). This source capability is pending review; check installed command help. The separate [read-only plan](files-copy-tree.md) remains an observation, never a saved execution token. Existing single-file copy/duplicate commands keep their contracts.
+`cueward files copy-tree execute` adds the bounded directory-copy slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). This source capability was merged in [PR #59](https://github.com/Termdock-dev/cueward/pull/59); check installed command help. The separate [read-only plan](files-copy-tree.md) remains an observation, never a saved execution token. Existing single-file copy/duplicate commands keep their contracts.
 
 ## Select a fresh authorized request
 

@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads, Spotlight content search, Finder context/reveal, explicit iCloud status/downloads, PDF/image/Quick Look previews, and authorized no-overwrite directory/file creation, single-file duplication, recursive-copy planning/execution, same-volume rename/move or explicit independent batch rename planning/execution when the installed CLI supports them. Not for general web research or developing Cueward itself.
+description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads, Spotlight content search, Finder context/reveal, explicit iCloud status/downloads, PDF/image/Quick Look previews, and authorized no-overwrite directory/file creation, single-file duplication, recursive-copy planning/execution, read-only trash proposals, same-volume rename/move or explicit independent batch rename planning/execution when the installed CLI supports them. Not for general web research or developing Cueward itself.
 ---
 
 # Cueward Agent
@@ -19,6 +19,7 @@ Use `cueward doctor --json` when an available operation reports a permission/pre
 | --- | --- |
 | Current app UI, screenshots, native windows, background input, waits, snapshot differences, app launch/open, or Spaces | [computer-use.md](references/computer-use.md) |
 | Existing files: scoped filesystem/Spotlight search, metadata/reads, Finder location/selection, an explicit Finder reveal, iCloud state, a requested cloud download, or PDF/image/Quick Look preview | [files.md](references/files.md), then check whether `files` is installed |
+| Selected-entry trash proposals before a removal decision | [file-trash.md](references/file-trash.md), then check installed command help |
 | Finder tag names, initial tagging, no-op checks, or receipts | [file-tags.md](references/file-tags.md), then check installed command help |
 | Explicit batch rename plans and authorized independent execution/receipts | [file-batch-rename.md](references/file-batch-rename.md), then check installed command help |
 | Requested same-volume rename/move or their saved receipts | [file-relocation.md](references/file-relocation.md), then check installed command help |

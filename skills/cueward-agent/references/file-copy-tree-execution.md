@@ -1,6 +1,6 @@
 # Execute an authorized bounded directory copy
 
-New source capability pending review. Check installed `files copy-tree execute --help` and `files copy-tree receipt --help`. Use only for the user's selected directory and exact new destination. A [read-only plan](file-copy-tree.md), revisions or a saved receipt do not authorize a write.
+Source capability merged in [PR #59](https://github.com/Termdock-dev/cueward/pull/59); this does not establish availability in the installed CLI. Check installed `files copy-tree execute --help` and `files copy-tree receipt --help`. Use only for the user's selected directory and exact new destination. A [read-only plan](file-copy-tree.md), revisions or a saved receipt do not authorize a write.
 
 Observe source and the destination's existing parent with `files info`, then submit fresh guards:
 
