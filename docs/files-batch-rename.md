@@ -1,6 +1,6 @@
 # Read-only batch rename plans
 
-`files rename-batch plan` adds a planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). This source capability is pending review; check installed command help. It does not rename anything or implement batch execution.
+`files rename-batch plan` adds a planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Check installed command help; the separate execution capability is pending review. Planning does not rename anything; authorized independent batches use the separate [execution command](files-batch-execution.md).
 
 ## Explicit proposals
 
@@ -56,6 +56,6 @@ All initial successful single-item observations are rechecked after the batch sc
 
 These are sequential observations, not an atomic namespace snapshot, path lock, reservation, authorization or reusable execution token. Changes after the last check remain possible; metadata versions are not content hashes or source-inode CAS. The no-materialization policy and filesystem-only provider boundary are inherited from single-item planning; true TCC/provider/unmount/read-only/external-volume and older macOS acceptance remain unverified.
 
-Do not implement batch execution by looping over the existing rename commands with these saved versions: each successful rename changes parent/source revisions, and dependencies or partial completion need explicit handling. Reobserve after changes and present the requested plan to the user. Persistent execution/partial-failure receipts and an execution policy remain a separate #42 slice, along with recursive copy/directory duplicate, trash/recovery, cross-volume operations, safe existing-tag edits and real-platform acceptance. Permanent deletion is excluded.
+Do not implement batch execution by looping over the existing rename commands with these saved versions: each successful rename changes parent/source revisions, and dependencies or partial completion need explicit handling. Reobserve after changes and present the requested plan to the user. The separate [independent execution command](files-batch-execution.md) replans remaining entries and advances guards from verified child receipts; it does not replay a saved plan. Remaining work includes dependency-aware swaps/chains, recursive copy/directory duplicate, trash/recovery, cross-volume operations, safe existing-tag edits and real-platform acceptance. Permanent deletion is excluded.
 
 Disposable tests cover exact names/order/versions, unchanged bytes/inode/mode/mtime/ctime, no-op/existing/broken-link targets, duplicate sources/destinations, hardlink identity, case/Unicode potential collisions across same/different parents, chains/swaps/nested directories, retained item errors, scope/count/byte bounds, alias/availability refusal, stable root-directory symlinks and retargeted-then-restored root symlinks, different-device observation, an earlier source/destination changing while later items are inspected and worker timeout. CLI tests exercise actual worker JSON, exit semantics, canonical-root anchoring, escaped names and no receipt announcement. No personal files or tag preferences are changed.

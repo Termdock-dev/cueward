@@ -1,4 +1,5 @@
 //! Read-only batch rename proposals, never a recipe for replaying single-item writes.
+pub mod execution;
 mod conflicts;
 mod model;
 #[cfg(test)]

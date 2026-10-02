@@ -46,3 +46,8 @@ This document serves as the contextual memory for any Agent working on the Cuewa
 ## 7. Same-volume relocation: no overwrite, explicit concurrency limit
 
 For #42, the user accepted protection focused on deletion/overwriting rather than requiring atomic source-identity compare-and-swap. Same-volume rename/move use guarded exclusive root-relative Darwin rename, without payload staging, destination replacement or a copy-then-delete fallback. Observed source/parent versions narrow races but cannot condition the kernel call on the selected source inode. Post-check mismatches preserve actual observations as incomplete evidence without rollback/retry. Cross-volume removal, trash and existing-tag replacement remain separate work. See [file relocation](files-relocation.md) for the command and receipt contract.
+
+
+## 8. Independent batch rename: fail-stop and verified revision advancement
+
+For #42, batch execution accepts only explicit independent entries that pass whole-batch conflict checks. Remaining sources retain their original revisions; same-identity/path parent revisions advance only from verified child relocation results. A held canonical root, child root guards, remaining-item replanning and final aggregate checks narrow observed races without claiming CAS or isolation. One supervised worker/lifeline covers all items. Persistent aggregate evidence references full child receipts; any failure stops later submissions without replay, rollback or deletion. Plans remain observations, not execution tokens. See [batch execution](files-batch-execution.md).

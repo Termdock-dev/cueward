@@ -93,3 +93,30 @@ fn batch_rename_entry_json_preserves_exact_names_order_and_revision_guards() {
     assert_eq!(result[1].path, PathBuf::from("b"));
     assert_eq!(result[0].expected_parent_version, "p");
 }
+
+#[test]
+fn batch_execute_and_receipt_parse_without_overwrite_replay_or_plan_input() {
+    let mut execute = args();
+    execute[3] = "execute";
+    assert!(Cli::try_parse_from(execute.clone()).is_ok());
+    for flags in [
+        vec!["--overwrite"],
+        vec!["--resume"],
+        vec!["--plan", "saved.json"],
+        vec!["--timeout-ms", "0"],
+    ] {
+        assert!(Cli::try_parse_from(execute.clone().into_iter().chain(flags)).is_err());
+    }
+    assert!(
+        Cli::try_parse_from([
+            "cueward",
+            "files",
+            "rename-batch",
+            "receipt",
+            "--operation-id",
+            "id"
+        ])
+        .is_ok()
+    );
+    assert!(Cli::try_parse_from(["cueward", "files", "rename-batch", "receipt"]).is_err());
+}

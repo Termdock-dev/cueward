@@ -109,3 +109,23 @@ pub(super) fn save(receipt: &RelocationReceipt) -> Result<(), FileError> {
 fn json(value: &impl Serialize) -> Result<serde_json::Value, FileError> {
     serde_json::to_value(value).map_err(|e| FileError::new(FileErrorCode::Internal, e.to_string()))
 }
+
+/// Allocate one child receipt under an already supervised batch; never dispatch or replay it.
+pub(in crate::files) fn execute_child(
+    platform: &impl RelocationPlatform,
+    request: &RelocationRequest,
+    checkpoint: &mut impl FnMut(&RelocationReceipt) -> Result<(), FileError>,
+) -> Result<RelocationReceipt, FileError> {
+    let mut receipt = STORE.create(|id, path| RelocationReceipt::new(id, path, request.clone()))?;
+    let mut persist = |child: &RelocationReceipt| {
+        save(child)?;
+        checkpoint(child)
+    };
+    persist(&receipt)?;
+    STORE.claim(&receipt.operation_id)?;
+    if let Err(error) = relocation::execute(platform, &mut receipt, &mut persist) {
+        receipt.record_error(error);
+    }
+    persist(&receipt)?;
+    Ok(receipt)
+}

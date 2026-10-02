@@ -2,7 +2,7 @@ use super::mutation::version;
 use super::*;
 use std::os::unix::fs::MetadataExt;
 
-fn entry(root: &Path, path: &str, name: &str) -> String {
+pub(super) fn entry(root: &Path, path: &str, name: &str) -> String {
     let parent = Path::new(path)
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
@@ -35,7 +35,7 @@ fn plan(root: &Path, entries: &[String], success: bool) -> Value {
     );
     envelope(&output.stdout, "files")
 }
-fn fixture() -> tempfile::TempDir {
+pub(super) fn fixture() -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     fs::write(root.path().join("a"), b"OWNED a\0").unwrap();
     fs::write(root.path().join("b"), b"OWNED b\0").unwrap();
