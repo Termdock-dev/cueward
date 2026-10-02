@@ -46,6 +46,7 @@ pub(crate) struct ReceiptArgs {
 enum Response {
     Mkdir(Box<MutationReceipt>),
     Copy(Box<MutationReceipt>),
+    Duplicate(Box<MutationReceipt>),
     Receipt(Box<MutationReceipt>),
 }
 
@@ -71,7 +72,8 @@ pub(super) fn copy(args: CopyArgs) {
     };
     dispatch(request, args.scope.timeout_ms);
 }
-fn dispatch(request: MutationRequest, timeout_ms: u64) {
+/// Dispatch supported writes with receipt-based completion semantics.
+pub(super) fn dispatch(request: MutationRequest, timeout_ms: u64) {
     let result = std::env::current_exe()
         .map_err(FileError::from)
         .and_then(|exe| mutation::run(&exe, &request, timeout_ms));
@@ -81,6 +83,7 @@ fn dispatch(request: MutationRequest, timeout_ms: u64) {
     let result = result.map(|receipt| match request.action {
         MutationAction::Mkdir => Response::Mkdir(Box::new(receipt)),
         MutationAction::Copy { .. } => Response::Copy(Box::new(receipt)),
+        MutationAction::Duplicate { .. } => Response::Duplicate(Box::new(receipt)),
     });
     output("files", result);
     if !success {

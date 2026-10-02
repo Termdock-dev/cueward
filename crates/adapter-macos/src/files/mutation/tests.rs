@@ -9,6 +9,8 @@ mod relocation;
 mod boundary;
 #[path = "publication_tests.rs"]
 mod publication_guards;
+#[path = "duplicate_tests.rs"]
+mod duplicate;
 
 fn fixture() -> (tempfile::TempDir, MutationRequest) {
     let root = tempfile::tempdir().unwrap();
@@ -45,6 +47,11 @@ fn fresh(request: &mut MutationRequest) {
     .unwrap()
     .version;
     if let MutationAction::Copy {
+        path,
+        expected_version,
+        ..
+    }
+    | MutationAction::Duplicate {
         path,
         expected_version,
         ..

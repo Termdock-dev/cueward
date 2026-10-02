@@ -1,6 +1,8 @@
-//! No-overwrite mkdir/single-file copy with durable checkpoints and explicit outcomes.
+//! No-overwrite mkdir/single-file copy/duplicate with durable checkpoints and explicit outcomes.
 mod context;
 mod copying;
+mod duplication;
+pub use duplication::duplicate_destination;
 mod model;
 mod staging;
 use crate::files::*;

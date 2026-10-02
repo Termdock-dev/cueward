@@ -11,12 +11,18 @@ pub struct MutationRequest {
     pub action: MutationAction,
 }
 
-/// A file copy requires a prior source revision; directory trees are not copied.
+/// Copy/duplicate require a prior source revision; directory trees are not copied.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case")]
 pub enum MutationAction {
     Mkdir,
     Copy {
+        path: PathBuf,
+        expected_version: String,
+        max_bytes: u64,
+    },
+    /// An independent regular-file copy in the source's existing parent.
+    Duplicate {
         path: PathBuf,
         expected_version: String,
         max_bytes: u64,

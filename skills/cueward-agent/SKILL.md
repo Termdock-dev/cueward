@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads, Spotlight content search, Finder context/reveal, explicit iCloud status/downloads, PDF/image/Quick Look previews, and authorized no-overwrite directory/file creation or same-volume rename/move when the installed CLI supports them. Not for general web research or developing Cueward itself.
+description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads, Spotlight content search, Finder context/reveal, explicit iCloud status/downloads, PDF/image/Quick Look previews, and authorized no-overwrite directory/file creation, single-file duplication or same-volume rename/move when the installed CLI supports them. Not for general web research or developing Cueward itself.
 ---
 
 # Cueward Agent
@@ -21,7 +21,7 @@ Use `cueward doctor --json` when an available operation reports a permission/pre
 | Existing files: scoped filesystem/Spotlight search, metadata/reads, Finder location/selection, an explicit Finder reveal, iCloud state, a requested cloud download, or PDF/image/Quick Look preview | [files.md](references/files.md), then check whether `files` is installed |
 | Finder tag names, initial tagging, no-op checks, or receipts | [file-tags.md](references/file-tags.md), then check installed command help |
 | Requested same-volume rename/move or their saved receipts | [file-relocation.md](references/file-relocation.md), then check installed command help |
-| Requested empty directory creation, single-file copy, or saved write receipts | [file-mutations.md](references/file-mutations.md), then check installed command help |
+| Requested empty directory creation, single-file copy/duplicate, or saved write receipts | [file-mutations.md](references/file-mutations.md), then check installed command help |
 | Past browsing/notes/messages, indexed knowledge, capture or digest | [retrieval.md](references/retrieval.md) |
 | Live Safari tabs, DOM controls, bookmarks, console/network or browser AI state | [safari.md](references/safari.md) |
 | Notes, Quick Notes, Reminders, Calendar, OCR, clipboard, Stickies or Voice Memos | [apple-apps.md](references/apple-apps.md) |

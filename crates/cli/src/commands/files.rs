@@ -8,6 +8,8 @@ mod tags;
 
 #[path = "files_mutation.rs"]
 mod mutation;
+#[path = "files_duplicate.rs"]
+mod duplicate;
 #[path = "files_relocation.rs"]
 mod relocation;
 
@@ -79,6 +81,8 @@ pub(crate) enum FilesAction {
     Mkdir(mutation::MkdirArgs),
     /// Copy one regular file and verify bytes/metadata; never overwrite.
     Copy(mutation::CopyArgs),
+    /// Create an independent regular-file sibling under an explicit new name; never overwrite.
+    Duplicate(duplicate::DuplicateArgs),
     /// Read saved operation evidence without resuming or retrying a mutation.
     Receipt(mutation::ReceiptArgs),
     /// Read PDF/image content or request a Quick Look thumbnail.
@@ -164,6 +168,7 @@ impl FilesAction {
             | Self::Preview { .. }
             | Self::Mkdir(_)
             | Self::Copy(_)
+            | Self::Duplicate(_)
             | Self::Receipt(_) => {
                 return Err(FileError::new(
                     FileErrorCode::InvalidOptions,
@@ -239,6 +244,7 @@ pub(crate) fn dispatch(action: FilesAction) {
         FilesAction::Tags { action } => return tags::dispatch(action),
         FilesAction::Mkdir(args) => return mutation::mkdir(args),
         FilesAction::Copy(args) => return mutation::copy(args),
+        FilesAction::Duplicate(args) => return duplicate::dispatch(args),
         FilesAction::Receipt(args) => return mutation::receipt(args),
         FilesAction::Preview { action } => return preview::dispatch(action),
         FilesAction::Cloud { action } => return cloud::dispatch(action),

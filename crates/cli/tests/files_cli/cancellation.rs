@@ -63,12 +63,19 @@ fn nonempty(path: &Path) -> bool {
 fn prepare(root: &Path, action: &str) -> MutationRequest {
     fs::write(root.join("source"), b"owned source bytes").unwrap();
     let parent = super::mutation::version(root, ".");
+    let copy_version = super::mutation::version(root, "source");
     let action = if action == "mkdir" {
         MutationAction::Mkdir
+    } else if action == "duplicate" {
+        MutationAction::Duplicate {
+            path: "source".into(),
+            expected_version: copy_version,
+            max_bytes: 1024,
+        }
     } else {
         MutationAction::Copy {
             path: "source".into(),
-            expected_version: super::mutation::version(root, "source"),
+            expected_version: copy_version,
             max_bytes: 1024,
         }
     };
@@ -199,8 +206,8 @@ fn verify_interrupted(root: &Path, fixture: &Path, action: &str, signal: &str) {
     );
 }
 #[test]
-fn parent_interruption_prevents_delayed_mkdir_and_copy() {
-    for action in ["mkdir", "copy"] {
+fn parent_interruption_prevents_delayed_creation_copy_and_duplicate() {
+    for action in ["mkdir", "copy", "duplicate"] {
         for signal in ["-INT", "-TERM", "-KILL"] {
             interrupt_delayed(action, signal, false);
         }
@@ -209,7 +216,7 @@ fn parent_interruption_prevents_delayed_mkdir_and_copy() {
 
 #[test]
 fn parent_death_stops_an_armed_mutation_worker() {
-    for action in ["mkdir", "copy"] {
+    for action in ["mkdir", "copy", "duplicate"] {
         for signal in ["-INT", "-TERM", "-KILL"] {
             interrupt_delayed(action, signal, true);
         }

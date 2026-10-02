@@ -18,7 +18,9 @@ pub(super) fn prepare<P: MutationPlatform>(
         .ok_or_else(|| context::changed("missing staging leaf"))?;
     let created = match receipt.request.action {
         MutationAction::Mkdir => platform.create_directory(&staging.directory, name),
-        MutationAction::Copy { .. } => platform.create_file(&staging.directory, name),
+        MutationAction::Copy { .. } | MutationAction::Duplicate { .. } => {
+            platform.create_file(&staging.directory, name)
+        }
     };
     Ok((staging, created.file?))
 }
@@ -31,7 +33,9 @@ pub(super) fn populate<P: MutationPlatform>(
     receipt: &mut MutationReceipt,
     checkpoint: &mut impl FnMut(&MutationReceipt) -> Result<(), FileError>,
 ) -> Result<(), FileError> {
-    if let MutationAction::Copy { max_bytes, .. } = receipt.request.action {
+    if let MutationAction::Copy { max_bytes, .. } | MutationAction::Duplicate { max_bytes, .. } =
+        receipt.request.action
+    {
         receipt.stage = MutationStage::Copying;
         checkpoint(receipt)?;
         receipt.verification = Some(copying::copy(platform, context, file, max_bytes)?);

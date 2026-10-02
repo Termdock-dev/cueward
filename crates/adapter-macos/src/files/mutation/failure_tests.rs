@@ -2,7 +2,7 @@ use super::*;
 use std::ffi::OsStr;
 use std::fs::File;
 
-fn direct(
+pub(super) fn direct(
     request: &MutationRequest,
     checkpoint: &mut impl FnMut(&MutationReceipt) -> Result<(), FileError>,
 ) -> MutationReceipt {
