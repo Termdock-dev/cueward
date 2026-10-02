@@ -2,6 +2,7 @@
 pub mod cloud;
 pub mod mutation;
 pub mod relocation;
+pub mod batch_rename;
 pub mod tags;
 mod store;
 mod guarded_rename;

@@ -21,6 +21,8 @@ mod cloud;
 mod mutation;
 #[path = "files_cli/duplicate.rs"]
 mod duplicate;
+#[path = "files_cli/batch_rename.rs"]
+mod batch_rename;
 #[path = "files_cli/tags.rs"]
 mod tags;
 #[path = "files_cli/cancellation.rs"]
