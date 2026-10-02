@@ -1,6 +1,7 @@
 //! Scoped file operations with macOS identity, explicit actions and deadlines.
 pub mod cloud;
 pub mod mutation;
+pub mod relocation;
 pub mod tags;
 mod store;
 pub mod preview;
