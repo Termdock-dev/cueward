@@ -1,6 +1,7 @@
 //! Scoped file operations with macOS identity, explicit actions and deadlines.
 pub mod cloud;
 pub mod mutation;
+pub mod copy_tree;
 pub mod relocation;
 pub mod batch_rename;
 pub mod batch_execution;
