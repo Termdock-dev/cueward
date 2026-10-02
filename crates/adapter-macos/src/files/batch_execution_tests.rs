@@ -212,3 +212,6 @@ fn batch_execute_rejects_malformed_or_progressed_records_before_any_child() {
         cleanup(&receipt);
     }
 }
+
+#[path = "batch_execution_conflict_tests.rs"]
+mod conflicts;

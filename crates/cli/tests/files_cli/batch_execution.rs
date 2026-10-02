@@ -134,3 +134,53 @@ fn batch_execute_timeout_returns_saved_uncertain_evidence_without_replay() {
     assert!(!root.path().join("new").exists());
     cleanup(&serde_json::to_value(&receipt).unwrap());
 }
+
+#[test]
+fn batch_execute_cli_dense_conflicts_preserve_not_started_receipt_within_store_limit() {
+    let root = fixture();
+    for (name, kinds) in [("new", 2), ("a", 3)] {
+        let encoded = entry(root.path(), "a", name);
+        let entries = vec![encoded; 50];
+        let request = json!({"root":root.path(),"entries":entries.iter().map(|e|serde_json::from_str::<Value>(e).unwrap()).collect::<Vec<_>>()});
+        assert!(serde_json::to_vec(&request).unwrap().len() <= 16384);
+        let value = execute(root.path(), &entries, false);
+        let receipt = &value["Ok"]["result"];
+        let output = command()
+            .args([
+                "files",
+                "rename-batch",
+                "receipt",
+                "--operation-id",
+                receipt["operation_id"].as_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+        let saved = envelope(&output.stdout, "files");
+        let size = fs::metadata(receipt["receipt_path"].as_str().unwrap())
+            .unwrap()
+            .len();
+        cleanup(receipt);
+        assert!(output.status.success());
+        assert_eq!(&saved["Ok"]["result"], receipt);
+        assert_eq!(
+            receipt["status"], "not_started",
+            "dense preflight conflicts must not degrade into uncertain evidence"
+        );
+        assert_eq!(receipt["error"]["code"], "conflict");
+        assert_eq!(receipt["items"].as_array().unwrap().len(), 50);
+        assert!(
+            receipt["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|i| i["operation_id"].is_null() && i["mutation_attempted"] == false)
+        );
+        let recorded = receipt["issues"].as_array().unwrap().len();
+        let omitted = receipt["omitted_issue_count"].as_u64().unwrap() as usize;
+        assert!(recorded > 0 && omitted > 0);
+        assert_eq!(recorded + omitted, kinds * 50 * 49 / 2);
+        assert!(size <= 256 * 1024);
+        assert_eq!(fs::read(root.path().join("a")).unwrap(), b"OWNED a\0");
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 2);
+    }
+}
