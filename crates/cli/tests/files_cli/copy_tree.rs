@@ -175,7 +175,7 @@ fn copy_tree_cli_root_alias_stays_canonical_and_existing_commands_stay_compatibl
     }
     assert!(
         !command()
-            .args(["files", "copy-tree", "execute"])
+            .args(["files", "copy-tree", "execute", "--overwrite"])
             .output()
             .unwrap()
             .status

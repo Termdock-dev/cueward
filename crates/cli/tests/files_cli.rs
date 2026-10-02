@@ -21,6 +21,8 @@ mod cloud;
 mod mutation;
 #[path = "files_cli/copy_tree.rs"]
 mod copy_tree;
+#[path = "files_cli/tree_execution.rs"]
+mod tree_execution;
 #[path = "files_cli/duplicate.rs"]
 mod duplicate;
 #[path = "files_cli/batch_rename.rs"]

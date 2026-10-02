@@ -113,6 +113,8 @@ pub(crate) enum Command {
     #[command(hide = true)]
     FilesCopyTreePlanWorker,
     #[command(hide = true)]
+    FilesCopyTreeWorker,
+    #[command(hide = true)]
     FilesBatchRenameWorker,
     #[command(hide = true)]
     FilesTagsReadWorker,
@@ -276,6 +278,7 @@ pub(crate) fn dispatch(command: Command) {
         Command::FilesMutationWorker => files::mutation_worker(),
         Command::FilesRelocationWorker => files::relocation_worker(),
         Command::FilesRelocationPlanWorker => files::relocation_plan_worker(),
+        Command::FilesCopyTreeWorker => files::copy_tree_execute_worker(),
         Command::FilesCopyTreePlanWorker => files::copy_tree_plan_worker(),
         Command::FilesBatchRenamePlanWorker => files::batch_rename_plan_worker(),
         Command::FilesBatchRenameWorker => files::batch_rename_execute_worker(),

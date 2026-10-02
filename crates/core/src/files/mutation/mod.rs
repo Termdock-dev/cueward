@@ -1,6 +1,7 @@
 //! No-overwrite mkdir/single-file copy/duplicate with durable checkpoints and explicit outcomes.
 mod context;
 mod copying;
+pub use copying::{copy_file_verified, verify_readable};
 mod duplication;
 pub use duplication::duplicate_destination;
 mod model;

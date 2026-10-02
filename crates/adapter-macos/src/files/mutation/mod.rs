@@ -1,5 +1,5 @@
 //! Supervised no-overwrite mutations with persistent uncertain/partial receipts.
-mod attributes;
+pub(super) mod attributes;
 mod journal;
 mod native;
 mod publication;

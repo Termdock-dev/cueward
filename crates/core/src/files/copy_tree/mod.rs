@@ -1,5 +1,6 @@
-//! Bounded read-only recursive copy proposals; no data reads or namespace writes.
+//! Bounded read-only tree proposals and separate verified no-overwrite execution.
 mod model;
+pub mod execution;
 mod traversal;
 use crate::files::scope::Scope;
 use crate::files::*;
