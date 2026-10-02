@@ -3,7 +3,7 @@ mod attributes;
 mod journal;
 mod native;
 mod publication;
-mod supervision;
+pub(super) mod supervision;
 #[cfg(test)]
 mod tests;
 
@@ -48,8 +48,8 @@ pub fn run(
     let input = MutationWorkerRequest {
         operation_id: prepared.operation_id.clone(),
     };
-    supervision::announce(&prepared.operation_id)?;
-    let result = supervision::run(executable, &input, timeout_ms)
+    supervision::announce(&prepared.operation_id, "receipt")?;
+    let result = supervision::run(executable, "files-mutation-worker", &input, timeout_ms)
         .and_then(|receipt| verify_response(&prepared, receipt));
     match result {
         Ok(receipt) => Ok(receipt),

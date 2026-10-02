@@ -7,23 +7,24 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 /// Publish only the generated recovery ID, failing before dispatch if stderr cannot be flushed.
-pub(super) fn announce(id: &str) -> Result<(), FileError> {
+pub(in crate::files) fn announce(id: &str, command: &str) -> Result<(), FileError> {
     // Only a generated UUID is printed here, never unwrapped external paths/content.
     let mut stderr = io::stderr().lock();
     writeln!(
         stderr,
-        "cueward files operation_id={id}; inspect with: cueward files receipt --operation-id {id}"
+        "cueward files operation_id={id}; inspect with: cueward files {command} --operation-id {id}"
     )?;
     stderr.flush()?;
     Ok(())
 }
 
 /// Keep the parent socket open while the shared supervisor owns the mutation worker.
-pub(super) fn run(
+pub(in crate::files) fn run<T: serde::de::DeserializeOwned>(
     executable: &Path,
-    request: &MutationWorkerRequest,
+    worker_name: &str,
+    request: &impl serde::Serialize,
     timeout_ms: u64,
-) -> Result<MutationReceipt, FileError> {
+) -> Result<T, FileError> {
     let mut payload = protocol::payload(request, timeout_ms)?;
     payload.push(b'\n');
     let (mut parent, worker) = UnixStream::pair()?;
@@ -31,7 +32,7 @@ pub(super) fn run(
     // Do not shut down the write half: EOF means parent cancellation/death, not input end.
     // Both originals are CLOEXEC; only the worker endpoint becomes its stdin on spawn.
     let result = crate::window::process::run_with_input(
-        Command::new(executable).arg("files-mutation-worker"),
+        Command::new(executable).arg(worker_name),
         Stdio::from(OwnedFd::from(worker)),
         Duration::from_millis(timeout_ms),
     )
@@ -42,7 +43,7 @@ pub(super) fn run(
 }
 
 /// Read one bounded JSON line, then monitor stdin for the rest of the worker lifetime.
-pub(super) fn read_request() -> Result<MutationWorkerRequest, FileError> {
+pub(in crate::files) fn read_request<T: serde::de::DeserializeOwned>() -> Result<T, FileError> {
     let mut bytes = Vec::new();
     {
         let mut stdin = io::stdin().lock();

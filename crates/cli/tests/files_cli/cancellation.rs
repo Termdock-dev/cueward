@@ -32,9 +32,9 @@ fn cancellation_worker_helper() {
     mutation::execute_worker(&request).unwrap();
 }
 
-struct Processes {
-    parent: Option<std::process::Child>,
-    worker: Option<String>,
+pub(super) struct Processes {
+    pub(super) parent: Option<std::process::Child>,
+    pub(super) worker: Option<String>,
 }
 impl Drop for Processes {
     fn drop(&mut self) {
@@ -49,7 +49,8 @@ impl Drop for Processes {
         }
     }
 }
-fn wait_for(mut predicate: impl FnMut() -> bool) {
+/// Wait for an owned subprocess barrier with a bounded test deadline.
+pub(super) fn wait_for(mut predicate: impl FnMut() -> bool) {
     let end = Instant::now() + Duration::from_secs(5);
     while !predicate() {
         assert!(Instant::now() < end, "timed out waiting for test barrier");

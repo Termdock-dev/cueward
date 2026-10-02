@@ -3,6 +3,9 @@ use cueward_core::files::*;
 use std::io::Read;
 use std::path::PathBuf;
 
+#[path = "files_tags.rs"]
+mod tags;
+
 #[path = "files_mutation.rs"]
 mod mutation;
 
@@ -56,6 +59,11 @@ pub(crate) enum EncodingArg {
 
 #[derive(Subcommand)]
 pub(crate) enum FilesAction {
+    /// Read or explicitly edit exact Finder tag names with saved evidence.
+    Tags {
+        #[command(subcommand)]
+        action: tags::TagsCommand,
+    },
     /// Create one empty directory without replacing existing entries.
     Mkdir(mutation::MkdirArgs),
     /// Copy one regular file and verify bytes/metadata; never overwrite.
@@ -135,7 +143,8 @@ pub(crate) struct ReadArgs {
 impl FilesAction {
     fn request(self) -> Result<(FileRequest, u64), FileError> {
         let (scope, action) = match self {
-            Self::Finder { .. }
+            Self::Tags { .. }
+            | Self::Finder { .. }
             | Self::Spotlight(_)
             | Self::Cloud { .. }
             | Self::Preview { .. }
@@ -210,6 +219,7 @@ impl ReadArgs {
 /// Dispatch a user command through a deadline-controlled worker.
 pub(crate) fn dispatch(action: FilesAction) {
     let action = match action {
+        FilesAction::Tags { action } => return tags::dispatch(action),
         FilesAction::Mkdir(args) => return mutation::mkdir(args),
         FilesAction::Copy(args) => return mutation::copy(args),
         FilesAction::Receipt(args) => return mutation::receipt(args),
@@ -278,6 +288,8 @@ pub(crate) use finder::worker as finder_worker;
 pub(crate) use mutation::worker as mutation_worker;
 pub(crate) use preview::worker as preview_worker;
 pub(crate) use spotlight::worker as spotlight_worker;
+pub(crate) use tags::read_worker as tags_read_worker;
+pub(crate) use tags::worker as tags_worker;
 
 #[cfg(test)]
 #[path = "files_tests.rs"]

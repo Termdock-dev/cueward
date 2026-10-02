@@ -576,6 +576,8 @@ Use `files preview pdf/image/thumbnail --root /absolute/directory --path relativ
 
 Use `files mkdir` or `files copy` for an explicitly selected no-overwrite creation/copy, with observed source/parent revision guards. Objects are privately staged before guarded atomic publication; the selected root must share the receipt storage filesystem. Failed operations can retain private staged content or a published destination; read saved evidence with `files receipt --operation-id` and inspect both before retrying. See [file mutations](docs/files-mutations.md) for supported metadata, outcomes and remaining management work.
 
+`files tags read/add/remove/receipt` observes and edits exact Finder tag names with file/tag revision guards, retaining other names and stored colors. See [file tags](docs/files-tags.md) for supported representations, legacy-label/hardlink limits, receipts and concurrency boundaries.
+
 Use `files cloud status --root /absolute/directory --path relative/file` for per-field iCloud state. `files cloud download` explicitly submits a version-guarded iCloud file download; submission does not verify completion, and other provider state remains unknown. See [cloud state and downloads](docs/files-cloud.md).
 
 Use `files metadata --root /absolute/directory --path relative/file.txt` for native UTType, Finder tags and package/alias flags with per-field availability; see [resource metadata](docs/files-metadata.md). Sorting, hidden names, versioned pagination, explicit encoding, and hex output are available. See [file operations](docs/files.md) for root scope, symlink handling, implicit-download prevention, errors, deadlines, and remaining Finder capabilities.

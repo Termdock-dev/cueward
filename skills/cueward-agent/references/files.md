@@ -125,7 +125,7 @@ Dataless placeholders are distinct from empty files. The macOS worker denies dat
 
 The worker deadline defaults to 10 seconds, configurable with --timeout-ms 1..30000. List/info/read/search/metadata/spotlight do not edit the source file or request Finder/app activation. On change/error/timeout, reobserve before resuming; it discards detected changed-file results, but is not a sandbox against malicious concurrent path swaps.
 
-UTType/tag search filters, package pruning, alias resolution and generic third-party provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image/Quick Look previews have a separate command below; authorized mkdir/single-file copy and saved receipts use [file-mutations.md](file-mutations.md); other file-management actions remain subsequent work.
+UTType/tag search filters, package pruning, alias resolution and generic third-party provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image/Quick Look previews have a separate command below; authorized mkdir/single-file copy and saved receipts use [file-mutations.md](file-mutations.md); authorized tag-name edits use [file-tags.md](file-tags.md); other file-management actions remain subsequent work.
 
 
 ## Preview PDF pages, images or a Quick Look thumbnail
