@@ -1,6 +1,6 @@
 # Read-only recursive copy plans
 
-`cueward files copy-tree plan` implements the directory-planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Check installed `--help` first. Recursive copying and directory duplication are not executable yet; existing [single-file copy/duplicate](files-mutations.md) commands retain their contracts.
+`cueward files copy-tree plan` implements the directory-planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Check installed `--help` first. The separate [verified execution](files-copy-tree-execution.md) is a new source capability pending review; this plan never authorizes or executes it. Existing [single-file copy/duplicate](files-mutations.md) commands retain their contracts.
 
 ## Select and observe
 
@@ -14,7 +14,7 @@ cueward files copy-tree plan --root /Users/me/Documents --path Project \
   --expected-parent-version '<Archive version>'
 ```
 
-There is no execute, overwrite, merge, follow-links, auto-suffix, parent creation, receipt lookup or saved-plan replay option. Planning does not authorize a future write. It does not edit payloads or selected metadata, create the destination, stage a copy, allocate mutation receipts, activate Finder or request downloads. Read-only transport can use private temporary files elsewhere; directory access times are not promised unchanged.
+The plan command has no overwrite, merge, follow-links, auto-suffix, parent creation, receipt lookup or saved-plan replay option. Execute and typed receipt lookup are separate subcommands with a stricter contract. Planning does not authorize a future write. It does not edit payloads or selected metadata, create the destination, stage a copy, allocate mutation receipts, activate Finder or request downloads. Read-only transport can use private temporary files elsewhere; directory access times are not promised unchanged.
 
 ## Observations and blockers
 
@@ -55,4 +55,4 @@ Disposable tests cover hidden/Unicode/newline names, sorted order, empty directo
 
 Native APIs were checked against the installed macOS 27 SDK and Apple's [Libc enumeration implementation](https://github.com/apple-oss-distributions/Libc/blob/main/gen/FreeBSD/readdir.c) and [directory entry definition](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/dirent.h). The adapter uses the already resolved `libc` package directly for platform bindings rather than duplicating Darwin ABI structures; no new package version is resolved.
 
-Recursive-copy execution, directory/package duplicate, trash/recovery, cross-volume operations and safe existing-tag edits remain subsequent work. Real provider/TCC/read-only/unmount/external-volume and older macOS acceptance are unverified. Permanent deletion is excluded. Remaining work is tracked in #42.
+Verified execution with an explicit sibling destination can copy ordinary directory trees; it is not a `files duplicate` directory mode. Package duplication, trash/recovery, cross-volume operations and safe existing-tag edits remain subsequent work. Real provider/TCC/read-only/unmount/external-volume and older macOS acceptance are unverified. Permanent deletion is excluded. Remaining work is tracked in #42.

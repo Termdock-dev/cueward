@@ -19,7 +19,7 @@ const MAX_NAMES: usize = 65536;
 const MAX_BYTES: usize = 4 * 1024 * 1024;
 
 /// Hash bounded descriptor attributes including names/lengths, never following a path.
-pub(super) fn digest(file: &File) -> Result<(String, usize), FileError> {
+pub(in crate::files) fn digest(file: &File) -> Result<(String, usize), FileError> {
     let names = names(file)?;
     let mut values: Vec<_> = names.split(|b| *b == 0).filter(|s| !s.is_empty()).collect();
     values.sort_unstable();

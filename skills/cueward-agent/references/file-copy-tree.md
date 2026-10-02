@@ -1,6 +1,6 @@
 # Inspect a recursive directory copy proposal
 
-Check installed `files copy-tree plan --help`. Use this read-only command for the user's selected source directory and explicit new destination, not as permission to copy. Recursive-copy execution and directory duplication are unavailable; single-file commands keep their separate [mutation contract](file-mutations.md).
+Check installed `files copy-tree plan --help`. Use this read-only command for the user's selected source directory and explicit new destination, not as permission to copy. Authorized [tree execution](file-copy-tree-execution.md) is separate and pending review; single-file commands keep their separate [mutation contract](file-mutations.md).
 
 Observe source and the destination's existing parent with `files info`, then pass their versions:
 
@@ -10,7 +10,7 @@ cueward files copy-tree plan --root /absolute/directory --path Project \
   --expected-parent-version '<Archive version>'
 ```
 
-The root is absolute; source/destination are relative with no parent traversal. The destination must have an existing parent. There is no execute, overwrite, merge, follow-links, auto-suffix, parent creation, receipt or saved-plan input. Planning does not write selected payloads/metadata, create a copy, allocate mutation receipts, activate Finder or request downloads.
+The root is absolute; source/destination are relative with no parent traversal. The destination must have an existing parent. The plan command has no overwrite, merge, follow-links, auto-suffix, parent creation, receipt or saved-plan input. Execute and typed lookup are separate subcommands. Planning does not write selected payloads/metadata, create a copy, allocate mutation receipts, activate Finder or request downloads.
 
 Operation is copy_tree_plan. Outer Ok / exit zero means observations returned, not a successful copy. Inspect has_blockers, issues, all entries.error and enumeration_complete. Execution_supported is always false, even without blockers. Never loop over single-file copy using a saved tree plan: later writes change parent revisions and partial delivery requires a separate execution contract.
 

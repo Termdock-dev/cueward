@@ -85,7 +85,7 @@ pub(crate) enum FilesAction {
     Mkdir(mutation::MkdirArgs),
     /// Copy one regular file and verify bytes/metadata; never overwrite.
     Copy(mutation::CopyArgs),
-    /// Inspect a recursive directory copy proposal without writing anything.
+    /// Plan or execute a bounded tree copy, or inspect its saved evidence.
     CopyTree {
         #[command(subcommand)]
         action: copy_tree::CopyTreeCommand,
@@ -327,6 +327,7 @@ pub(super) fn output<T: serde::Serialize>(source: &str, result: Result<T, FileEr
 pub(crate) use batch_rename::execute_worker as batch_rename_execute_worker;
 pub(crate) use batch_rename::worker as batch_rename_plan_worker;
 pub(crate) use cloud::worker as cloud_worker;
+pub(crate) use copy_tree::execute_worker as copy_tree_execute_worker;
 pub(crate) use copy_tree::worker as copy_tree_plan_worker;
 pub(crate) use finder::worker as finder_worker;
 pub(crate) use mutation::worker as mutation_worker;

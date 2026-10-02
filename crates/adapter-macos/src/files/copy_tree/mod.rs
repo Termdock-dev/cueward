@@ -1,5 +1,6 @@
-//! Read-only recursive copy observations, without receipts or publication calls.
+//! Read-only tree observations and separate supervised no-overwrite execution.
 mod native;
+pub mod execution;
 use super::{MacFiles, policy, protocol};
 use cueward_core::files::FileError;
 use cueward_core::files::copy_tree::{self, CopyTreePlan, CopyTreeRequest};

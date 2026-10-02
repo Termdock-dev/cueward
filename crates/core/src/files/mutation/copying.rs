@@ -12,18 +12,30 @@ pub(super) fn copy<P: MutationPlatform>(
         .source
         .as_ref()
         .ok_or_else(|| context::changed("missing source descriptor"))?;
-    let mut reader = &source.file;
+    copy_file_verified(platform, &source.file, &source.info, destination, maximum)
+}
+
+/// Copy one held source, verifying data, permissions, mtime and bounded xattrs.
+pub fn copy_file_verified(
+    platform: &impl MutationPlatform,
+    source: &File,
+    info: &FileInfo,
+    destination: &mut File,
+    maximum: u64,
+) -> Result<CopyVerification, FileError> {
+    context::check_source(platform, source, info)?;
+    let mut reader = source;
     let (bytes, digest) = transfer(&mut reader, destination, maximum)?;
-    if bytes != source.info.size {
+    if bytes != info.size {
         return Err(context::changed("source size changed during copy"));
     }
-    context::check_source(platform, &source.file, &source.info)?;
-    let (attributes, attribute_bytes) = platform.copy_attributes(&source.file, destination)?;
-    let metadata = source.file.metadata()?;
+    context::check_source(platform, source, info)?;
+    let (attributes, attribute_bytes) = platform.copy_attributes(source, destination)?;
+    let metadata = source.metadata()?;
     destination.set_permissions(metadata.permissions())?;
     destination.set_times(std::fs::FileTimes::new().set_modified(metadata.modified()?))?;
     destination.sync_all()?;
-    context::check_source(platform, &source.file, &source.info)?;
+    context::check_source(platform, source, info)?;
     destination.seek(SeekFrom::Start(0))?;
     let (read_bytes, read_digest) = hash(destination, maximum)?;
     let actual = destination.metadata()?;
@@ -75,7 +87,8 @@ fn hash(input: &mut impl Read, maximum: u64) -> Result<(u64, String), FileError>
     transfer(input, &mut std::io::sink(), maximum)
 }
 
-pub(super) fn verify_readable(
+/// Independently verify the readable content of a freshly opened destination.
+pub fn verify_readable(
     platform: &impl MutationPlatform,
     file: &File,
     info: &FileInfo,

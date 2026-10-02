@@ -35,7 +35,7 @@ fn copy_tree_plan_requires_scope_paths_and_both_revision_guards() {
     }
 }
 #[test]
-fn copy_tree_plan_bounds_and_no_execution_overwrite_or_links() {
+fn copy_tree_plan_bounds_and_no_overwrite_or_links() {
     assert!(
         Cli::try_parse_from(args().into_iter().chain([
             "--max-entries",
@@ -66,5 +66,35 @@ fn copy_tree_plan_bounds_and_no_execution_overwrite_or_links() {
     }
     let mut input = args();
     input[3] = "execute";
-    assert!(Cli::try_parse_from(input).is_err());
+    assert!(Cli::try_parse_from(input).is_ok());
+}
+
+#[test]
+fn tree_execute_parsing_has_separate_entry_bound_and_no_replay_or_overwrite() {
+    let mut input = args();
+    input[3] = "execute";
+    assert!(Cli::try_parse_from(input.clone()).is_ok());
+    for flags in [
+        vec!["--max-entries", "65"],
+        vec!["--max-entries", "0"],
+        vec!["--overwrite"],
+        vec!["--plan", "saved.json"],
+        vec!["--resume"],
+        vec!["--follow-links"],
+        vec!["--timeout-ms", "0"],
+    ] {
+        assert!(Cli::try_parse_from(input.clone().into_iter().chain(flags)).is_err());
+    }
+    assert!(
+        Cli::try_parse_from([
+            "cueward",
+            "files",
+            "copy-tree",
+            "receipt",
+            "--operation-id",
+            "id"
+        ])
+        .is_ok()
+    );
+    assert!(Cli::try_parse_from(["cueward", "files", "copy-tree", "receipt"]).is_err());
 }
