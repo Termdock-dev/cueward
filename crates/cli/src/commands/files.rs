@@ -10,6 +10,8 @@ mod tags;
 mod mutation;
 #[path = "files_duplicate.rs"]
 mod duplicate;
+#[path = "files_batch_rename.rs"]
+mod batch_rename;
 #[path = "files_relocation.rs"]
 mod relocation;
 
@@ -83,6 +85,11 @@ pub(crate) enum FilesAction {
     Copy(mutation::CopyArgs),
     /// Create an independent regular-file sibling under an explicit new name; never overwrite.
     Duplicate(duplicate::DuplicateArgs),
+    /// Observe a bounded batch of explicit sibling renames; execution is not supported.
+    RenameBatch {
+        #[command(subcommand)]
+        action: batch_rename::BatchRenameCommand,
+    },
     /// Read saved operation evidence without resuming or retrying a mutation.
     Receipt(mutation::ReceiptArgs),
     /// Read PDF/image content or request a Quick Look thumbnail.
@@ -169,6 +176,7 @@ impl FilesAction {
             | Self::Mkdir(_)
             | Self::Copy(_)
             | Self::Duplicate(_)
+            | Self::RenameBatch { .. }
             | Self::Receipt(_) => {
                 return Err(FileError::new(
                     FileErrorCode::InvalidOptions,
@@ -245,6 +253,7 @@ pub(crate) fn dispatch(action: FilesAction) {
         FilesAction::Mkdir(args) => return mutation::mkdir(args),
         FilesAction::Copy(args) => return mutation::copy(args),
         FilesAction::Duplicate(args) => return duplicate::dispatch(args),
+        FilesAction::RenameBatch { action } => return batch_rename::dispatch(action),
         FilesAction::Receipt(args) => return mutation::receipt(args),
         FilesAction::Preview { action } => return preview::dispatch(action),
         FilesAction::Cloud { action } => return cloud::dispatch(action),
@@ -306,6 +315,7 @@ pub(super) fn output<T: serde::Serialize>(source: &str, result: Result<T, FileEr
     }
 }
 
+pub(crate) use batch_rename::worker as batch_rename_plan_worker;
 pub(crate) use cloud::worker as cloud_worker;
 pub(crate) use finder::worker as finder_worker;
 pub(crate) use mutation::worker as mutation_worker;

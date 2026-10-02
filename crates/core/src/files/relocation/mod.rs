@@ -1,4 +1,5 @@
 //! Same-filesystem path-based relocation with observations and conservative receipts.
+pub mod batch;
 mod context;
 mod model;
 mod validation;
