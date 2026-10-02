@@ -1,19 +1,45 @@
-//! Read-only relocation planning; platform namespace changes are not performed here.
+//! Same-filesystem path-based relocation with observations and conservative receipts.
 mod context;
 mod model;
 mod validation;
+mod receipt;
+mod operation;
+mod verification;
 use crate::files::*;
 pub use model::*;
+pub use operation::execute;
+pub use receipt::*;
 use std::fs::{File, Metadata};
 use std::path::{Path, PathBuf};
 pub use validation::rename_destination;
 
-/// Metadata-only hooks for a relocation plan; no platform APIs enter core.
+/// Platform hooks for observations and one guarded rename; no native APIs enter core.
 pub trait RelocationPlatform: FilePlatform {
     /// Open a directory without following links or materializing data.
     fn open_directory(&self, path: &Path) -> Result<File, FileError>;
     /// Compare observed filesystem devices, not inferred identity-string formatting.
     fn same_filesystem(&self, source: &Metadata, destination_parent: &Metadata) -> bool;
+    /// Establish guarded/exclusive rename support without changing selected objects.
+    fn prepare_rename(
+        &self,
+        _parent: &Path,
+        _receipt: &RelocationReceipt,
+    ) -> Result<(), FileError> {
+        Err(FileError::new(
+            FileErrorCode::Unavailable,
+            "guarded rename unavailable",
+        ))
+    }
+    /// Submit one root-relative exclusive rename; this is not source-inode CAS.
+    fn rename(&self, _root: &File, _request: &RelocationRequest) -> RenameOutcome {
+        RenameOutcome {
+            result: Err(FileError::new(
+                FileErrorCode::Unavailable,
+                "guarded rename unavailable",
+            )),
+            renamed: Some(false),
+        }
+    }
 }
 
 /// Describe a proposed move/rename without changing names, contents or metadata.
@@ -23,6 +49,14 @@ pub fn plan(
 ) -> Result<RelocationPlan, FileError> {
     validation::validate(request)?;
     let context = context::Context::prepare(platform, request)?;
+    build_plan(platform, request, &context)
+}
+
+fn build_plan<P: RelocationPlatform>(
+    platform: &P,
+    request: &RelocationRequest,
+    context: &context::Context<'_, P>,
+) -> Result<RelocationPlan, FileError> {
     let destination_before = context.destination(request)?;
     let destination_path = context.destination_path(request)?;
     let result = RelocationPlan {

@@ -576,6 +576,8 @@ Use `files preview pdf/image/thumbnail --root /absolute/directory --path relativ
 
 Use `files mkdir` or `files copy` for an explicitly selected no-overwrite creation/copy, with observed source/parent revision guards. Objects are privately staged before guarded atomic publication; the selected root must share the receipt storage filesystem. Failed operations can retain private staged content or a published destination; read saved evidence with `files receipt --operation-id` and inspect both before retrying. See [file mutations](docs/files-mutations.md) for supported metadata, outcomes and remaining management work.
 
+Use `files rename/move` for a selected same-volume entry, with no overwrite or cross-volume copy/delete fallback. `--dry-run` observes proposals; `files relocation receipt` reads saved evidence. Source versions are preflight checks, not atomic inode locks. See [file relocation](docs/files-relocation.md) for concurrency and interruption limits.
+
 `files tags read/add/remove/receipt` reads exact Finder tag names/colors and supports atomic initial tagging only when the raw tag attribute is absent. Existing-attribute additions/removals are rejected; only no-op requests remain supported on existing tags. See [file tags](docs/files-tags.md) for supported representations, legacy-label/hardlink limits, receipts and concurrency boundaries.
 
 Use `files cloud status --root /absolute/directory --path relative/file` for per-field iCloud state. `files cloud download` explicitly submits a version-guarded iCloud file download; submission does not verify completion, and other provider state remains unknown. See [cloud state and downloads](docs/files-cloud.md).

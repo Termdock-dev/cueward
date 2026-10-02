@@ -7,8 +7,8 @@ pub(super) struct Observed {
     pub info: FileInfo,
 }
 pub(super) struct Context<'a, P: RelocationPlatform> {
-    scope: Scope<'a, P>,
-    root: File,
+    pub(super) scope: Scope<'a, P>,
+    pub(super) root: File,
     pub root_info: FileInfo,
     pub source: Observed,
     pub source_parent: Observed,

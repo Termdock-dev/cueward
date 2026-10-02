@@ -105,6 +105,10 @@ pub(crate) enum Command {
     #[command(hide = true)]
     FilesTagsWorker,
     #[command(hide = true)]
+    FilesRelocationWorker,
+    #[command(hide = true)]
+    FilesRelocationPlanWorker,
+    #[command(hide = true)]
     FilesTagsReadWorker,
     /// Discover, launch, and explore macOS applications without requesting activation.
     App {
@@ -264,6 +268,8 @@ pub(crate) fn dispatch(command: Command) {
         Command::FilesCloudWorker => files::cloud_worker(),
         Command::FilesPreviewWorker => files::preview_worker(),
         Command::FilesMutationWorker => files::mutation_worker(),
+        Command::FilesRelocationWorker => files::relocation_worker(),
+        Command::FilesRelocationPlanWorker => files::relocation_plan_worker(),
         Command::FilesTagsWorker => files::tags_worker(),
         Command::FilesTagsReadWorker => files::tags_read_worker(),
         Command::App { action } => app::dispatch(action),
