@@ -23,6 +23,10 @@ mod mutation;
 mod tags;
 #[path = "files_cli/cancellation.rs"]
 mod cancellation;
+#[path = "files_cli/relocation.rs"]
+mod relocation;
+#[path = "files_cli/relocation_cancellation.rs"]
+mod relocation_cancellation;
 
 fn command() -> Command {
     Command::new(env!("CARGO_BIN_EXE_cueward"))

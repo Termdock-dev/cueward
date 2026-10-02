@@ -3,6 +3,7 @@ mod listing;
 mod metadata;
 mod model;
 pub mod mutation;
+pub mod relocation;
 pub mod tags;
 mod reading;
 mod scope;

@@ -8,6 +8,8 @@ mod tags;
 
 #[path = "files_mutation.rs"]
 mod mutation;
+#[path = "files_relocation.rs"]
+mod relocation;
 
 #[path = "files_preview.rs"]
 mod preview;
@@ -63,6 +65,15 @@ pub(crate) enum FilesAction {
     Tags {
         #[command(subcommand)]
         action: tags::TagsCommand,
+    },
+    /// Rename one same-volume entry without overwriting; source identity is checked, not locked.
+    Rename(relocation::RenameArgs),
+    /// Move one entry on the same volume; never copy then delete.
+    Move(relocation::MoveArgs),
+    /// Inspect saved move/rename evidence only.
+    Relocation {
+        #[command(subcommand)]
+        action: relocation::RelocationCommand,
     },
     /// Create one empty directory without replacing existing entries.
     Mkdir(mutation::MkdirArgs),
@@ -143,7 +154,10 @@ pub(crate) struct ReadArgs {
 impl FilesAction {
     fn request(self) -> Result<(FileRequest, u64), FileError> {
         let (scope, action) = match self {
-            Self::Tags { .. }
+            Self::Rename(_)
+            | Self::Move(_)
+            | Self::Relocation { .. }
+            | Self::Tags { .. }
             | Self::Finder { .. }
             | Self::Spotlight(_)
             | Self::Cloud { .. }
@@ -219,6 +233,9 @@ impl ReadArgs {
 /// Dispatch a user command through a deadline-controlled worker.
 pub(crate) fn dispatch(action: FilesAction) {
     let action = match action {
+        FilesAction::Rename(args) => return relocation::rename(args),
+        FilesAction::Move(args) => return relocation::move_entry(args),
+        FilesAction::Relocation { action } => return relocation::receipt(action),
         FilesAction::Tags { action } => return tags::dispatch(action),
         FilesAction::Mkdir(args) => return mutation::mkdir(args),
         FilesAction::Copy(args) => return mutation::copy(args),
@@ -286,6 +303,8 @@ pub(super) fn output<T: serde::Serialize>(source: &str, result: Result<T, FileEr
 pub(crate) use cloud::worker as cloud_worker;
 pub(crate) use finder::worker as finder_worker;
 pub(crate) use mutation::worker as mutation_worker;
+pub(crate) use relocation::worker as relocation_worker;
+pub(crate) use relocation::plan_worker as relocation_plan_worker;
 pub(crate) use preview::worker as preview_worker;
 pub(crate) use spotlight::worker as spotlight_worker;
 pub(crate) use tags::read_worker as tags_read_worker;

@@ -42,3 +42,7 @@ This document serves as the contextual memory for any Agent working on the Cuewa
 - **Context**: Automatically categorizing and tagging incoming Cues based on user-defined domains (e.g., `#Rust`, `#Finance`).
 - **Decision**: Use the Aho-Corasick automaton algorithm (via the `aho-corasick` or `regex` crate in Rust) for multi-pattern string search during the ingestion phase.
 - **Reasoning**: Using LLMs to categorize every single scraped paragraph is incredibly slow and expensive. Aho-Corasick allows Cueward to scan millions of characters against thousands of keywords simultaneously in milliseconds (O(N) time complexity). This acts as an "Edge Compute Router," instantly tagging 80% of the content locally and reserving the expensive LLM API calls only for complex reasoning and summarization.
+
+## 7. Same-volume relocation: no overwrite, explicit concurrency limit
+
+For #42, the user accepted protection focused on deletion/overwriting rather than requiring atomic source-identity compare-and-swap. Same-volume rename/move use guarded exclusive root-relative Darwin rename, without payload staging, destination replacement or a copy-then-delete fallback. Observed source/parent versions narrow races but cannot condition the kernel call on the selected source inode. Post-check mismatches preserve actual observations as incomplete evidence without rollback/retry. Cross-volume removal, trash and existing-tag replacement remain separate work. See [file relocation](files-relocation.md) for the command and receipt contract.
