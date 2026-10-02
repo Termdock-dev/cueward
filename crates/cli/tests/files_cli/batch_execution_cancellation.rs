@@ -1,6 +1,7 @@
 //! Parent interruption must prevent a delayed writer from creating its destination.
 use super::*;
-use cueward_adapter_macos::files::relocation::{self, RelocationAction, RelocationRequest};
+use cueward_adapter_macos::files::batch_execution;
+use cueward_adapter_macos::files::batch_rename::BatchRenameRequest;
 
 #[test]
 fn cancellation_parent_helper() {
@@ -8,8 +9,8 @@ fn cancellation_parent_helper() {
         return;
     };
     let value: Value = serde_json::from_slice(&fs::read(config).unwrap()).unwrap();
-    let request: RelocationRequest = serde_json::from_value(value["request"].clone()).unwrap();
-    let _ = relocation::run(
+    let request: BatchRenameRequest = serde_json::from_value(value["request"].clone()).unwrap();
+    let _ = batch_execution::run(
         Path::new(value["worker"].as_str().unwrap()),
         &request,
         30000,
@@ -23,48 +24,42 @@ fn cancellation_worker_helper() {
     };
     let config = Path::new(&config);
     let directory = config.parent().unwrap();
-    let request = relocation::read_supervised_request().unwrap();
+    let request = batch_execution::read_supervised_request().unwrap();
     fs::write(directory.join("ready"), std::process::id().to_string()).unwrap();
     wait_for(|| directory.join("release").exists());
     // If the lifetime monitor fails, this would perform the actual filesystem mutation.
-    relocation::execute_worker(&request).unwrap();
+    batch_execution::execute_worker(&request).unwrap();
 }
 
 use super::cancellation::wait_for;
-fn prepare(root: &Path, action: &str) -> RelocationRequest {
+fn prepare(root: &Path, _action: &str) -> BatchRenameRequest {
     fs::write(root.join("source"), b"owned source bytes").unwrap();
-    let parent = super::mutation::version(root, ".");
-    let action = if action == "rename" {
-        RelocationAction::Rename
-    } else {
-        RelocationAction::Move
-    };
-    RelocationRequest {
+    BatchRenameRequest {
         root: root.into(),
-        path: "source".into(),
-        expected_version: super::mutation::version(root, "source"),
-        destination: "destination".into(),
-        expected_parent_version: parent,
-        action,
+        entries: vec![
+            serde_json::from_str(&super::batch_rename::entry(root, "source", "destination"))
+                .unwrap(),
+        ],
     }
 }
+
 fn interrupt_delayed(action: &str, signal: &str, armed: bool) {
     let fixture = tempfile::tempdir().unwrap();
     let root = fixture.path().join("root");
     fs::create_dir(&root).unwrap();
     let request = prepare(&root, action);
     super::cancellation_harness::Harness {
-        module: "relocation_cancellation",
-        worker: "files-relocation-worker",
-        namespace: "files-relocation",
-        lookup: "relocation",
+        module: "batch_execution_cancellation",
+        worker: "files-batch-rename-worker",
+        namespace: "files-batch-rename",
+        lookup: "rename-batch",
     }
     .interrupt(fixture.path(), &root, &request, signal, armed);
 }
 
 #[test]
-fn parent_interruption_prevents_delayed_rename_and_move() {
-    for action in ["rename", "move"] {
+fn batch_execute_parent_interruption_prevents_delayed_writer() {
+    for action in ["batch rename"] {
         for signal in ["-INT", "-TERM", "-KILL"] {
             interrupt_delayed(action, signal, false);
         }
@@ -72,8 +67,8 @@ fn parent_interruption_prevents_delayed_rename_and_move() {
 }
 
 #[test]
-fn parent_death_stops_an_armed_mutation_worker() {
-    for action in ["rename", "move"] {
+fn batch_execute_parent_death_stops_armed_writer() {
+    for action in ["batch rename"] {
         for signal in ["-INT", "-TERM", "-KILL"] {
             interrupt_delayed(action, signal, true);
         }

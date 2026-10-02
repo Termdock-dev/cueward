@@ -315,6 +315,7 @@ pub(super) fn output<T: serde::Serialize>(source: &str, result: Result<T, FileEr
     }
 }
 
+pub(crate) use batch_rename::execute_worker as batch_rename_execute_worker;
 pub(crate) use batch_rename::worker as batch_rename_plan_worker;
 pub(crate) use cloud::worker as cloud_worker;
 pub(crate) use finder::worker as finder_worker;
