@@ -1,7 +1,8 @@
-//! Bounded, explicitly scoped filesystem reads with platform identity/open hooks.
+//! Scoped filesystem reads and no-overwrite mutations with platform identity/open hooks.
 mod listing;
 mod metadata;
 mod model;
+pub mod mutation;
 mod reading;
 mod scope;
 mod search;
