@@ -111,7 +111,9 @@ fn reject_conflicts(
     for item in &mut plan.items {
         receipt.items[start + item.index].error = item.error.take();
     }
-    receipt.issues = std::mem::take(&mut plan.issues);
+    let issues = std::mem::take(&mut plan.issues);
+    receipt.omitted_issue_count = issues.len().saturating_sub(MAX_STORED_BATCH_ISSUES);
+    receipt.issues = issues.into_iter().take(MAX_STORED_BATCH_ISSUES).collect();
     for issue in &mut receipt.issues {
         for index in &mut issue.entries {
             *index += start;

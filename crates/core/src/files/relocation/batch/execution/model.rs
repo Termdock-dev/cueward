@@ -3,6 +3,9 @@ use crate::files::relocation::{RelocationReceipt, RelocationStatus};
 use crate::files::{FileError, FileErrorCode, FileInfo};
 use serde::{Deserialize, Serialize};
 
+/// Keep quadratic conflict diagnostics from exhausting the bounded aggregate store.
+pub const MAX_STORED_BATCH_ISSUES: usize = 128;
+
 /// Aggregate progress; individual native evidence stays in relocation receipts.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BatchExecutionReceipt {
@@ -16,6 +19,9 @@ pub struct BatchExecutionReceipt {
     pub active_index: Option<usize>,
     pub items: Vec<BatchExecutionItem>,
     pub issues: Vec<BatchRenameIssue>,
+    /// Omitted diagnostics, not omitted inputs; older receipts kept their full issue list.
+    #[serde(default)]
+    pub omitted_issue_count: usize,
     pub error: Option<FileError>,
 }
 /// A pending item has no child ID; an allocated child is never replayed.
@@ -56,6 +62,7 @@ impl BatchExecutionReceipt {
             active_index: None,
             items,
             issues: Vec::new(),
+            omitted_issue_count: 0,
             error: None,
         }
     }
@@ -68,6 +75,7 @@ impl BatchExecutionReceipt {
             || self.active_index.is_some()
             || self.error.is_some()
             || !self.issues.is_empty()
+            || self.omitted_issue_count != 0
             || self.items.len() != self.request.entries.len()
             || self.items.iter().enumerate().any(|(index, item)| {
                 item.index != index
@@ -122,3 +130,7 @@ impl BatchExecutionReceipt {
         self.error = Some(error);
     }
 }
+
+#[cfg(test)]
+#[path = "model_tests.rs"]
+mod tests;
