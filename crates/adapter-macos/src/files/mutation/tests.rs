@@ -5,6 +5,8 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 mod failures;
 #[path = "relocation_tests.rs"]
 mod relocation;
+#[path = "boundary_tests.rs"]
+mod boundary;
 
 fn fixture() -> (tempfile::TempDir, MutationRequest) {
     let root = tempfile::tempdir().unwrap();
