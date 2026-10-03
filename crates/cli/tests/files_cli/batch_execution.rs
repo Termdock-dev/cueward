@@ -4,7 +4,7 @@ use cueward_adapter_macos::files::batch_execution;
 use cueward_adapter_macos::files::batch_rename::BatchRenameRequest;
 use std::os::unix::fs::PermissionsExt;
 
-fn execute(root: &Path, entries: &[String], success: bool) -> Value {
+pub(super) fn execute(root: &Path, entries: &[String], success: bool) -> Value {
     let mut command = command();
     command
         .args(["files", "rename-batch", "execute", "--root"])

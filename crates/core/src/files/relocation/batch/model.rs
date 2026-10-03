@@ -13,6 +13,9 @@ pub struct BatchRenameEntry {
     pub name: String,
     pub expected_version: String,
     pub expected_parent_version: String,
+    /// Rename only this leaf symlink object; missing/false keeps legacy link rejection.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub link_itself: bool,
 }
 
 /// Bounded read-only proposals under one selected root, in input order.
@@ -61,4 +64,8 @@ pub struct BatchRenamePlan {
     pub issues: Vec<BatchRenameIssue>,
     pub has_conflicts: bool,
     pub execution_supported: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }

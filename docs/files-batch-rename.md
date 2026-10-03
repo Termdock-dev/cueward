@@ -1,10 +1,10 @@
 # Read-only batch rename plans
 
-`files rename-batch plan` adds a planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Check installed command help; the separate execution capability is pending review. Planning does not rename anything; authorized independent batches use the separate [execution command](files-batch-execution.md).
+`files rename-batch plan` adds a planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Check installed command help. New [per-entry link-object selection](files-batch-link-rename.md) is pending review. Planning does not rename anything; authorized independent batches use the separate [execution command](files-batch-execution.md).
 
 ## Explicit proposals
 
-Observe each selected source and its existing parent using `files info`. Supply one absolute root and repeat `--entry` with a JSON object containing exactly four required fields: relative `path`, exact new leaf `name`, source `expected_version` and parent `expected_parent_version`.
+Observe each selected source and its existing parent using `files info`. Supply one absolute root and repeat `--entry` with a JSON object containing four required fields: relative `path`, exact new leaf `name`, source `expected_version` and parent `expected_parent_version`.
 
 ```bash
 cueward files info --root /absolute/directory --path report.txt
@@ -19,7 +19,7 @@ Do not concatenate unescaped filenames into JSON; use a JSON serializer. Entries
 
 There must be 1..64 entries and the entire serialized root/entries worker request must fit 16 KiB, including escaping and JSON structure. The count ceiling does not promise that all 64 entries fit. Unknown JSON fields, missing fields, wrong types or malformed entry JSON fail the outer request. `--timeout-ms` defaults to 10000, range 1..30000, for one worker's entire batch; it is not a per-item allowance. Parent-side argument parsing is outside this deadline.
 
-Available regular files, directories, packages and hardlinked entries use the existing [relocation planning contract](files-relocation.md). Contents are not recursively inspected or hashed. Source links, link traversal, Finder aliases/unknown alias state, placeholders/unknown availability and special files remain unsupported. Existing destination leaf links are observed as conflicts, not followed. No payload or selected metadata writes, Finder activation, provider downloads or mutation receipts are requested. Read-only process transport can use private temporary files outside the selected root.
+Available regular files, directories, packages and hardlinked entries use the existing [relocation planning contract](files-relocation.md). Contents are not recursively inspected or hashed. Source links remain unsupported by default; the new optional per-entry boolean `link_itself=true` requires a leaf symlink and uses the [explicit link-object contract](files-batch-link-rename.md). Intermediate link traversal, Finder aliases/unknown alias state, placeholders/unknown availability and special files remain unsupported. Existing destination leaf links are observed as conflicts, not followed. No payload or selected metadata writes, Finder activation, provider downloads or mutation receipts are requested. Read-only process transport can use private temporary files outside the selected root.
 
 ## JSON and exit semantics
 

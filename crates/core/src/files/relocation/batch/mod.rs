@@ -93,7 +93,7 @@ fn observe(
             expected_version: entry.expected_version.clone(),
             expected_parent_version: entry.expected_parent_version.clone(),
             action: RelocationAction::Rename,
-            link_itself: false,
+            link_itself: entry.link_itself,
         },
     )?;
     if proposal.root.path != root.path

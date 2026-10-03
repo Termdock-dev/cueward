@@ -13,6 +13,9 @@ enum Change {
     Parent,
     Alias(std::path::PathBuf, std::path::PathBuf),
     Final,
+    PendingLink,
+    FinalLink,
+    LinkTarget(std::path::PathBuf),
     Rejected,
     Unknown,
     Pause(std::path::PathBuf),
@@ -39,6 +42,9 @@ impl BatchRenamePlatform for Racing {
     }
 }
 impl RelocationPlatform for Racing {
+    fn open_symlink(&self, p: &Path) -> Result<File, FileError> {
+        RelocationPlatform::open_symlink(&MacFiles, p)
+    }
     fn open_directory(&self, p: &Path) -> Result<File, FileError> {
         RelocationPlatform::open_directory(&MacFiles, p)
     }
@@ -68,6 +74,11 @@ impl RelocationPlatform for Racing {
         assert_eq!(outcome.renamed, Some(true));
         if count == 1 {
             match &self.change {
+                Change::PendingLink => {
+                    fs::rename(self.root.join("b"), self.root.join("saved-pending")).unwrap();
+                    symlink("replacement", self.root.join("b")).unwrap();
+                }
+                Change::LinkTarget(target) => fs::write(target, b"OWNED changed target").unwrap(),
                 Change::Source => fs::write(self.root.join("b"), b"OWNED changed").unwrap(),
                 Change::Target => {
                     fs::write(self.root.join("other"), b"OWNED external target").unwrap()
@@ -88,6 +99,10 @@ impl RelocationPlatform for Racing {
         }
         if count == 2 && matches!(self.change, Change::Final) {
             fs::write(self.root.join("new"), b"OWNED externally changed result").unwrap();
+        }
+        if count == 2 && matches!(self.change, Change::FinalLink) {
+            fs::rename(self.root.join("new"), self.root.join("saved-completed")).unwrap();
+            symlink("replacement", self.root.join("new")).unwrap();
         }
         outcome
     }
@@ -260,3 +275,63 @@ fn batch_execute_child_anchor_mismatch_refuses_native_submission_with_valid_sour
 
 #[path = "batch_execution_lifetime_tests.rs"]
 mod lifetime;
+
+#[test]
+fn batch_link_races_stop_on_object_changes_but_ignore_unselected_target_changes() {
+    for change_kind in 0..3 {
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let target = outside.path().join("PRIVATE");
+        fs::write(&target, b"OWNED target").unwrap();
+        symlink(&target, root.path().join("a")).unwrap();
+        symlink("missing", root.path().join("b")).unwrap();
+        let mut request = request(root.path(), &[("a", "new"), ("b", "other")]);
+        for entry in &mut request.entries {
+            entry.link_itself = true;
+        }
+        let platform = Racing {
+            root: root.path().into(),
+            calls: Cell::new(0),
+            change: match change_kind {
+                0 => Change::PendingLink,
+                1 => Change::FinalLink,
+                _ => Change::LinkTarget(target.clone()),
+            },
+        };
+        let r = perform(&platform, &request);
+        if change_kind == 2 {
+            assert_eq!(r.status, RelocationStatus::Completed, "{:?}", r.error);
+            assert!(r.completion_verified);
+            assert_eq!(fs::read(&target).unwrap(), b"OWNED changed target");
+            assert_eq!(fs::read_link(root.path().join("new")).unwrap(), target);
+        } else {
+            assert_eq!(r.status, RelocationStatus::Incomplete, "{:?}", r.error);
+            assert!(!r.completion_verified && r.items[0].completion_verified);
+            assert_eq!(fs::read(&target).unwrap(), b"OWNED target");
+            if change_kind == 0 {
+                assert_eq!(platform.calls.get(), 1);
+                assert!(r.items[1].operation_id.is_none());
+                assert_eq!(
+                    fs::read_link(root.path().join("b")).unwrap(),
+                    Path::new("replacement")
+                );
+                assert_eq!(
+                    fs::read_link(root.path().join("saved-pending")).unwrap(),
+                    Path::new("missing")
+                );
+            } else {
+                assert_eq!(platform.calls.get(), 2);
+                assert!(r.items[1].completion_verified);
+                assert_eq!(
+                    fs::read_link(root.path().join("saved-completed")).unwrap(),
+                    target
+                );
+                assert_eq!(
+                    fs::read_link(root.path().join("new")).unwrap(),
+                    Path::new("replacement")
+                );
+            }
+        }
+        cleanup(&r);
+    }
+}

@@ -11,6 +11,7 @@ fn fresh() -> BatchExecutionReceipt {
                 name: "new".into(),
                 expected_version: "source".into(),
                 expected_parent_version: "parent".into(),
+                link_itself: false,
             }],
         },
     )

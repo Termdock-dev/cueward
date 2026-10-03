@@ -89,10 +89,24 @@ fn launch(directory: &Path, request: &BatchRenameRequest) -> Processes {
         group: None,
     }
 }
-fn interrupt(signal: &str) {
+fn interrupt(signal: &str, links: bool) {
     let root = fixture();
     let transport = tempfile::tempdir().unwrap();
-    let request = request(root.path(), &[("a", "new"), ("b", "other")]);
+    let outside = tempfile::tempdir().unwrap();
+    let target = outside.path().join("PRIVATE");
+    fs::write(&target, b"OWNED outside").unwrap();
+    let target_before = MacFiles.stamp(&fs::metadata(&target).unwrap());
+    if links {
+        fs::remove_file(root.path().join("a")).unwrap();
+        fs::remove_file(root.path().join("b")).unwrap();
+        symlink(&target, root.path().join("a")).unwrap();
+        symlink("missing", root.path().join("b")).unwrap();
+    }
+    let inode = fs::symlink_metadata(root.path().join("a")).unwrap().ino();
+    let mut request = request(root.path(), &[("a", "new"), ("b", "other")]);
+    for entry in &mut request.entries {
+        entry.link_itself = links;
+    }
     let mut processes = launch(transport.path(), &request);
     wait_for(|| transport.path().join("ready").exists());
     processes.group = Some(fs::read_to_string(transport.path().join("group")).unwrap());
@@ -126,14 +140,39 @@ fn interrupt(signal: &str) {
     assert!(!receipt.completion_verified && receipt.items[0].mutation_attempted);
     assert_eq!(receipt.items[0].renamed, None);
     assert!(receipt.items[1].operation_id.is_none());
-    assert_eq!(fs::read(root.path().join("new")).unwrap(), b"OWNED a\0");
-    assert_eq!(fs::read(root.path().join("b")).unwrap(), b"OWNED b\0");
-    assert!(!root.path().join("a").exists() && !root.path().join("other").exists());
+    assert_eq!(
+        fs::symlink_metadata(root.path().join("new")).unwrap().ino(),
+        inode
+    );
+    if links {
+        assert_eq!(fs::read_link(root.path().join("new")).unwrap(), target);
+        assert_eq!(
+            fs::read_link(root.path().join("b")).unwrap(),
+            Path::new("missing")
+        );
+        assert_eq!(
+            MacFiles.stamp(&fs::metadata(&target).unwrap()),
+            target_before
+        );
+        assert_eq!(fs::read(&target).unwrap(), b"OWNED outside");
+    } else {
+        assert_eq!(fs::read(root.path().join("new")).unwrap(), b"OWNED a\0");
+        assert_eq!(fs::read(root.path().join("b")).unwrap(), b"OWNED b\0");
+    }
+    assert!(fs::symlink_metadata(root.path().join("a")).is_err());
+    assert!(fs::symlink_metadata(root.path().join("other")).is_err());
     cleanup(&receipt);
 }
 #[test]
 fn batch_execute_parent_death_after_first_native_rename_preserves_partial_evidence() {
     for signal in ["-INT", "-TERM", "-KILL"] {
-        interrupt(signal);
+        interrupt(signal, false);
+    }
+}
+
+#[test]
+fn batch_link_parent_death_after_first_native_rename_preserves_partial_evidence_and_targets() {
+    for signal in ["-INT", "-TERM", "-KILL"] {
+        interrupt(signal, true);
     }
 }

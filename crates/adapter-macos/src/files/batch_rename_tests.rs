@@ -30,6 +30,7 @@ pub(super) fn request(root: &Path, proposals: &[(&str, &str)]) -> BatchRenameReq
                     expected_parent_version: super::super::observe(root, parent, false, None)
                         .unwrap()
                         .version,
+                    link_itself: false,
                 }
             })
             .collect(),

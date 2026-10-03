@@ -1,6 +1,6 @@
 # Same-volume rename and move
 
-`files rename`, `files move`, their `--dry-run` plans and `files relocation receipt` implement another slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Check the installed CLI's help before using it. The new [explicit symlink-object option](files-link-relocation.md) is pending review. Use only the user's authorized source, new name/destination and absolute root.
+`files rename`, `files move`, their `--dry-run` plans and `files relocation receipt` implement another slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Check the installed CLI's help before using it. The [explicit symlink-object option](files-link-relocation.md) was merged in PR #64. Use only the user's authorized source, new name/destination and absolute root.
 
 ## Select paths and observe versions
 

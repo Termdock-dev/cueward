@@ -29,6 +29,7 @@ fn request(root: &Path, entries: &[(&str, &str)]) -> BatchRenameRequest {
                     expected_parent_version: super::super::observe(root, parent, false, None)
                         .unwrap()
                         .version,
+                    link_itself: false,
                 }
             })
             .collect(),
@@ -215,3 +216,6 @@ fn batch_execute_rejects_malformed_or_progressed_records_before_any_child() {
 
 #[path = "batch_execution_conflict_tests.rs"]
 mod conflicts;
+
+#[path = "batch_link_tests.rs"]
+mod links;

@@ -37,6 +37,7 @@ fn batch_rename_plan_exposes_no_execution_or_overwrite_flags() {
         vec!["--execute"],
         vec!["--overwrite"],
         vec!["--follow-links"],
+        vec!["--link-itself"],
         vec!["--timeout-ms", "0"],
         vec!["--timeout-ms", "30001"],
     ] {
@@ -102,6 +103,8 @@ fn batch_execute_and_receipt_parse_without_overwrite_replay_or_plan_input() {
     for flags in [
         vec!["--overwrite"],
         vec!["--resume"],
+        vec!["--link-itself"],
+        vec!["--follow-links"],
         vec!["--plan", "saved.json"],
         vec!["--timeout-ms", "0"],
     ] {
@@ -119,4 +122,31 @@ fn batch_execute_and_receipt_parse_without_overwrite_replay_or_plan_input() {
         .is_ok()
     );
     assert!(Cli::try_parse_from(["cueward", "files", "rename-batch", "receipt"]).is_err());
+}
+
+#[test]
+fn batch_rename_json_requires_explicit_boolean_permission_for_each_link() {
+    let base = serde_json::json!({"path":"link","name":"new","expected_version":"s","expected_parent_version":"p"});
+    let mut selected = base.clone();
+    selected["link_itself"] = true.into();
+    let mut unselected = base.clone();
+    unselected["link_itself"] = false.into();
+    let entries = parse_entries(&[
+        base.to_string(),
+        selected.to_string(),
+        unselected.to_string(),
+    ])
+    .unwrap();
+    assert!(!entries[0].link_itself && entries[1].link_itself && !entries[2].link_itself);
+    for value in [
+        serde_json::json!("true"),
+        serde_json::json!(null),
+        serde_json::json!(1),
+    ] {
+        selected["link_itself"] = value;
+        assert_eq!(
+            parse_entries(&[selected.to_string()]).unwrap_err().code,
+            FileErrorCode::InvalidOptions
+        );
+    }
 }

@@ -11,7 +11,8 @@ use cueward_core::files::relocation::batch::MAX_BATCH_RENAMES;
 pub(crate) struct BatchRenameArgs {
     #[arg(long)]
     root: PathBuf,
-    /// Repeat one JSON object with path, name, expected_version and expected_parent_version.
+    /// Repeat JSON with path, name, expected_version and expected_parent_version;
+    /// optional link_itself=true selects only a symlink.
     #[arg(long = "entry", required = true, action = clap::ArgAction::Append)]
     entries: Vec<String>,
     #[arg(long, default_value_t = 10000, value_parser=clap::value_parser!(u64).range(1..=30000))]
