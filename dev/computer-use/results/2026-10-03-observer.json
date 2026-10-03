@@ -1,0 +1,21 @@
+{
+  "kind": "read_only_diagnostic",
+  "date": "2026-10-03",
+  "timezone": "Asia/Taipei",
+  "macos": "27.0.1",
+  "architecture": "arm64",
+  "requested_interval_ms": 20,
+  "execution_duration_ms": 1007.4,
+  "execution_sample_count": 54,
+  "online_display_count": 3,
+  "whole_trace_max_gap_ms": 25.3,
+  "whole_trace_max_desktop_read_ms": 5.4,
+  "observation_error_count": 0,
+  "foreground_distinct_count": 1,
+  "visible_space_map_distinct_count": 1,
+  "pointer_distinct_count": 17,
+  "receiver_still_inactive": true,
+  "helper_finished_reason": "stopped",
+  "stationary_pointer_check": "failed",
+  "limitations": "Read-only receiver/observer smoke, not fresh-agent task acceptance. Pointer changes are unattributed. No physical isolation or sub-sample transient guarantee. Raw evidence stays local."
+}

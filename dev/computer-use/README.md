@@ -2,6 +2,8 @@
 
 For the separate fresh-agent task preparation and result checker, see the [task acceptance framework](task-acceptance.md). Benchmark/probe outcomes are not fresh-agent task acceptance results.
 
+The [read-only desktop observer](desktop-observer.md) supplies timestamped task intervals, per-online-display visible Spaces, foreground/pointer samples and receiver activation events. It remains separate from task execution and independent artifact checks.
+
 Run on an unlocked macOS desktop with Accessibility and Screen Recording permissions:
 
 ```sh
