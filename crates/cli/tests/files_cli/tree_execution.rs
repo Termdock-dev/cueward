@@ -113,7 +113,7 @@ fn tree_execute_cli_real_worker_publishes_verified_tree_and_typed_saved_receipt(
     cleanup(&receipt);
 }
 #[test]
-fn tree_execute_cli_blockers_exit_nonzero_with_saved_not_started_evidence() {
+fn tree_execute_cli_copies_links_and_keeps_blockers_as_saved_failed_evidence() {
     for case in ["existing", "link", "budget"] {
         let root = fixture();
         match case {
@@ -125,13 +125,23 @@ fn tree_execute_cli_blockers_exit_nonzero_with_saved_not_started_evidence() {
         }
         let receipt = execute(
             root.path(),
-            false,
+            case == "link",
             if case == "budget" {
                 &["--max-entries", "1"]
             } else {
                 &[]
             },
         );
+        if case == "link" {
+            assert_eq!(receipt["status"], "completed");
+            assert_eq!(
+                fs::read_link(root.path().join("副本\n<external>/broken")).unwrap(),
+                Path::new("missing")
+            );
+            lookup(&receipt);
+            cleanup(&receipt);
+            continue;
+        }
         assert_eq!(receipt["status"], "not_started");
         assert_eq!(receipt["completion_verified"], false);
         assert_eq!(receipt["mutation_attempted"], false);

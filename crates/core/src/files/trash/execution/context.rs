@@ -6,6 +6,7 @@ pub(super) struct Context<'a, P: TrashPlatform> {
     pub plan: TrashPlan,
     pub root: File,
     pub source: File,
+    pub parent: File,
     pub trash: File,
     pub trash_info: FileInfo,
 }
@@ -14,7 +15,8 @@ impl<'a, P: TrashPlatform> Context<'a, P> {
         let plan = super::super::plan(platform, &receipt.request.plan_request())?;
         supported(&plan, &receipt.request)?;
         let root = platform.open_directory(Path::new(&plan.root.path))?;
-        let source = platform.open_regular(Path::new(&plan.source.path))?;
+        let parent = platform.open_directory(Path::new(&plan.source_parent.path))?;
+        let source = platform.open_object(&plan.source)?;
         platform.validate_copy_source(&source, &plan.source)?;
         let trash_path = platform.trash_directory(&plan.source)?;
         let trash = platform.open_directory(&trash_path)?;
@@ -34,6 +36,7 @@ impl<'a, P: TrashPlatform> Context<'a, P> {
             plan,
             root,
             source,
+            parent,
             trash,
             trash_info,
         };
@@ -66,7 +69,9 @@ impl<'a, P: TrashPlatform> Context<'a, P> {
     }
     pub(super) fn revalidate(&self, receipt: &TrashReceipt) -> Result<(), FileError> {
         let fresh = super::super::plan(self.platform, &receipt.request.plan_request())?;
-        supported(&fresh, &receipt.request)?;
+        let mut effective = receipt.request.clone();
+        effective.expected_parent_version = self.plan.source_parent.version.clone();
+        supported(&fresh, &effective)?;
         if fresh.root.path != self.plan.root.path
             || fresh.root.version != self.plan.root.version
             || fresh.source.path != self.plan.source.path
@@ -99,23 +104,27 @@ impl<'a, P: TrashPlatform> Context<'a, P> {
     }
 }
 fn supported(plan: &TrashPlan, request: &TrashRequest) -> Result<(), FileError> {
-    if plan.target_kind != TrashTargetKind::RegularFile
-        || plan.resources.is_package != (ResourceValue::Available { value: false })
-        || plan.resources.is_alias_file != (ResourceValue::Available { value: false })
-        || plan.root.data_state != DataState::NotDataless
+    if !matches!(
+        plan.target_kind,
+        TrashTargetKind::RegularFile
+            | TrashTargetKind::Directory
+            | TrashTargetKind::PackageDirectory
+            | TrashTargetKind::Symlink
+            | TrashTargetKind::FinderAlias
+    ) || plan.root.data_state != DataState::NotDataless
         || plan.source_parent.data_state != DataState::NotDataless
         || plan.source.data_state != DataState::NotDataless
     {
         return Err(FileError::new(
             FileErrorCode::UnsupportedType,
-            "trash execution accepts only known available ordinary files, not packages, aliases, links or unknown availability",
+            "trash execution requires a known available file, directory, package, alias or symlink object",
         ));
     }
     check_version(
         &Some(request.expected_parent_version.clone()),
         &plan.source_parent.version,
     )?;
-    if plan.source.size > request.max_bytes {
+    if plan.source.kind != FileKind::Directory && plan.source.size > request.max_bytes {
         return Err(FileError::new(
             FileErrorCode::ScanLimit,
             "source exceeds backup max-bytes",

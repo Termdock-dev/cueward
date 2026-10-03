@@ -1,50 +1,38 @@
-//! Refuse stale-snapshot replacements; only absence can be guarded atomically.
+//! Observed revision guards preserve detected external edits; replacement is explicitly non-CAS.
 use super::tests::{direct, fixture, refresh};
 use super::*;
 use cueward_core::files::tags::TagEdit;
 
 #[test]
-fn native_replacement_cannot_overwrite_an_edit_after_the_last_observation() {
-    let (_root, request) = fixture();
+fn observed_external_edit_before_submission_is_not_overwritten() {
+    let (_root, mut request) = fixture();
+    assert_eq!(
+        direct(&request, &mut |_| Ok(())).status,
+        TagsStatus::Completed
+    );
     let file = context::Context::prepare(&request.root, &request.path, None)
         .unwrap()
         .file;
-    let tags = |name: &str| {
-        vec![FileTag {
-            name: name.into(),
-            color: Some(6),
-        }]
-    };
-    native::write(&file, &codec::encode(&tags("Original")).unwrap(), false).unwrap();
-    let observed = native::read(&file).unwrap();
-    let planned = edit_tags(&observed.tags, &request.edit).unwrap();
-    // This owned external edit occurs AFTER the last read, directly before the setter.
-    let external = tags("Finder edit");
-    let bytes = codec::encode(&external).unwrap();
-    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
-    assert!(
-        std::process::Command::new("/usr/bin/xattr")
-            .args(["-wx", "com.apple.metadata:_kMDItemUserTags", &hex])
-            .arg(request.root.join(&request.path))
-            .status()
-            .unwrap()
-            .success()
-    );
-    let result = native::write(&file, &codec::encode(&planned).unwrap(), true);
-    assert_eq!(
-        native::read(&file).unwrap().tags,
-        external,
-        "the external edit must survive"
-    );
-    assert!(
-        result.is_err(),
-        "a stale replacement must never be submitted"
-    );
-    assert_eq!(native::read(&file).unwrap().raw, Some(bytes));
+    request.edit = TagEdit::Add(vec!["Other".into()]);
+    refresh(&mut request);
+    let external = codec::encode(&[FileTag {
+        name: "Finder edit".into(),
+        color: Some(6),
+    }])
+    .unwrap();
+    let receipt = direct(&request, &mut |r| {
+        if r.stage == TagsStage::Writing {
+            native::write(&file, &external, true)?;
+        }
+        Ok(())
+    });
+    assert_eq!(receipt.status, TagsStatus::NotStarted);
+    assert_eq!(receipt.changed_by_operation, Some(false));
+    assert_eq!(native::read(&file).unwrap().raw, Some(external));
 }
 
 #[test]
-fn mutating_existing_tag_attributes_is_rejected_before_submission() {
+fn existing_tags_can_be_added_and_removed_without_losing_unselected_names() {
     let (_root, mut request) = fixture();
     assert_eq!(
         direct(&request, &mut |_| Ok(())).status,
@@ -58,10 +46,10 @@ fn mutating_existing_tag_attributes_is_rejected_before_submission() {
         refresh(&mut request);
         let before = read(&request.root, &request.path, None).unwrap();
         let receipt = direct(&request, &mut |_| Ok(()));
-        assert_eq!(receipt.status, TagsStatus::NotStarted);
-        assert!(!receipt.mutation_attempted && !receipt.completion_verified);
-        assert_eq!(receipt.error.unwrap().code, FileErrorCode::UnsupportedType);
-        assert_eq!(
+        assert_eq!(receipt.status, TagsStatus::Completed);
+        assert!(receipt.mutation_attempted && receipt.completion_verified);
+        assert!(receipt.original_attribute_base64.is_some());
+        assert_ne!(
             read(&request.root, &request.path, None)
                 .unwrap()
                 .tags_version,
@@ -80,10 +68,9 @@ fn a_present_empty_attribute_is_not_an_absent_attribute_for_initial_add() {
     refresh(&mut request);
     let before = native::read(&file).unwrap().raw;
     let receipt = direct(&request, &mut |_| Ok(()));
-    assert_eq!(receipt.status, TagsStatus::NotStarted);
-    assert!(!receipt.mutation_attempted);
-    assert_eq!(receipt.error.unwrap().code, FileErrorCode::UnsupportedType);
-    assert_eq!(native::read(&file).unwrap().raw, before);
+    assert_eq!(receipt.status, TagsStatus::Completed);
+    assert!(receipt.mutation_attempted && receipt.original_attribute_base64.is_some());
+    assert_ne!(native::read(&file).unwrap().raw, before);
 }
 
 #[test]

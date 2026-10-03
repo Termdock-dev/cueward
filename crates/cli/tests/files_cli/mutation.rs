@@ -141,8 +141,12 @@ fn write_rejections_exit_nonzero_with_not_started_receipts_and_preserve_data() {
         cleanup(&receipt);
     }
     let link_revision = version(root.path(), "link");
-    let receipt = copy_receipt(root.path(), "link", "new", &link_revision, &parent, false);
-    assert_eq!(receipt["error"]["code"], "unsupported_type");
+    let receipt = copy_receipt(root.path(), "link", "new", &link_revision, &parent, true);
+    assert_eq!(receipt["status"], "completed");
+    assert_eq!(
+        fs::read_link(root.path().join("new")).unwrap(),
+        Path::new("/outside/missing")
+    );
     cleanup(&receipt);
     assert_eq!(
         fs::read(root.path().join("source")).unwrap(),
@@ -152,7 +156,12 @@ fn write_rejections_exit_nonzero_with_not_started_receipts_and_preserve_data() {
         fs::read(root.path().join("existing")).unwrap(),
         b"destination bytes"
     );
-    assert!(!root.path().join("new").exists());
+    assert!(
+        fs::symlink_metadata(root.path().join("new"))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
 }
 
 #[test]

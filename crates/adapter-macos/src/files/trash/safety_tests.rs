@@ -250,7 +250,11 @@ fn trash_execute_accepts_native_added_macl_but_keeps_all_original_attributes() {
             assert!(!attributes.exact_match);
             assert_eq!(
                 attributes.accepted_platform_additions,
-                [if content.is_empty() { "com.apple.macl (added, zero bytes)".to_owned() } else { format!("com.apple.macl (added, {} bytes)", content.len()) }]
+                [if content.is_empty() {
+                    "com.apple.macl (added, zero bytes)".to_owned()
+                } else {
+                    format!("com.apple.macl (added, {} bytes)", content.len())
+                }]
             );
             assert_ne!(
                 attributes.sha256,
@@ -320,6 +324,9 @@ fn trash_execute_backup_overlap_and_private_parent_retargeting_never_submit_nati
     let mut value = fixture();
     let mut platform = platform(&value);
     platform.storage_inside = true;
+    fs::remove_file(value.root.path().join("source")).unwrap();
+    fs::create_dir(value.root.path().join("source")).unwrap();
+    value.receipt.request = request(value.root.path());
     direct(&mut value, &platform, |_| Ok(()));
     assert_eq!(value.receipt.status, MutationStatus::NotStarted);
     assert!(value.receipt.backup_path.is_none());

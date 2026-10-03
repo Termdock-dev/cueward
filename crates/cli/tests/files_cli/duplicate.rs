@@ -111,15 +111,12 @@ fn duplicate_cli_invalid_names_fail_without_receipt_announcement_or_a_new_file()
     assert_eq!(fs::read_dir(root.path()).unwrap().count(), 1);
 }
 #[test]
-fn duplicate_cli_directory_and_stale_source_are_failed_receipts_not_empty_copies() {
+fn duplicate_cli_copies_packages_but_stale_source_is_a_failed_receipt() {
     let root = tempfile::tempdir().unwrap();
     fs::create_dir(root.path().join("Owned.app")).unwrap();
     fs::write(root.path().join("source"), b"OWNED source").unwrap();
-    let directory = invoke(root.path(), "Owned.app", "directory-copy", false);
-    assert_eq!(
-        directory["Ok"]["result"]["error"]["code"],
-        "unsupported_type"
-    );
+    let directory = invoke(root.path(), "Owned.app", "directory-copy", true);
+    assert_eq!(directory["Ok"]["result"]["status"], "completed");
     cleanup(&directory["Ok"]["result"]);
     let parent = version(root.path(), ".");
     let stale = run(
@@ -141,5 +138,5 @@ fn duplicate_cli_directory_and_stale_source_are_failed_receipts_not_empty_copies
     assert_eq!(stale["Ok"]["result"]["error"]["code"], "changed");
     cleanup(&stale["Ok"]["result"]);
     assert!(!root.path().join("new").exists());
-    assert!(!root.path().join("directory-copy").exists());
+    assert!(root.path().join("directory-copy").is_dir());
 }

@@ -5,7 +5,7 @@ pub(super) struct Staged {
     pub files: Vec<File>,
 }
 pub(super) fn prepare<P: TreeExecutionPlatform>(
-    context: &context::Context<'_, P>,
+    context: &mut context::Context<'_, P>,
     receipt: &mut TreeReceipt,
     checkpoint: &mut impl FnMut(&TreeReceipt) -> Result<(), FileError>,
 ) -> Result<Staged, FileError> {
@@ -20,6 +20,15 @@ pub(super) fn prepare<P: TreeExecutionPlatform>(
         receipt.receipt_path.clone(),
     );
     let storage = context.platform.prepare_staging(&proxy, &context.root)?;
+    crate::files::mutation::objects::advance_staging(
+        context.platform,
+        &storage,
+        &receipt.request.root,
+        &context.root,
+        &context.parent,
+        &mut context.plan.root,
+        &mut context.plan.destination_parent,
+    )?;
     let source = Path::new(&context.plan.entries[0].source.path).canonicalize()?;
     if storage.directory.metadata()?.is_dir()
         && storage
@@ -57,7 +66,7 @@ pub(super) fn populate<P: TreeExecutionPlatform>(
         receipt.stage = TreeStage::Copying;
         checkpoint(receipt)?;
         let mut file = create(context, staged, &files, index)?;
-        if entry.source.kind == FileKind::File {
+        if matches!(entry.source.kind, FileKind::File | FileKind::Symlink) {
             let verified = copy_file_verified(
                 context.platform,
                 &context.sources[index],
@@ -128,7 +137,12 @@ fn create<P: TreeExecutionPlatform>(
     let name = name.ok_or_else(|| changed("missing staged leaf"))?;
     match entry.source.kind {
         FileKind::Directory => context.platform.create_directory(parent, name).file,
-        FileKind::File => context.platform.create_file(parent, name).file,
+        FileKind::File | FileKind::Symlink => {
+            context
+                .platform
+                .create_object(parent, name, &entry.source)
+                .file
+        }
         _ => Err(changed("unsupported node reached tree construction")),
     }
 }

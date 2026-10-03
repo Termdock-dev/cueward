@@ -10,15 +10,15 @@ pub use model::*;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-/// Guarded scope removal and native trash of a verified private file; no shell deletion fallback.
+/// Guarded scope removal and native trash of a verified private object; no shell deletion fallback.
 pub trait TrashPlatform: MutationPlatform {
     /// Locate an existing private user Trash; never create it or move anything.
     fn trash_directory(&self, source: &FileInfo) -> Result<PathBuf, FileError>;
-    /// Require available same-volume private Trash and one ordinary source link.
+    /// Require available same-volume private Trash and a supported source object.
     fn validate_trash(&self, root: &File, source: &File, trash: &File) -> Result<(), FileError>;
     /// Move relative to held roots exclusively; cannot guarantee source-inode CAS.
     fn stage_source(&self, root: &File, source: &Path, private: &File, name: &Path) -> Publication;
-    /// Trash only the verified privately staged ordinary file, returning the native actual URL.
+    /// Trash only the verified privately staged selected object, returning the native actual URL.
     fn trash_staged(&self, source: &FileInfo) -> NativeTrashResult;
     /// Observe bounded extended attributes without changing file offsets.
     fn trash_attribute_digest(&self, file: &File) -> Result<(String, usize), FileError>;
@@ -55,8 +55,8 @@ pub fn execute(
     checkpoint: &mut impl FnMut(&TrashReceipt) -> Result<(), FileError>,
 ) -> Result<(), FileError> {
     receipt.validate_fresh()?;
-    let context = context::Context::prepare(platform, receipt)?;
-    let backup = verification::backup(&context, receipt, checkpoint)?;
+    let mut context = context::Context::prepare(platform, receipt)?;
+    let backup = verification::backup(&mut context, receipt, checkpoint)?;
     context.revalidate(receipt)?;
     verification::check_backup(&context, receipt, &backup)?;
     receipt.stage = TrashStage::BackedUp;
@@ -129,7 +129,7 @@ fn observe(platform: &impl FilePlatform, path: &Path) -> Result<FileInfo, FileEr
             "observation parent is not canonical or was retargeted",
         ));
     }
-    let info = scope.info(&scope.resolve(Path::new(leaf), false, false)?)?;
+    let info = scope.info(&scope.resolve(Path::new(leaf), false, true)?)?;
     scope.revalidate_root()?;
     Ok(info)
 }

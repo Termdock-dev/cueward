@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads, Spotlight content search, Finder context/reveal, explicit iCloud status/downloads, PDF/image/Quick Look previews, and authorized no-overwrite directory/file creation, single-file duplication, recursive-copy planning/execution including explicitly selected package contents, read-only trash proposals and explicitly confirmed ordinary-file trash with retained verified backup and authorized backup-copy restoration, same-volume rename/move including explicitly selected symlink objects or explicit independent batch rename planning/execution when the installed CLI supports them. Not for general web research or developing Cueward itself.
+description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads, Spotlight content search, Finder context/reveal, explicit iCloud status/downloads, PDF/image/Quick Look previews, and authorized no-overwrite directory/file creation, file/directory duplication, recursive-copy planning/execution including explicitly selected package contents, read-only trash proposals and explicitly confirmed file/directory/link trash with retained verified backup and authorized backup-copy restoration, rename and same/cross-volume move including explicitly selected symlink objects or explicit independent batch rename planning/execution when the installed CLI supports them. Not for general web research or developing Cueward itself.
 ---
 
 # Cueward Agent
@@ -19,17 +19,17 @@ Use `cueward doctor --json` when an available operation reports a permission/pre
 | --- | --- |
 | Current app UI, screenshots, native windows, background input, waits, snapshot differences, app launch/open, or Spaces | [computer-use.md](references/computer-use.md) |
 | Existing files: scoped filesystem/Spotlight search, metadata/reads, Finder location/selection, an explicit Finder reveal, iCloud state, a requested cloud download, or PDF/image/Quick Look preview | [files.md](references/files.md), then check whether `files` is installed |
-| Restore an original verified backup from a completed ordinary-file trash receipt | [file-trash-restore.md](references/file-trash-restore.md), then check installed command help |
-| Explicitly confirmed ordinary-file trash or saved trash receipts | [file-trash-execution.md](references/file-trash-execution.md), then check installed command help |
+| Restore an original verified backup from a completed verified trash receipt | [file-trash-restore.md](references/file-trash-restore.md), then check installed command help |
+| Explicitly confirmed file/directory/link trash or saved trash receipts | [file-trash-execution.md](references/file-trash-execution.md), then check installed command help |
 | Selected-entry trash proposals before a removal decision | [file-trash.md](references/file-trash.md), then check installed command help |
-| Finder tag names, initial tagging, no-op checks, or receipts | [file-tags.md](references/file-tags.md), then check installed command help |
+| Finder tag names, requested additions/removals, no-op checks, or receipts | [file-tags.md](references/file-tags.md), then check installed command help |
 | Explicit batch rename plans and authorized independent execution/receipts, including per-entry symlink-object selection | [file-batch-rename.md](references/file-batch-rename.md), then check installed command help |
-| Requested same-volume rename/move or their saved receipts | [file-relocation.md](references/file-relocation.md), then check installed command help |
+| Requested rename and same/cross-volume move or their saved receipts | [file-relocation.md](references/file-relocation.md), then check installed command help |
 | Explicit symlink-object rename/move | [file-link-relocation.md](references/file-link-relocation.md), then check installed command help |
 | Explicit package-content copy or sibling duplication | [file-package-copy.md](references/file-package-copy.md), then check installed command help |
 | Authorized recursive directory copy execution or saved tree receipts | [file-copy-tree-execution.md](references/file-copy-tree-execution.md), then check installed command help |
 | Read-only recursive directory copy proposals | [file-copy-tree.md](references/file-copy-tree.md), then check installed command help |
-| Requested empty directory creation, single-file copy/duplicate, or saved write receipts | [file-mutations.md](references/file-mutations.md), then check installed command help |
+| Requested empty directory creation, file/directory/link copy/duplicate, or saved write receipts | [file-mutations.md](references/file-mutations.md), then check installed command help |
 | Past browsing/notes/messages, indexed knowledge, capture or digest | [retrieval.md](references/retrieval.md) |
 | Live Safari tabs, DOM controls, bookmarks, console/network or browser AI state | [safari.md](references/safari.md) |
 | Notes, Quick Notes, Reminders, Calendar, OCR, clipboard, Stickies or Voice Memos | [apple-apps.md](references/apple-apps.md) |

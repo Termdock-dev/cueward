@@ -51,7 +51,7 @@ pub(crate) struct TreeScopeArgs {
     /// Summed observed file sizes; execution also bounds each file transfer.
     #[arg(long, default_value_t=67108864, value_parser=clap::value_parser!(u64).range(1..=268435456))]
     max_bytes: u64,
-    /// Traverse known package directories too; links and unsupported metadata remain blocked.
+    /// Traverse known package directories too; symlink objects are copied without following targets.
     #[arg(long)]
     include_packages: bool,
     #[arg(long, default_value_t=10000, value_parser=clap::value_parser!(u64).range(1..=30000))]

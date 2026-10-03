@@ -69,19 +69,19 @@ pub(crate) enum EncodingArg {
 
 #[derive(Subcommand)]
 pub(crate) enum FilesAction {
-    /// Inspect trash proposals, explicitly trash one verified ordinary file or read receipts.
+    /// Inspect trash proposals, explicitly trash one verified object or read receipts.
     Trash {
         #[command(subcommand)]
         action: trash::TrashCommand,
     },
-    /// Read Finder tags, create initial tags or verify no-ops with saved evidence.
+    /// Read, add or remove selected Finder tags with saved original-attribute evidence.
     Tags {
         #[command(subcommand)]
         action: tags::TagsCommand,
     },
     /// Rename one same-volume entry without overwriting; source identity is checked, not locked.
     Rename(relocation::RenameArgs),
-    /// Move one entry on the same volume; never copy then delete.
+    /// Move without overwrite; across volumes verify a copy and retain the original privately.
     Move(relocation::MoveArgs),
     /// Inspect saved move/rename evidence only.
     Relocation {
@@ -90,14 +90,14 @@ pub(crate) enum FilesAction {
     },
     /// Create one empty directory without replacing existing entries.
     Mkdir(mutation::MkdirArgs),
-    /// Copy one regular file and verify bytes/metadata; never overwrite.
+    /// Copy a file, directory/package or symlink object and verify metadata; never overwrite.
     Copy(mutation::CopyArgs),
     /// Plan or execute a bounded tree copy, or inspect its saved evidence.
     CopyTree {
         #[command(subcommand)]
         action: copy_tree::CopyTreeCommand,
     },
-    /// Create an independent regular-file sibling under an explicit new name; never overwrite.
+    /// Create an independent sibling object under an exact new name; never overwrite.
     Duplicate(duplicate::DuplicateArgs),
     /// Observe a bounded batch of explicit sibling renames; execution is not supported.
     RenameBatch {

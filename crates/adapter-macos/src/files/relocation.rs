@@ -1,4 +1,4 @@
-//! One-use same-volume relocation and read-only planning.
+//! One-use same/cross-volume relocation and read-only planning.
 use super::{
     MacFiles,
     mutation::{MutationPlatform, supervision},
@@ -9,6 +9,8 @@ use super::{
 mod native;
 #[path = "relocation/links.rs"]
 mod links;
+#[path = "relocation/cross_volume.rs"]
+mod cross_volume;
 #[path = "relocation/transport.rs"]
 mod transport;
 pub use transport::*;
@@ -24,6 +26,13 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 impl RelocationPlatform for MacFiles {
+    fn cross_volume_move(
+        &self,
+        receipt: &mut RelocationReceipt,
+        checkpoint: &mut dyn FnMut(&RelocationReceipt) -> Result<(), FileError>,
+    ) -> Result<(), FileError> {
+        cross_volume::execute(receipt, checkpoint)
+    }
     fn open_directory(&self, path: &Path) -> Result<File, FileError> {
         MutationPlatform::open_directory(self, path)
     }

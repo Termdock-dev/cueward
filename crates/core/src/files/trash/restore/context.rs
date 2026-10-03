@@ -33,7 +33,7 @@ impl<'a, P: TrashPlatform> Context<'a, P> {
         let parent_info = original_parent(&scope, receipt, &destination, evidence.parent)?;
         let root = platform.open_directory(Path::new(&root_info.path))?;
         let parent = platform.open_directory(Path::new(&parent_info.path))?;
-        let backup = platform.open_regular(Path::new(&evidence.backup.path))?;
+        let backup = platform.open_object(evidence.backup)?;
         platform.validate_copy_source(&backup, evidence.backup)?;
         let context = Self {
             platform,

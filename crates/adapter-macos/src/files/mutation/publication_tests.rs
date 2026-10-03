@@ -24,7 +24,7 @@ fn unsupported_or_ignored_publication_flags_fail_closed() {
     fs::remove_dir_all(path).unwrap();
 }
 #[test]
-fn a_different_root_filesystem_is_rejected_before_staging() {
+fn a_wrong_root_descriptor_is_rejected_before_staging() {
     let (_root, request) = fixture();
     let prepared = journal::create(&request).unwrap();
     let path = journal::directory(&prepared.operation_id).unwrap();

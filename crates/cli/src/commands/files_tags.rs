@@ -6,9 +6,9 @@ use cueward_core::files::tags::{TagEdit, TagSnapshot};
 pub(crate) enum TagsCommand {
     /// Read names, stored colors and the exact tag revision without editing.
     Read(TagsReadArgs),
-    /// Create initial tags only when the tag attribute is absent; existing-name no-ops allowed.
+    /// Add exact names, preserving unselected tags/colors and saving the original attribute.
     Add(TagsWriteArgs),
-    /// Verify an absent-name no-op; removing existing tags is unsupported (use Finder).
+    /// Remove only selected names, preserving other tags/colors; missing-name requests are no-ops.
     Remove(TagsWriteArgs),
     /// Read saved evidence only, without restoring tags or retrying.
     Receipt {

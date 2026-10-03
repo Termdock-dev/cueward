@@ -414,3 +414,71 @@ fn restore_actual_cli_from_controlled_completed_receipt_verifies_publication_and
         fs::remove_dir_all(directory).unwrap();
     }
 }
+
+#[test]
+fn restore_directory_package_and_leaf_link_copies_preserve_nested_bytes_and_references() {
+    for kind in ["directory", "Owned.app", "link"] {
+        let mut original = trash::fixture();
+        fs::remove_file(original.root.path().join("source")).unwrap();
+        let source = original.root.path().join(kind);
+        if kind == "link" {
+            std::os::unix::fs::symlink("/outside/missing", &source).unwrap();
+        } else {
+            fs::create_dir_all(source.join("nested")).unwrap();
+            fs::write(source.join("nested/data"), b"OWNED nested bytes").unwrap();
+            std::os::unix::fs::symlink("../../missing", source.join("nested/broken")).unwrap();
+        }
+        original.receipt.request.path = kind.into();
+        original.receipt.request.expected_version =
+            crate::files::observe(original.root.path(), Path::new(kind), false, None)
+                .unwrap()
+                .version;
+        original.receipt.request.expected_parent_version =
+            crate::files::observe(original.root.path(), Path::new("."), false, None)
+                .unwrap()
+                .version;
+        let mut value = from_original(original);
+        let recorded = original_json(&value);
+        direct(&mut value, |_| Ok(()));
+        assert_eq!(
+            value.receipt.status,
+            MutationStatus::Completed,
+            "{kind} {:?}",
+            value.receipt.error
+        );
+        assert!(value.receipt.completion_verified && value.receipt.staging_verified);
+        assert_eq!(original_json(&value), recorded);
+        let backup = Path::new(value.original.receipt.backup_path.as_ref().unwrap());
+        assert_ne!(
+            value.receipt.destination_after.as_ref().unwrap().identity,
+            value
+                .original
+                .receipt
+                .backup_after
+                .as_ref()
+                .unwrap()
+                .identity
+        );
+        for retained in [
+            source.as_path(),
+            backup,
+            trash::trashed(&value.original).as_path(),
+        ] {
+            if kind == "link" {
+                assert_eq!(
+                    fs::read_link(retained).unwrap(),
+                    Path::new("/outside/missing")
+                );
+            } else {
+                assert_eq!(
+                    fs::read(retained.join("nested/data")).unwrap(),
+                    b"OWNED nested bytes"
+                );
+                assert_eq!(
+                    fs::read_link(retained.join("nested/broken")).unwrap(),
+                    Path::new("../../missing")
+                );
+            }
+        }
+    }
+}

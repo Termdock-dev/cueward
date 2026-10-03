@@ -162,7 +162,7 @@ fn verify_tree<P: TreeExecutionPlatform>(
         }
         verify_metadata(context, &file, index)?;
         match node.kind {
-            FileKind::File => verify_readable(
+            FileKind::File | FileKind::Symlink => verify_readable(
                 context.platform,
                 &file,
                 &info,

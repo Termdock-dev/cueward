@@ -17,6 +17,22 @@ const CLOEXEC: i32 = 0x01000000;
 const NONBLOCK: i32 = 4;
 
 impl MutationPlatform for MacFiles {
+    fn open_link(&self, path: &Path) -> Result<File, FileError> {
+        cueward_core::files::relocation::RelocationPlatform::open_symlink(self, path)
+    }
+    fn create_link(&self, parent: &File, name: &OsStr, target: &str) -> Creation {
+        objects::create_link(parent, name, target)
+    }
+    fn copy_names(
+        &self,
+        file: &File,
+        maximum: usize,
+    ) -> Result<Vec<std::ffi::OsString>, FileError> {
+        cueward_core::files::copy_tree::CopyTreePlatform::tree_names(self, file, maximum)
+    }
+    fn read_copy_attributes(&self, file: &File) -> Result<(String, usize), FileError> {
+        attributes::digest(file)
+    }
     fn prepare_staging(
         &self,
         receipt: &MutationReceipt,
@@ -75,22 +91,20 @@ impl MutationPlatform for MacFiles {
         if metadata.mode() & 0o7000 != 0 || metadata.st_flags() & 0x20 != 0 {
             return Err(FileError::new(
                 FileErrorCode::UnsupportedType,
-                "special permission bits and compressed sources are not supported in this copy slice",
+                "special permission bits and compressed sources are not supported by verified copying",
             ));
+        }
+        if info.kind == FileKind::Symlink {
+            attributes::digest(file)?;
+            return Ok(());
         }
         let resources = super::super::metadata::inspect(Path::new(&info.path), &metadata)?;
         match resources.is_alias_file {
-            ResourceValue::Available { value: false } => {}
-            ResourceValue::Available { value: true } => {
-                return Err(FileError::new(
-                    FileErrorCode::UnsupportedType,
-                    "Finder aliases are not copied or resolved",
-                ));
-            }
+            ResourceValue::Available { .. } => {}
             _ => {
                 return Err(FileError::new(
                     FileErrorCode::Unavailable,
-                    "cannot verify that copy source is not a Finder alias",
+                    "cannot establish copy source alias state",
                 ));
             }
         }
@@ -125,7 +139,7 @@ impl MutationPlatform for MacFiles {
     }
 }
 
-fn leaf(name: &OsStr) -> Result<CString, FileError> {
+pub(super) fn leaf(name: &OsStr) -> Result<CString, FileError> {
     let bytes = name.as_bytes();
     if bytes.is_empty() || bytes == b"." || bytes == b".." || bytes.contains(&b'/') {
         return Err(FileError::new(

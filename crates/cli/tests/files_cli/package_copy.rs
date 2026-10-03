@@ -129,7 +129,7 @@ fn package_cli_actual_worker_publishes_verified_independent_package_with_saved_o
     cleanup(receipt);
 }
 #[test]
-fn package_cli_no_opt_in_links_conflicts_or_limits_refuse_before_staging() {
+fn package_cli_copies_link_objects_but_opt_in_conflicts_and_limits_still_apply() {
     for mode in 0..4 {
         let root = fixture();
         let outside = tempfile::tempdir().unwrap();
@@ -150,9 +150,23 @@ fn package_cli_no_opt_in_links_conflicts_or_limits_refuse_before_staging() {
                 &[]
             },
         );
-        assert!(!output.status.success());
         let result = envelope(&output.stdout, "files");
         let receipt = &result["Ok"]["result"];
+        if mode == 1 {
+            assert!(output.status.success(), "{receipt}");
+            assert_eq!(receipt["status"], "completed");
+            assert_eq!(
+                fs::read_link(root.path().join("副本\n<external>.app/outside")).unwrap(),
+                outside.path()
+            );
+            assert_eq!(
+                fs::read(outside.path().join("PRIVATE")).unwrap(),
+                b"not selected"
+            );
+            cleanup(receipt);
+            continue;
+        }
+        assert!(!output.status.success());
         assert_eq!(receipt["status"], "not_started");
         assert!(receipt["staging_path"].is_null());
         assert_eq!(receipt["mutation_attempted"], false);

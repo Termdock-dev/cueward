@@ -95,7 +95,7 @@ fn package_execute_uses_verified_tree_copy_with_independent_nodes_and_persistent
     assert_eq!(json(&saved).unwrap(), json(&value.receipt).unwrap());
 }
 #[test]
-fn package_execute_refuses_without_opt_in_links_limits_or_conflicts_before_staging() {
+fn package_execute_copies_link_objects_and_refuses_missing_opt_in_limits_or_conflicts() {
     for mode in 0..5 {
         let mut value = package_fixture();
         match mode {
@@ -111,6 +111,19 @@ fn package_execute_refuses_without_opt_in_links_limits_or_conflicts_before_stagi
         }
         save(&value.receipt).unwrap();
         perform(&mut value);
+        if mode == 1 {
+            assert_eq!(
+                value.receipt.status,
+                MutationStatus::Completed,
+                "{:?}",
+                value.receipt.error
+            );
+            assert_eq!(
+                fs::read_link(value.root.path().join("Owned-copy.app/link")).unwrap(),
+                Path::new("missing")
+            );
+            continue;
+        }
         assert_eq!(
             value.receipt.status,
             MutationStatus::NotStarted,

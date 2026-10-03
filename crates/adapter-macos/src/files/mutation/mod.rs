@@ -2,6 +2,7 @@
 pub(super) mod attributes;
 mod journal;
 mod native;
+mod objects;
 mod publication;
 pub(super) mod supervision;
 #[cfg(test)]

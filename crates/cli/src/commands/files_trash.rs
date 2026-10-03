@@ -5,7 +5,7 @@ use cueward_adapter_macos::files::trash;
 pub(crate) enum TrashCommand {
     /// Inspect one selected entry before deciding a trash operation; never move or delete.
     Plan(TrashPlanArgs),
-    /// Back up one ordinary file, verify and move it once into existing system Trash.
+    /// Back up one selected file/directory/link object, verify and move it to existing Trash.
     Execute(TrashExecuteArgs),
     /// Restore verified retained backup to the original path; never overwrite or remove Trash.
     Restore(RestoreArgs),
@@ -24,7 +24,7 @@ pub(crate) enum TrashCommand {
 pub(crate) struct TrashPlanArgs {
     #[arg(long)]
     root: PathBuf,
-    /// Non-root relative entry; plan can inspect a leaf link, execute refuses links.
+    /// Non-root relative entry; a leaf link selects the reference, never its target.
     #[arg(long)]
     path: PathBuf,
     /// Version from files info on this exact selected entry.
@@ -40,7 +40,7 @@ pub(crate) struct TrashExecuteArgs {
     /// Fresh version of the source parent, from files info.
     #[arg(long)]
     expected_parent_version: String,
-    /// Required explicit confirmation of this exact selected file; never infer from a plan.
+    /// Required explicit confirmation of this exact selected object; never infer from a plan.
     #[arg(long, required = true)]
     confirm: bool,
     #[arg(long, default_value_t=67108864, value_parser=clap::value_parser!(u64).range(1..=268435456))]

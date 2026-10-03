@@ -7,7 +7,7 @@ use cueward_adapter_macos::files::relocation::{
 pub(crate) struct RelocationScope {
     #[arg(long)]
     root: PathBuf,
-    /// Existing relative entry; links require link-itself, aliases/downloads remain unsupported.
+    /// Existing relative entry; links require link-itself; alias bytes stay opaque and placeholders are refused.
     #[arg(long)]
     path: PathBuf,
     #[arg(long)]
@@ -36,7 +36,7 @@ pub(crate) struct RenameArgs {
 pub(crate) struct MoveArgs {
     #[command(flatten)]
     scope: RelocationScope,
-    /// New relative destination on the same volume; no overwrite or copy/delete fallback.
+    /// New relative destination; different-device moves verify a copy then retain the original privately.
     #[arg(long)]
     destination: PathBuf,
 }
@@ -67,7 +67,7 @@ pub(super) fn rename(args: RenameArgs) {
         Err(error) => output::<Response>("files", Err(error)),
     }
 }
-/// Move an entry without copying bytes or deleting destination data.
+/// Move without overwrite; across volumes verify a copy before retaining the original.
 pub(super) fn move_entry(args: MoveArgs) {
     dispatch(args.scope, args.destination, RelocationAction::Move);
 }

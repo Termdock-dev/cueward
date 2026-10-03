@@ -1,4 +1,4 @@
-//! Same-filesystem path-based relocation with observations and conservative receipts.
+//! Same/cross-filesystem relocation with observations and conservative receipts.
 pub mod batch;
 mod context;
 mod model;
@@ -36,6 +36,17 @@ pub trait RelocationPlatform: FilePlatform {
         Err(FileError::new(
             FileErrorCode::Unavailable,
             "guarded rename unavailable",
+        ))
+    }
+    /// Copy and verify across devices before retaining the original in private storage.
+    fn cross_volume_move(
+        &self,
+        _receipt: &mut RelocationReceipt,
+        _checkpoint: &mut dyn FnMut(&RelocationReceipt) -> Result<(), FileError>,
+    ) -> Result<(), FileError> {
+        Err(FileError::new(
+            FileErrorCode::Unavailable,
+            "cross-volume move unavailable",
         ))
     }
     /// Submit one root-relative exclusive rename; this is not source-inode CAS.
