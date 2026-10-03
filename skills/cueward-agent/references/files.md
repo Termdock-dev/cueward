@@ -125,7 +125,18 @@ Dataless placeholders are distinct from empty files. The macOS worker denies dat
 
 The worker deadline defaults to 10 seconds, configurable with --timeout-ms 1..30000. List/info/read/search/metadata/spotlight do not edit the source file or request Finder/app activation. On change/error/timeout, reobserve before resuming; it discards detected changed-file results, but is not a sandbox against malicious concurrent path swaps.
 
-UTType/tag search filters, package pruning, alias resolution and generic third-party provider downloads are not part of this slice. Use app open only for an explicitly selected recipient; its sent_unverified result does not prove content was received. PDF/image/Quick Look previews have a separate command below; authorized mkdir/single-file copy/duplicate and saved receipts use [file-mutations.md](file-mutations.md); authorized initial tagging and read/no-op checks use [file-tags.md](file-tags.md); authorized same-volume rename/move use [file-relocation.md](file-relocation.md), with [explicit symlink-object selection](file-link-relocation.md), merged in PR #64, when installed; explicit batch rename planning and authorized independent execution use [file-batch-rename.md](file-batch-rename.md); read-only recursive-copy proposals use [file-copy-tree.md](file-copy-tree.md); authorized [tree execution](file-copy-tree-execution.md) was merged in PR #59; [explicit package-content copies](file-package-copy.md) were merged in PR #63 and retain the same bounds and unsupported-child refusals; [read-only trash proposals](file-trash.md) inspect selected-entry scope without removal, and [explicitly confirmed ordinary-file trash](file-trash-execution.md) retains a verified backup with native-result evidence. Completed ordinary-file trash receipts have separate [backup restoration](file-trash-restore.md), merged in PR #62. Check installed help; broader recovery and other unfinished management actions remain subsequent work.
+UTType/tag search filters, package pruning, alias resolution and generic third-party provider downloads are not implemented. Use `app open` only for an explicitly selected recipient; `sent_unverified` does not prove content was received. Check installed help for each requested action:
+
+- File/directory/link creation, copy/duplicate and receipts: [file-mutations.md](file-mutations.md).
+- Tag read/add/remove, including existing supported arrays: [file-tags.md](file-tags.md).
+- Same/cross-volume rename/move: [file-relocation.md](file-relocation.md), with [explicit symlink-object selection](file-link-relocation.md).
+- Independent batch rename: [file-batch-rename.md](file-batch-rename.md).
+- Bounded directory proposals and authorized copying: [file-copy-tree.md](file-copy-tree.md), [file-copy-tree-execution.md](file-copy-tree-execution.md), and [explicit package contents](file-package-copy.md).
+- Read-only selected-entry trash proposals: [file-trash.md](file-trash.md).
+- Explicitly confirmed file/directory/package/alias/link trash with a verified backup: [file-trash-execution.md](file-trash-execution.md).
+- Backup-copy restoration from completed verified trash receipts: [file-trash-restore.md](file-trash-restore.md).
+
+Do not infer authorization from a plan, observation revision or saved receipt. Permanent deletion and automatic retry/rollback are not supported.
 
 
 ## Preview PDF pages, images or a Quick Look thumbnail

@@ -1,4 +1,5 @@
-//! Parent interruption must prevent a delayed writer from creating its destination.
+//! Shared supervision signal coverage: INT/TERM/KILL before startup and after arming.
+//! Other worker suites check their operation-specific effects with TERM and deadlines.
 use super::*;
 use cueward_adapter_macos::files::mutation::{self, MutationAction, MutationRequest};
 use std::os::unix::fs::PermissionsExt;
@@ -207,18 +208,14 @@ fn verify_interrupted(root: &Path, fixture: &Path, action: &str, signal: &str) {
 }
 #[test]
 fn parent_interruption_prevents_delayed_creation_copy_and_duplicate() {
-    for action in ["mkdir", "copy", "duplicate"] {
-        for signal in ["-INT", "-TERM", "-KILL"] {
-            interrupt_delayed(action, signal, false);
-        }
+    for (action, signal) in [("mkdir", "-INT"), ("copy", "-TERM"), ("duplicate", "-KILL")] {
+        interrupt_delayed(action, signal, false);
     }
 }
 
 #[test]
 fn parent_death_stops_an_armed_mutation_worker() {
-    for action in ["mkdir", "copy", "duplicate"] {
-        for signal in ["-INT", "-TERM", "-KILL"] {
-            interrupt_delayed(action, signal, true);
-        }
+    for (action, signal) in [("mkdir", "-INT"), ("copy", "-TERM"), ("duplicate", "-KILL")] {
+        interrupt_delayed(action, signal, true);
     }
 }

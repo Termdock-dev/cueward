@@ -31,7 +31,14 @@ pub fn run(
         },
         timeout,
     )
-    .and_then(|receipt| verify_response(&prepared, receipt));
+    .and_then(|receipt| {
+        protocol::verify_receipt(
+            &prepared,
+            receipt,
+            &read_receipt(&prepared.operation_id)?,
+            "relocation result differs from prepared/stored evidence",
+        )
+    });
     match result {
         Ok(receipt) => Ok(receipt),
         Err(mut error) => {
@@ -47,23 +54,7 @@ pub fn run(
         }
     }
 }
-fn verify_response(
-    prepared: &RelocationReceipt,
-    receipt: RelocationReceipt,
-) -> Result<RelocationReceipt, FileError> {
-    let stored = read_receipt(&prepared.operation_id)?;
-    if receipt.operation_id != prepared.operation_id
-        || receipt.receipt_path != prepared.receipt_path
-        || json(&receipt.request)? != json(&prepared.request)?
-        || json(&receipt)? != json(&stored)?
-    {
-        return Err(FileError::new(
-            FileErrorCode::Internal,
-            "relocation result differs from prepared/stored evidence",
-        ));
-    }
-    Ok(receipt)
-}
+
 /// Query evidence, never resume or undo the operation.
 pub fn read_receipt(id: &str) -> Result<RelocationReceipt, FileError> {
     let receipt: RelocationReceipt = STORE.load(id)?;
@@ -105,9 +96,6 @@ pub fn execute_worker(input: &RelocationWorkerRequest) -> Result<RelocationRecei
 /// Atomically persist bounded relocation evidence.
 pub(super) fn save(receipt: &RelocationReceipt) -> Result<(), FileError> {
     STORE.save(&receipt.operation_id, &receipt.receipt_path, receipt)
-}
-fn json(value: &impl Serialize) -> Result<serde_json::Value, FileError> {
-    serde_json::to_value(value).map_err(|e| FileError::new(FileErrorCode::Internal, e.to_string()))
 }
 
 /// Allocate one child receipt under an already supervised batch; never dispatch or replay it.

@@ -127,8 +127,8 @@ fn batch_link_execution_verifies_mixed_parents_noops_inodes_references_and_saved
     assert_eq!(MacFiles.stamp(&fs::metadata(&target).unwrap()), before);
     assert_eq!(fs::read(&target).unwrap(), b"OWNED outside");
     assert_eq!(
-        json(&read_receipt(&receipt.operation_id).unwrap()).unwrap(),
-        json(&receipt).unwrap()
+        serde_json::to_value(read_receipt(&receipt.operation_id).unwrap()).unwrap(),
+        serde_json::to_value(&receipt).unwrap()
     );
     assert_eq!(
         execute_worker(&BatchExecutionWorkerRequest {

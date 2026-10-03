@@ -206,7 +206,7 @@ fn locks(pid: Option<i32>, directory: Option<&Path>) -> Result<RevealLocks, File
     let supplied = directory.is_some();
     let directory = match directory {
         Some(path) => path.to_owned(),
-        None => PathBuf::from(crate::screenshot::ensure_cache_dir().map_err(lock_error)?),
+        None => PathBuf::from(crate::cache::ensure_cache_dir().map_err(lock_error)?),
     };
     let global =
         crate::window::lock_path(&directory.join("finder-reveal.lock")).map_err(lock_error)?;

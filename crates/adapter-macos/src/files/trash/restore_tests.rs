@@ -133,14 +133,14 @@ fn restore_preserves_original_trash_backup_and_receipt_and_creates_independent_v
             .identity
     );
     assert_eq!(
-        json(value.receipt.verification.as_ref().unwrap()).unwrap(),
-        json(value.original.receipt.backup_verification.as_ref().unwrap()).unwrap()
+        serde_json::to_value(value.receipt.verification.as_ref().unwrap()).unwrap(),
+        serde_json::to_value(value.original.receipt.backup_verification.as_ref().unwrap()).unwrap()
     );
     assert!(!value.receipt.trash_item_touched && !value.receipt.backup_removed);
     assert_retained(&value, &original);
     assert_eq!(
-        json(&read_receipt(&value.receipt.operation_id).unwrap()).unwrap(),
-        json(&value.receipt).unwrap()
+        serde_json::to_value(read_receipt(&value.receipt.operation_id).unwrap()).unwrap(),
+        serde_json::to_value(&value.receipt).unwrap()
     );
     assert!(super::super::execution::read_receipt(&value.receipt.operation_id).is_err());
     assert!(value.receipt.validate_fresh().is_err());

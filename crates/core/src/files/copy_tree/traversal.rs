@@ -4,29 +4,21 @@ use crate::files::scope::text;
 pub(super) struct Scan<'a, 'b, P: CopyTreePlatform> {
     scope: &'a Scope<'b, P>,
     request: &'a CopyTreeRequest,
-    parent: &'a File,
     pub entries: Vec<CopyTreeEntry>,
     pub bytes: u64,
     pub complete: bool,
-    pub different_filesystem: bool,
     // Keep descriptors for all supported nodes until final revision checks.
     json_bytes: usize,
     opened: Vec<(std::path::PathBuf, File, usize)>,
 }
 impl<'a, 'b, P: CopyTreePlatform> Scan<'a, 'b, P> {
-    pub(super) fn new(
-        scope: &'a Scope<'b, P>,
-        request: &'a CopyTreeRequest,
-        parent: &'a File,
-    ) -> Self {
+    pub(super) fn new(scope: &'a Scope<'b, P>, request: &'a CopyTreeRequest) -> Self {
         Self {
             scope,
             request,
-            parent,
             entries: Vec::new(),
             bytes: 0,
             complete: true,
-            different_filesystem: false,
             json_bytes: 0,
             opened: Vec::new(),
         }
@@ -55,10 +47,6 @@ impl<'a, 'b, P: CopyTreePlatform> Scan<'a, 'b, P> {
             return Ok(());
         }
         let file = open(self.scope.platform, &source)?;
-        self.different_filesystem |= !self
-            .scope
-            .platform
-            .same_tree_filesystem(&file, self.parent)?;
         if source.kind == FileKind::Directory {
             self.children(&file, path, relative, depth)?;
         }

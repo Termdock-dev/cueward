@@ -227,7 +227,5 @@ fn check_cancelled(directory: &Path, root: &Path, before_version: &str) {
 }
 #[test]
 fn tag_parent_interruption_rejects_delayed_writer_startup() {
-    for signal in ["-INT", "-TERM", "-KILL"] {
-        interrupt(signal);
-    }
+    interrupt("-TERM");
 }

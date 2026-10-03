@@ -167,7 +167,7 @@ fn lock(directory: Option<&Path>) -> Result<std::fs::File, FileError> {
     let directory = match directory {
         Some(path) => path.to_owned(),
         None => PathBuf::from(
-            crate::screenshot::ensure_cache_dir()
+            crate::cache::ensure_cache_dir()
                 .map_err(|e| FileError::new(FileErrorCode::Unavailable, e.to_string()))?,
         ),
     };

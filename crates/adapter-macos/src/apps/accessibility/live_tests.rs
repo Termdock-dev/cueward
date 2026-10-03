@@ -82,7 +82,7 @@ unsafe extern "C" {
 }
 
 fn assert_input_lock_blocks(pid: i32, token: &str) {
-    let path = std::path::PathBuf::from(crate::screenshot::ensure_cache_dir().unwrap())
+    let path = std::path::PathBuf::from(crate::cache::ensure_cache_dir().unwrap())
         .join(format!("input-{pid}.lock"));
     let lock = fs::OpenOptions::new()
         .create(true)

@@ -1,6 +1,6 @@
-# Explicit verified single-file trash
+# Explicit verified selected-entry trash
 
-Execution was merged in PR #61. Check installed `files trash execute --help` and `files trash receipt --help`. Use only after the user explicitly confirms the exact selected ordinary file. A [read-only plan](file-trash.md) is not authorization. Never substitute permanent deletion, shell cleanup or `files move` to an invented Trash path.
+Execution was merged in PR #61. Check installed `files trash execute --help` and `files trash receipt --help`. Use only after the user explicitly confirms the exact selected file, directory/package, opaque alias or symlink reference. A [read-only plan](file-trash.md) is not authorization. Never substitute permanent deletion, shell cleanup or `files move` to an invented Trash path.
 
 Observe the exact source and its existing parent, then pass fresh guards:
 
@@ -12,7 +12,7 @@ cueward files trash execute --root /absolute/directory --path Reports/old.txt \
 cueward files trash receipt --operation-id '<announced UUID>'
 ```
 
-For a root-level file observe parent `.`. Root is absolute; path is explicit, non-root and relative, without parent traversal. No default selection, globs, recursion, overwrite, force, link following, caller-chosen Trash, batch, retry, resume, restore or permanent delete. Missing `--confirm` refuses before allocation/dispatch. Confirmation for one operation does not authorize another request.
+For a root-level file observe parent `.`. Root is absolute; path is explicit, non-root and relative, without parent traversal. No default selection, globs, overwrite, force, link following, caller-chosen Trash, batch, retry, resume, restore or permanent delete. Missing `--confirm` refuses before allocation/dispatch. Confirmation for one operation does not authorize another request.
 
 Available files, directory/package trees, opaque aliases and symlink references are backed up and verified before removal. Unknown state, hardlinked ordinary files, special entries/permissions and compressed sources are refused. Source and existing private current-user Trash must share a filesystem; root/receipt storage need not. Private backup/staging stays outside the selected source tree and Trash. No permanent-deletion fallback is permitted.
 

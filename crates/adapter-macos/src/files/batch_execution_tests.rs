@@ -109,8 +109,8 @@ fn batch_execute_advances_sibling_parent_guards_and_preserves_original_request()
     assert_eq!(fs::read(root.path().join("other")).unwrap(), b"OWNED b\0");
     assert!(!root.path().join("a").exists() && !root.path().join("b").exists());
     assert_eq!(
-        json(&read_receipt(&receipt.operation_id).unwrap()).unwrap(),
-        json(&receipt).unwrap()
+        serde_json::to_value(read_receipt(&receipt.operation_id).unwrap()).unwrap(),
+        serde_json::to_value(&receipt).unwrap()
     );
     assert!(
         execute_worker(&BatchExecutionWorkerRequest {

@@ -59,18 +59,10 @@ fn interrupt_delayed(action: &str, signal: &str, armed: bool) {
 
 #[test]
 fn batch_execute_parent_interruption_prevents_delayed_writer() {
-    for action in ["batch rename"] {
-        for signal in ["-INT", "-TERM", "-KILL"] {
-            interrupt_delayed(action, signal, false);
-        }
-    }
+    interrupt_delayed("batch rename", "-TERM", false);
 }
 
 #[test]
 fn batch_execute_parent_death_stops_armed_writer() {
-    for action in ["batch rename"] {
-        for signal in ["-INT", "-TERM", "-KILL"] {
-            interrupt_delayed(action, signal, true);
-        }
-    }
+    interrupt_delayed("batch rename", "-TERM", true);
 }

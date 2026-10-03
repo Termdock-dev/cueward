@@ -37,7 +37,14 @@ pub fn run(
         },
         timeout,
     )
-    .and_then(|receipt| verify_response(&prepared, receipt));
+    .and_then(|receipt| {
+        protocol::verify_receipt(
+            &prepared,
+            receipt,
+            &read_receipt(&prepared.operation_id)?,
+            "batch response differs from prepared or saved evidence",
+        )
+    });
     match result {
         Ok(receipt) => Ok(receipt),
         Err(error) => {
@@ -50,23 +57,7 @@ pub fn run(
         }
     }
 }
-fn verify_response(
-    prepared: &BatchExecutionReceipt,
-    receipt: BatchExecutionReceipt,
-) -> Result<BatchExecutionReceipt, FileError> {
-    let stored = read_receipt(&prepared.operation_id)?;
-    if receipt.operation_id != prepared.operation_id
-        || receipt.receipt_path != prepared.receipt_path
-        || json(&receipt.request)? != json(&prepared.request)?
-        || json(&receipt)? != json(&stored)?
-    {
-        return Err(FileError::new(
-            FileErrorCode::Internal,
-            "batch response differs from prepared or saved evidence",
-        ));
-    }
-    Ok(receipt)
-}
+
 /// Load aggregate progress only; individual evidence uses files relocation receipt.
 pub fn read_receipt(id: &str) -> Result<BatchExecutionReceipt, FileError> {
     let receipt: BatchExecutionReceipt = STORE.load(id)?;
@@ -145,9 +136,6 @@ fn save(receipt: &BatchExecutionReceipt) -> Result<(), FileError> {
 }
 fn invalid(message: &str) -> FileError {
     FileError::new(FileErrorCode::InvalidOptions, message)
-}
-fn json(value: &impl Serialize) -> Result<serde_json::Value, FileError> {
-    serde_json::to_value(value).map_err(|e| FileError::new(FileErrorCode::Internal, e.to_string()))
 }
 
 #[cfg(test)]
