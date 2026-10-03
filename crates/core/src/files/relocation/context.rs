@@ -22,13 +22,18 @@ impl<'a, P: RelocationPlatform> Context<'a, P> {
         let root_info = scope.info(&scope.resolve(Path::new("."), false, false)?)?;
         let root = platform.open_directory(&scope.root)?;
         check_descriptor(platform, &root, &root_info)?;
-        let source = observe(&scope, &request.path, false)?;
+        let source = observe(&scope, &request.path, false, request.link_itself)?;
         check_version(
             &Some(request.expected_version.clone()),
             &source.info.version,
         )?;
-        let source_parent = observe(&scope, validation::parent(&request.path), true)?;
-        let destination_parent = observe(&scope, validation::parent(&request.destination), true)?;
+        let source_parent = observe(&scope, validation::parent(&request.path), true, false)?;
+        let destination_parent = observe(
+            &scope,
+            validation::parent(&request.destination),
+            true,
+            false,
+        )?;
         check_version(
             &Some(request.expected_parent_version.clone()),
             &destination_parent.info.version,
@@ -76,6 +81,9 @@ impl<'a, P: RelocationPlatform> Context<'a, P> {
 
     /// Query native source metadata and reject aliases or unknown alias state.
     pub(super) fn resources(&self, platform: &P) -> Result<ResourceMetadata, FileError> {
+        if self.source.info.kind == FileKind::Symlink {
+            return Ok(ResourceMetadata::not_applicable());
+        }
         let resources = platform.resource_metadata(
             Path::new(&self.source.info.path),
             &self.source.file.metadata()?,
@@ -104,7 +112,11 @@ impl<'a, P: RelocationPlatform> Context<'a, P> {
             ),
         ] {
             check_descriptor(self.scope.platform, &observed.file, &observed.info)?;
-            let current = self.scope.info(&self.scope.resolve(path, false, false)?)?;
+            let current = self.scope.info(&self.scope.resolve(
+                path,
+                false,
+                observed.info.kind == FileKind::Symlink,
+            )?)?;
             if current.path != observed.info.path || current.version != observed.info.version {
                 return Err(changed("source or parent path changed while planning"));
             }
@@ -118,25 +130,34 @@ fn observe<P: RelocationPlatform>(
     scope: &Scope<'_, P>,
     path: &Path,
     directory: bool,
+    leaf_link: bool,
 ) -> Result<Observed, FileError> {
-    let resolved = scope.resolve(path, false, false)?;
+    let resolved = scope.resolve(path, false, leaf_link)?;
     let info = scope.info(&resolved)?;
+    if leaf_link && info.kind != FileKind::Symlink {
+        return Err(FileError::new(
+            FileErrorCode::InvalidOptions,
+            "link-itself requires a leaf symlink",
+        ));
+    }
     if info.data_state != DataState::NotDataless {
         return Err(FileError::new(
             FileErrorCode::Unavailable,
             "planning never materializes unavailable/unknown source data",
         ));
     }
-    if !matches!(info.kind, FileKind::File | FileKind::Directory)
+    if !(matches!(info.kind, FileKind::File | FileKind::Directory)
+        || (leaf_link && info.kind == FileKind::Symlink))
         || (directory && info.kind != FileKind::Directory)
     {
         return Err(FileError::new(
             FileErrorCode::UnsupportedType,
-            "planning requires available regular files or directories",
+            "planning requires available files/directories or explicitly selected leaf links",
         ));
     }
     let file = match info.kind {
         FileKind::Directory => scope.platform.open_directory(&resolved.path)?,
+        FileKind::Symlink => scope.platform.open_symlink(&resolved.path)?,
         _ => scope.platform.open_regular(&resolved.path)?,
     };
     check_descriptor(scope.platform, &file, &info)?;

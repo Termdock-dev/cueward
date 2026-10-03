@@ -11,6 +11,9 @@ pub struct RelocationRequest {
     pub expected_version: String,
     pub expected_parent_version: String,
     pub action: RelocationAction,
+    /// Select only the leaf symlink itself, never its target or an ancestor link.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub link_itself: bool,
 }
 
 /// Rename keeps the parent; move selects an explicit destination under the same root.
@@ -34,4 +37,8 @@ pub struct RelocationPlan {
     pub destination_before: Option<FileInfo>,
     pub no_op: bool,
     pub same_filesystem: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }

@@ -98,6 +98,7 @@ mod tests {
             expected_version: "source".into(),
             expected_parent_version: "parent".into(),
             action: RelocationAction::Rename,
+            link_itself: false,
         };
         assert!(validate(&request).is_ok());
         request.destination = "to/destination".into();

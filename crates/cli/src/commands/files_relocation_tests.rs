@@ -75,3 +75,45 @@ fn relocation_requires_explicit_revisions_and_bounded_timeout() {
         );
     }
 }
+
+#[test]
+fn relocation_link_itself_is_an_explicit_option_not_follow_links_or_a_receipt_option() {
+    for (action, flag) in [("rename", "--name"), ("move", "--destination")] {
+        let args = [
+            "cueward",
+            "files",
+            action,
+            "--root",
+            "/tmp",
+            "--path",
+            "link",
+            flag,
+            "new",
+            "--expected-version",
+            "s",
+            "--expected-parent-version",
+            "p",
+        ];
+        assert!(Cli::try_parse_from(args).is_ok());
+        assert!(Cli::try_parse_from(args.into_iter().chain(["--link-itself"])).is_ok());
+        assert!(
+            Cli::try_parse_from(args.into_iter().chain(["--link-itself", "--dry-run"])).is_ok()
+        );
+        assert!(
+            Cli::try_parse_from(args.into_iter().chain(["--link-itself", "--follow-links"]))
+                .is_err()
+        );
+    }
+    assert!(
+        Cli::try_parse_from([
+            "cueward",
+            "files",
+            "relocation",
+            "receipt",
+            "--operation-id",
+            "id",
+            "--link-itself"
+        ])
+        .is_err()
+    );
+}

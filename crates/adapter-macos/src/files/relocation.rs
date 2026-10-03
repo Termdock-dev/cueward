@@ -7,6 +7,8 @@ use super::{
 };
 #[path = "relocation/native.rs"]
 mod native;
+#[path = "relocation/links.rs"]
+mod links;
 #[path = "relocation/transport.rs"]
 mod transport;
 pub use transport::*;
@@ -24,6 +26,9 @@ use std::path::Path;
 impl RelocationPlatform for MacFiles {
     fn open_directory(&self, path: &Path) -> Result<File, FileError> {
         MutationPlatform::open_directory(self, path)
+    }
+    fn open_symlink(&self, path: &Path) -> Result<File, FileError> {
+        links::open(path)
     }
     fn prepare_rename(&self, parent: &Path, receipt: &RelocationReceipt) -> Result<(), FileError> {
         native::prepare(parent, receipt)
@@ -61,3 +66,7 @@ mod race_tests;
 #[cfg(test)]
 #[path = "relocation/metadata_tests.rs"]
 mod mutation_metadata_tests;
+
+#[cfg(test)]
+#[path = "relocation/link_tests.rs"]
+mod link_tests;

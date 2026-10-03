@@ -27,6 +27,7 @@ pub(super) fn verify<P: RelocationPlatform>(
         || destination.modified != selected.modified
         || destination.mode != selected.mode
         || destination.created != selected.created
+        || destination.link_target != selected.link_target
         || platform.stamp(&context.source.file.metadata()?).version != destination.version
     {
         return Err(changed(

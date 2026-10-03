@@ -47,6 +47,8 @@ mod cancellation;
 mod cancellation_harness;
 #[path = "files_cli/relocation.rs"]
 mod relocation;
+#[path = "files_cli/link_relocation.rs"]
+mod link_relocation;
 #[path = "files_cli/relocation_cancellation.rs"]
 mod relocation_cancellation;
 

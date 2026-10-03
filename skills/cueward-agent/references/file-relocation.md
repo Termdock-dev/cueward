@@ -1,6 +1,6 @@
 # Authorized same-volume rename and move
 
-Use installed `files rename/move` only for the requested source and new name/destination. This source revision is pending review; check installed `--help`. Observe the source and the existing destination parent with `files info`, then supply their exact versions. One absolute root bounds both relative paths.
+Use installed `files rename/move` only for the requested source and new name/destination. Check installed `--help`; the new [explicit symlink-object option](file-link-relocation.md) is pending review. Observe the source and the existing destination parent with `files info`, then supply their exact versions. One absolute root bounds both relative paths.
 
 ```bash
 cueward files info --root /absolute/directory --path from/report.txt
@@ -10,7 +10,7 @@ cueward files move --root /absolute/directory --path from/report.txt --destinati
 cueward files relocation receipt --operation-id '<returned or announced ID>'
 ```
 
-Rename uses `--name` with one exact leaf, keeping its existing parent; use that parent's expected-parent-version. Move uses `--destination` with the full new relative path, not an implied destination folder. Reobserve after writes. There is no overwrite, merge, conflict auto-renaming, missing-parent creation or cross-volume copy/delete fallback. Initial links, aliases/unknown alias state, placeholders/unknown availability and special files are unsupported. Available files/directories/packages and hardlinked entries can move; packages are not recursively validated. A directory cannot move into its own subtree. Exact same-path requests verify a no-op; case-only existing-path conflicts are rejected.
+Rename uses `--name` with one exact leaf, keeping its existing parent; use that parent's expected-parent-version. Move uses `--destination` with the full new relative path, not an implied destination folder. Reobserve after writes. There is no overwrite, merge, conflict auto-renaming, missing-parent creation or cross-volume copy/delete fallback. Initial links are unsupported by default; [explicit link-object relocation](file-link-relocation.md) preserves their inode/reference text without following targets. Ancestor links, aliases/unknown alias state, placeholders/unknown availability and special files remain unsupported. Available files/directories/packages and hardlinked entries can move; packages are not recursively validated. A directory cannot move into its own subtree. Exact same-path requests verify a no-op; case-only existing-path conflicts are rejected.
 
 `--dry-run` returns rename_plan/move_plan observations including conflicts, same_filesystem and no_op. It makes no receipt, grants no execution token and does not establish native capability or reserve names. Execution requires supported guarded exclusive rename on the volume. Receipt storage need not share that volume.
 
