@@ -26,3 +26,6 @@ pub fn plan_worker(request: &CopyTreeRequest) -> Result<CopyTreePlan, FileError>
 mod tests;
 #[cfg(test)]
 mod safety_tests;
+
+#[cfg(test)]
+mod package_tests;

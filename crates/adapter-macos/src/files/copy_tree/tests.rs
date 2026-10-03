@@ -30,6 +30,7 @@ pub(super) fn request(root: &Path) -> CopyTreeRequest {
         max_entries: 256,
         max_depth: 16,
         max_bytes: 67108864,
+        include_packages: false,
     }
 }
 #[test]

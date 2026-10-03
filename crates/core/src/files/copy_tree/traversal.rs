@@ -141,9 +141,11 @@ impl<'a, 'b, P: CopyTreePlatform> Scan<'a, 'b, P> {
             ))
         } else if source.kind == FileKind::Directory
             && resources.is_package != (ResourceValue::Available { value: false })
+            && !(self.request.include_packages
+                && resources.is_package == (ResourceValue::Available { value: true }))
         {
             Some(unsupported(
-                "packages or unknown package state are not traversed",
+                "packages require explicit inclusion; unknown package state is never traversed",
             ))
         } else {
             self.scope

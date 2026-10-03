@@ -1,6 +1,6 @@
 # Restore a retained verified trash backup
 
-New source capability pending review. Check installed `files trash restore --help` and `files trash restore-receipt --help`. Use for an explicit user request to restore the original verified backup of a completed ordinary-file trash operation. This is an independent backup copy, not native Trash movement or Finder Put Back. Never use it to reconcile an uncertain/incomplete trash receipt.
+Source capability merged in PR #62. Check installed `files trash restore --help` and `files trash restore-receipt --help`. Use for an explicit user request to restore the original verified backup of a completed ordinary-file trash operation. This is an independent backup copy, not native Trash movement or Finder Put Back. Never use it to reconcile an uncertain/incomplete trash receipt.
 
 Read the original [trash receipt](file-trash-execution.md) and observe its original parent after trashing:
 

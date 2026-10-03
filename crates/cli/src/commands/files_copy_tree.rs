@@ -34,7 +34,7 @@ pub(crate) struct TreeExecuteArgs {
 pub(crate) struct TreeScopeArgs {
     #[arg(long)]
     root: PathBuf,
-    /// Source directory relative to root; packages are not traversed.
+    /// Source directory relative to root; packages are skipped unless explicitly included.
     #[arg(long)]
     path: PathBuf,
     /// Exact new relative directory path under an existing parent.
@@ -51,6 +51,9 @@ pub(crate) struct TreeScopeArgs {
     /// Summed observed file sizes; execution also bounds each file transfer.
     #[arg(long, default_value_t=67108864, value_parser=clap::value_parser!(u64).range(1..=268435456))]
     max_bytes: u64,
+    /// Traverse known package directories too; links and unsupported metadata remain blocked.
+    #[arg(long)]
+    include_packages: bool,
     #[arg(long, default_value_t=10000, value_parser=clap::value_parser!(u64).range(1..=30000))]
     timeout_ms: u64,
 }
@@ -96,6 +99,7 @@ fn request(args: TreeScopeArgs, max_entries: u16) -> CopyTreeRequest {
         max_entries: max_entries as usize,
         max_depth: args.max_depth as usize,
         max_bytes: args.max_bytes,
+        include_packages: args.include_packages,
     }
 }
 #[derive(serde::Serialize)]

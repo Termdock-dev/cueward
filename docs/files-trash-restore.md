@@ -1,6 +1,6 @@
 # Restore a verified retained trash backup
 
-`files trash restore` adds non-destructive backup recovery for [#42](https://github.com/Termdock-dev/cueward/issues/42). This source capability is pending review; check installed command help. It accepts only a completed, verified ordinary-file [trash execution receipt](files-trash-execution.md). It copies the retained backup to the recorded original path, with a new identity, without overwriting anything. It does not move, inspect or remove the native Trash item, consume the backup or rewrite the original receipt.
+`files trash restore` adds non-destructive backup recovery for [#42](https://github.com/Termdock-dev/cueward/issues/42). This source capability was merged in PR #62; check installed command help. It accepts only a completed, verified ordinary-file [trash execution receipt](files-trash-execution.md). It copies the retained backup to the recorded original path, with a new identity, without overwriting anything. It does not move, inspect or remove the native Trash item, consume the backup or rewrite the original receipt.
 
 ## Explicit request
 
@@ -51,4 +51,4 @@ Disposable tests cover backup-based recovery, unchanged original Trash/backup/re
 
 The separately ignored native CLI acceptance test trashes one newly owned fixture with Foundation, restores through this command and verifies that its exact native Trash entry, backup and original receipt remain unchanged. Test cleanup touches only that owned entry after verifying its restored copy; it never enumerates or empties personal Trash. The 2026-10-03 macOS 27.0.1 run was blocked before restore: native trash added a 72-byte `com.apple.macl`, and the existing empty-marker-only policy retained an `incomplete` trash receipt. That evidence is not accepted for restoration; this PR does not broaden the trash exception. A separate explicit release-CLI probe passed using a completed receipt from controlled owned-trash execution, exercising the actual restore worker, guarded publication, conflict refusal and saved lookup. Native trash-to-restore end-to-end acceptance, older macOS, true TCC denial, read-only/unmounted/external volumes, File Provider coordination and Finder UI remain unverified. `provider_coordination=filesystem_only_provider_state_unknown`; no download is requested.
 
-#42 remains open for broader trash/recovery types, partial-operation recovery, cross-volume operations, package duplication, existing-tag edits and remaining platform acceptance. Permanent deletion is excluded.
+#42 remains open for broader trash/recovery types, partial-operation recovery, cross-volume operations, broader package support, existing-tag edits and remaining platform acceptance. Permanent deletion is excluded.
