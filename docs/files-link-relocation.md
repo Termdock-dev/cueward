@@ -34,6 +34,12 @@ Preflight rejects stale link/parent revisions and revalidates held root/source/p
 
 Operations remain `rename_plan`, `move_plan`, `rename`, `move` and `relocation_receipt`. `link_itself=true` is retained in the request and saved evidence; missing/false preserves legacy rejection and false is omitted on serialization. Non-boolean values are rejected. Use a compatible installed CLI to operate links; saved lookup alone neither authorizes a write nor proves current completion. Execution exit zero requires `status=completed` and `completion_verified=true`; dry-run observations do not certify native support or grant an execution token.
 
+### Receipt readers across CLI revisions
+
+Compatibility is one-way. This feature's CLI reads legacy receipts with a missing `link_itself` as false. Pre-#64 relocation readers instead ignore unknown request fields, so they can successfully read an opt-in receipt while silently omitting `link_itself=true` from the reserialized output, including the nested `before.request`. The stored receipt is not rewritten by lookup, but that older output is incomplete evidence of the original request. Missing opt-in in an older reader's output does not establish that the original request lacked it.
+
+Use the same CLI binary whose `files rename --help` and `files move --help` expose `--link-itself` when reading link-aware receipts. Do not use an older reader's successful exit or field omission as a complete authorization record. Preserve the original `receipt_path` JSON and its opt-in fields unchanged; do not strip them, migrate namespaces manually or replay the operation. Older workers still reject an initially selected symlink, so ignoring this field does not enable link relocation. This slice retains the existing receipt schema/namespace; it does not promise fail-closed lookup on already distributed older binaries.
+
 Receipt storage, one-use claims, stderr operation announcements, parent SIGINT/SIGTERM/SIGKILL lifelines, timeout 1..30000 ms/default 10000 and conservative `not_started/incomplete/uncertain` outcomes are unchanged. Inspect receipt and actual paths on failure; do not retry, rewrite the reference, roll back, delete or replay automatically. No payload backup, activation, cross-volume copy/delete or target repair is added. Provider coordination remains `filesystem_only_provider_state_unknown`.
 
 ## Verification and remaining work
