@@ -6,6 +6,7 @@ pub mod relocation;
 pub mod batch_rename;
 pub mod batch_execution;
 pub mod tags;
+pub mod trash;
 mod store;
 mod guarded_rename;
 pub mod preview;

@@ -6,6 +6,7 @@ pub mod mutation;
 pub mod copy_tree;
 pub mod relocation;
 pub mod tags;
+pub mod trash;
 mod reading;
 mod scope;
 mod search;

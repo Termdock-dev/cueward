@@ -1,6 +1,6 @@
 # Read-only recursive copy plans
 
-`cueward files copy-tree plan` implements the directory-planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Check installed `--help` first. The separate [verified execution](files-copy-tree-execution.md) is a new source capability pending review; this plan never authorizes or executes it. Existing [single-file copy/duplicate](files-mutations.md) commands retain their contracts.
+`cueward files copy-tree plan` implements the directory-planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Check installed `--help` first. The separate [verified execution](files-copy-tree-execution.md) was merged in [PR #59](https://github.com/Termdock-dev/cueward/pull/59); this plan never authorizes or executes it. Existing [single-file copy/duplicate](files-mutations.md) commands retain their contracts.
 
 ## Select and observe
 

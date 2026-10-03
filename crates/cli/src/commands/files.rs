@@ -5,6 +5,8 @@ use std::path::PathBuf;
 
 #[path = "files_tags.rs"]
 mod tags;
+#[path = "files_trash.rs"]
+mod trash;
 
 #[path = "files_mutation.rs"]
 mod mutation;
@@ -67,6 +69,11 @@ pub(crate) enum EncodingArg {
 
 #[derive(Subcommand)]
 pub(crate) enum FilesAction {
+    /// Inspect one trash proposal without moving or deleting anything.
+    Trash {
+        #[command(subcommand)]
+        action: trash::TrashCommand,
+    },
     /// Read Finder tags, create initial tags or verify no-ops with saved evidence.
     Tags {
         #[command(subcommand)]
@@ -176,6 +183,7 @@ impl FilesAction {
             | Self::Move(_)
             | Self::Relocation { .. }
             | Self::Tags { .. }
+            | Self::Trash { .. }
             | Self::Finder { .. }
             | Self::Spotlight(_)
             | Self::Cloud { .. }
@@ -254,6 +262,7 @@ impl ReadArgs {
 /// Dispatch a user command through a deadline-controlled worker.
 pub(crate) fn dispatch(action: FilesAction) {
     let action = match action {
+        FilesAction::Trash { action } => return trash::dispatch(action),
         FilesAction::Rename(args) => return relocation::rename(args),
         FilesAction::Move(args) => return relocation::move_entry(args),
         FilesAction::Relocation { action } => return relocation::receipt(action),
@@ -337,6 +346,7 @@ pub(crate) use relocation::worker as relocation_worker;
 pub(crate) use spotlight::worker as spotlight_worker;
 pub(crate) use tags::read_worker as tags_read_worker;
 pub(crate) use tags::worker as tags_worker;
+pub(crate) use trash::worker as trash_plan_worker;
 
 #[cfg(test)]
 #[path = "files_tests.rs"]

@@ -1,6 +1,6 @@
 # Inspect a recursive directory copy proposal
 
-Check installed `files copy-tree plan --help`. Use this read-only command for the user's selected source directory and explicit new destination, not as permission to copy. Authorized [tree execution](file-copy-tree-execution.md) is separate and pending review; single-file commands keep their separate [mutation contract](file-mutations.md).
+Check installed `files copy-tree plan --help`. Use this read-only command for the user's selected source directory and explicit new destination, not as permission to copy. Authorized [tree execution](file-copy-tree-execution.md) is separate and merged in [PR #59](https://github.com/Termdock-dev/cueward/pull/59); single-file commands keep their separate [mutation contract](file-mutations.md).
 
 Observe source and the destination's existing parent with `files info`, then pass their versions:
 
