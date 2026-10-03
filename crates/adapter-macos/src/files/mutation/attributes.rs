@@ -20,16 +20,31 @@ const MAX_BYTES: usize = 4 * 1024 * 1024;
 
 /// Hash bounded descriptor attributes including names/lengths, never following a path.
 pub(in crate::files) fn digest(file: &File) -> Result<(String, usize), FileError> {
+    digest_filtered(file, false).map(|(digest, bytes, _)| (digest, bytes))
+}
+/// Native trash may add only a zero-byte com.apple.macl marker; still read every bounded value.
+pub(in crate::files) fn trash_digest(file: &File) -> Result<(String, usize, bool), FileError> {
+    digest_filtered(file, true)
+}
+fn digest_filtered(
+    file: &File,
+    allow_empty_macl: bool,
+) -> Result<(String, usize, bool), FileError> {
     let names = names(file)?;
     let mut values: Vec<_> = names.split(|b| *b == 0).filter(|s| !s.is_empty()).collect();
     values.sort_unstable();
     let mut hash = Sha256::new();
     let mut total = 0;
+    let mut excluded_empty_macl = false;
     for name in values {
         let c_name = CString::new(name).map_err(|_| invalid())?;
         let value = read_value(file, &c_name, MAX_BYTES - total)?;
         let size = value.len();
         total += size;
+        if allow_empty_macl && name == b"com.apple.macl" && size == 0 {
+            excluded_empty_macl = true;
+            continue;
+        }
         hash.update((name.len() as u64).to_be_bytes());
         hash.update(name);
         hash.update((size as u64).to_be_bytes());
@@ -41,7 +56,7 @@ pub(in crate::files) fn digest(file: &File) -> Result<(String, usize), FileError
             "attribute names changed while reading",
         ));
     }
-    Ok((format!("{:x}", hash.finalize()), total))
+    Ok((format!("{:x}", hash.finalize()), total, excluded_empty_macl))
 }
 
 fn read_value(file: &File, name: &CString, maximum: usize) -> Result<Vec<u8>, FileError> {

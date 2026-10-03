@@ -1,6 +1,6 @@
 # Read-only trash proposals
 
-`cueward files trash plan` implements the planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). This is a new source capability pending review; check installed `--help`. It describes one selected filesystem entry before the user decides whether to trash it. Actual trashing and recovery are not implemented. Permanent deletion is excluded.
+`cueward files trash plan` implements the planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Read-only planning was merged in PR #60; check installed `--help`. It describes one selected filesystem entry before the user decides whether to trash it. Separately confirmed ordinary-file removal uses [verified trash execution](files-trash-execution.md); recovery is not implemented. Permanent deletion is excluded.
 
 ## Select and observe
 
@@ -12,9 +12,9 @@ cueward files trash plan --root /Users/me/Documents --path Reports/old.txt \
   --expected-version '<observed entry version>'
 ```
 
-There is no default selection, root-directory target, batch/glob expansion, link-following, destination, confirmation flag, execute, receipt, restore or permanent-delete command. A filename containing `*` is one literal filename, not a match pattern. This command never moves/removes the selected entry, opens payloads through Cueward's reading engine, enumerates descendants, stages a backup, creates a mutation receipt, looks up a Trash directory, activates Finder or requests a download. Native resource inspection reuses `files metadata`; read access times are not promised unchanged.
+The plan accepts no default selection, root-directory target, batch/glob expansion, link-following, destination or confirmation flag. Separate execute/receipt commands do not change its read-only contract; restore and permanent deletion are unavailable. A filename containing `*` is one literal filename, not a match pattern. This command never moves/removes the selected entry, opens payloads through Cueward's reading engine, enumerates descendants, stages a backup, creates a mutation receipt, looks up a Trash directory, activates Finder or requests a download. Native resource inspection reuses `files metadata`; read access times are not promised unchanged.
 
-A successful plan is not authorization or proof that native trashing, deleting permissions or recovery are available. Present the exact selected path, entry kind and warnings to the user. Future removal will require a separate explicitly confirmed request and fresh observations, not replay of this JSON.
+A successful plan is not authorization or proof that native trashing, deleting permissions or recovery are available. Present the exact selected path, entry kind and warnings to the user. Removal requires a separate explicitly confirmed execution request and fresh observations, not replay of this JSON.
 
 ## Result and scope
 
@@ -46,10 +46,10 @@ Only a leaf link can be inspected. Symlink ancestors, parent traversal and an ab
 
 `--timeout-ms` defaults to 10,000 and accepts 1..30,000 for the whole read-only worker. Serialized requests fit 16 KiB. Results have a fixed 64 KiB pretty-JSON budget before external escaping/envelopes; exceeding it returns `scan_limit`, not partial apparently successful metadata. Native metadata allocation/latency is separate from the result bound.
 
-Resolution is anchored to the initially canonical root. The original supplied spelling stays in the request; source and parent path/identity/revisions and root alias mapping/revision are checked again before returning. Detected changes discard the proposal. These are sequential metadata observations, not an atomic snapshot, namespace reservation, source-inode lock or directory-content inventory. A directory revision does not summarize all descendant payload revisions. Reobserve before a later decision, and do not use `move` or shell deletion to bypass the missing trash operation.
+Resolution is anchored to the initially canonical root. The original supplied spelling stays in the request; source and parent path/identity/revisions and root alias mapping/revision are checked again before returning. Detected changes discard the proposal. These are sequential metadata observations, not an atomic snapshot, namespace reservation, source-inode lock or directory-content inventory. A directory revision does not summarize all descendant payload revisions. Reobserve before a later decision, and do not use `move` or shell deletion to bypass the confirmed trash workflow.
 
 ## Verification and remaining work
 
 Disposable native tests cover unchanged bytes/inode/link count/mode/mtime/ctime, exact Unicode/newline names, directories/packages, outside/broken leaf links, FIFO, read-only mode, stale/invalid/missing selection, stable/retargeted root aliases and ancestor-link refusal. Controlled platform seams cover aliases, unknown/dataless availability, per-field errors, unknown package state, source/parent changes during metadata inspection and result overflow. Actual CLI/worker tests cover JSON envelopes/escaping, failure exits, unavailable mutation options, strict request decoding and oversize/malformed input. A blocking-worker test covers the whole-worker deadline. No personal files or Trash items are moved or deleted.
 
-Future execution must validate scoped native submission, interruption receipts, actual returned Trash locations and recovery semantics rather than assume `~/.Trash` or reuse a proposed filename. Apple's candidate [`FileManager.trashItem(at:resultingItemURL:)`](https://developer.apple.com/documentation/foundation/filemanager/trashitem(at:resultingitemurl:)) reports the resulting location because trashing can change the name. This API is not called by planning. Real provider/TCC/read-only/unmount/external-volume and older macOS acceptance remain unverified. #42 remains open for actual trash/recovery and other unfinished management work.
+Separate [ordinary-file execution](files-trash-execution.md) performs verified backup and guarded private quarantine before native Foundation trash, recording its actual resulting location. Planning itself still does not call that API or create receipts. Real provider/TCC/read-only/unmount/external-volume and older macOS acceptance remain unverified. #42 remains open for restore, broader trash types and other unfinished management work.

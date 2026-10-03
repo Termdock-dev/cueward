@@ -35,6 +35,8 @@ mod batch_execution_cancellation;
 mod tags;
 #[path = "files_cli/trash.rs"]
 mod trash;
+#[path = "files_cli/trash_execution.rs"]
+mod trash_execution;
 #[path = "files_cli/cancellation.rs"]
 mod cancellation;
 #[path = "files_cli/cancellation_harness.rs"]

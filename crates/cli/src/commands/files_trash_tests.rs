@@ -47,3 +47,51 @@ fn trash_plan_parsing_never_accepts_confirmation_execution_restore_or_link_follo
         assert!(Cli::try_parse_from(input).is_err());
     }
 }
+#[test]
+fn trash_execute_requires_confirmation_parent_guard_and_accepts_bounded_backup() {
+    let mut input = args();
+    input[3] = "execute";
+    assert!(Cli::try_parse_from(input.clone()).is_err());
+    input.extend(["--expected-parent-version", "parent", "--confirm"]);
+    assert!(Cli::try_parse_from(input.clone()).is_ok());
+    for value in ["1", "268435456"] {
+        assert!(
+            Cli::try_parse_from(input.clone().into_iter().chain(["--max-bytes", value])).is_ok()
+        );
+    }
+    for value in ["0", "268435457"] {
+        assert!(
+            Cli::try_parse_from(input.clone().into_iter().chain(["--max-bytes", value])).is_err()
+        );
+    }
+    for flag in [
+        "--force",
+        "--recursive",
+        "--follow-links",
+        "--delete",
+        "--destination",
+    ] {
+        assert!(Cli::try_parse_from(input.clone().into_iter().chain([flag])).is_err());
+    }
+}
+#[test]
+fn trash_receipt_requires_an_id_and_exposes_no_resume_or_restore() {
+    assert!(
+        Cli::try_parse_from([
+            "cueward",
+            "files",
+            "trash",
+            "receipt",
+            "--operation-id",
+            "id"
+        ])
+        .is_ok()
+    );
+    assert!(Cli::try_parse_from(["cueward", "files", "trash", "receipt"]).is_err());
+    for command in ["restore", "delete", "resume", "retry"] {
+        assert!(
+            Cli::try_parse_from(["cueward", "files", "trash", command, "--operation-id", "id"])
+                .is_err()
+        );
+    }
+}
