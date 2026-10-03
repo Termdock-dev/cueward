@@ -69,7 +69,7 @@ pub(crate) enum EncodingArg {
 
 #[derive(Subcommand)]
 pub(crate) enum FilesAction {
-    /// Inspect one trash proposal without moving or deleting anything.
+    /// Inspect trash proposals, explicitly trash one verified ordinary file or read receipts.
     Trash {
         #[command(subcommand)]
         action: trash::TrashCommand,
@@ -346,6 +346,7 @@ pub(crate) use relocation::worker as relocation_worker;
 pub(crate) use spotlight::worker as spotlight_worker;
 pub(crate) use tags::read_worker as tags_read_worker;
 pub(crate) use tags::worker as tags_worker;
+pub(crate) use trash::execute_worker as trash_execute_worker;
 pub(crate) use trash::worker as trash_plan_worker;
 
 #[cfg(test)]

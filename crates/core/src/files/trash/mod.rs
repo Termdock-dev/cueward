@@ -1,4 +1,5 @@
 //! Read-only selected-entry trash proposals; never remove, move or enumerate descendants.
+pub mod execution;
 mod model;
 mod warnings;
 use crate::files::scope::Scope;

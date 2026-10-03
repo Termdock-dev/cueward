@@ -95,6 +95,8 @@ pub(crate) enum Command {
     #[command(hide = true)]
     FilesTrashPlanWorker,
     #[command(hide = true)]
+    FilesTrashWorker,
+    #[command(hide = true)]
     FilesFinderWorker,
     #[command(hide = true)]
     FilesSpotlightWorker,
@@ -274,6 +276,7 @@ pub(crate) fn dispatch(command: Command) {
         Command::Files { action } => files::dispatch(action),
         Command::FilesWorker => files::worker(),
         Command::FilesTrashPlanWorker => files::trash_plan_worker(),
+        Command::FilesTrashWorker => files::trash_execute_worker(),
         Command::FilesFinderWorker => files::finder_worker(),
         Command::FilesSpotlightWorker => files::spotlight_worker(),
         Command::FilesCloudWorker => files::cloud_worker(),

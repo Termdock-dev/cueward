@@ -57,7 +57,7 @@ External JSON operation is `copy_tree` for execution and `copy_tree_receipt` for
 
 The parent announces the operation ID on stderr before dispatch. Workers are claimed once and monitor the parent's socket lifetime before any work and continuously thereafter. Parent SIGINT/SIGTERM/SIGKILL stops workers, and worker deadlines stop their process group. Saved lookup never reopens selected paths or resumes execution. Inspect the receipt, private staging, source and destination before deciding another explicitly authorized operation. Private retained trees can contain user data and consume space; no automatic retention cleanup is included.
 
-No implicit materialization is allowed. `provider_coordination=filesystem_only_provider_state_unknown` is not a provider synchronization guarantee. Cross-volume copying, package duplication, trash/recovery and existing-tag edits remain separate work in #42. Real File Provider/TCC/read-only/unmount/external-volume and older macOS acceptance remain unverified.
+No implicit materialization is allowed. `provider_coordination=filesystem_only_provider_state_unknown` is not a provider synchronization guarantee. Cross-volume copying, package duplication, broader trash types/restore and existing-tag edits remain separate work in #42. Confirmed ordinary-file trash uses [verified trash execution](files-trash-execution.md). Real File Provider/TCC/read-only/unmount/external-volume and older macOS acceptance remain unverified.
 
 ## Verification scope
 

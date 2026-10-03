@@ -1,4 +1,5 @@
-//! Read-only trash-target observations under the existing no-materialization policy.
+//! Read-only trash proposals and separately confirmed, backed-up native trash execution.
+pub mod execution;
 use super::{MacFiles, policy, protocol};
 use cueward_core::files::{FileError, trash};
 use std::path::Path;
