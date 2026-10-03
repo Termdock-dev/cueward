@@ -98,10 +98,21 @@ fn launch(control: &Path, request: &CopyTreeRequest, mode: &str, timeout: u64) -
 fn interrupted(mode: &str, signal: Option<&str>) {
     let root = fixture();
     let control = tempfile::tempdir().unwrap();
-    let source_version = request(root.path()).expected_version;
+    let mut selected = request(root.path());
+    if mode == "package" {
+        fs::create_dir(root.path().join("source/Owned.app")).unwrap();
+        fs::write(
+            root.path().join("source/Owned.app/payload"),
+            b"OWNED package bytes",
+        )
+        .unwrap();
+        selected = request(root.path());
+        selected.include_packages = true;
+    }
+    let source_version = selected.expected_version.clone();
     let mut processes = launch(
         control.path(),
-        &request(root.path()),
+        &selected,
         mode,
         if signal.is_some() { 30000 } else { 2000 },
     );
@@ -147,7 +158,7 @@ fn interrupted(mode: &str, signal: Option<&str>) {
         fs::read(root.path().join("source/.hidden")).unwrap(),
         b"OWNED hidden\0"
     );
-    if mode == "partial" {
+    if mode == "partial" || mode == "package" {
         assert_eq!(receipt.stage, TreeStage::Copying);
         let staged = Path::new(receipt.staging_path.as_ref().unwrap());
         assert_eq!(fs::read(staged.join(".hidden")).unwrap(), b"OWNED hidden\0");
@@ -155,6 +166,13 @@ fn interrupted(mode: &str, signal: Option<&str>) {
     } else {
         assert_eq!(receipt.stage, TreeStage::Preflight);
         assert!(receipt.staging_path.is_none());
+    }
+    if mode == "package" {
+        assert!(receipt.request.include_packages);
+        assert_eq!(
+            fs::read(root.path().join("source/Owned.app/payload")).unwrap(),
+            b"OWNED package bytes"
+        );
     }
     let directory = Path::new(&receipt.receipt_path).parent().unwrap();
     assert_eq!(directory.file_name().unwrap().to_str().unwrap(), id);
@@ -171,4 +189,12 @@ fn tree_execute_parent_signals_stop_armed_and_partially_copied_workers() {
 #[test]
 fn tree_execute_deadline_after_private_copy_preserves_uncertain_receipt() {
     interrupted("partial", None);
+}
+
+#[test]
+fn package_execute_parent_signals_and_deadline_preserve_partial_private_copy_without_publication() {
+    for signal in ["-INT", "-TERM", "-KILL"] {
+        interrupted("package", Some(signal));
+    }
+    interrupted("package", None);
 }

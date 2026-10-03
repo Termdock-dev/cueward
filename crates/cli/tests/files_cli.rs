@@ -19,6 +19,8 @@ mod preview;
 mod cloud;
 #[path = "files_cli/mutation.rs"]
 mod mutation;
+#[path = "files_cli/package_copy.rs"]
+mod package_copy;
 #[path = "files_cli/copy_tree.rs"]
 mod copy_tree;
 #[path = "files_cli/tree_execution.rs"]

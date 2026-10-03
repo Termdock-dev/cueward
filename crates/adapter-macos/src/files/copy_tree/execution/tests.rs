@@ -44,6 +44,7 @@ pub(super) fn request(root: &Path) -> CopyTreeRequest {
         max_entries: 64,
         max_depth: 16,
         max_bytes: 67108864,
+        include_packages: false,
     }
 }
 pub(super) fn owned(root: tempfile::TempDir, request: CopyTreeRequest) -> Owned {

@@ -19,6 +19,9 @@ pub struct CopyTreeRequest {
     pub max_entries: usize,
     pub max_depth: usize,
     pub max_bytes: u64,
+    /// Explicitly include known package directories; unknown package state remains blocked.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub include_packages: bool,
 }
 
 /// One observed node and exact proposed destination, in sorted depth-first order.
@@ -54,4 +57,8 @@ pub struct CopyTreePlan {
     pub has_blockers: bool,
     pub execution_supported: bool,
     pub provider_coordination: String,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }

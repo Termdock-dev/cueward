@@ -98,3 +98,31 @@ fn tree_execute_parsing_has_separate_entry_bound_and_no_replay_or_overwrite() {
     );
     assert!(Cli::try_parse_from(["cueward", "files", "copy-tree", "receipt"]).is_err());
 }
+
+#[test]
+fn copy_tree_package_inclusion_is_explicit_for_plan_and_execute_not_receipt_or_single_file_copy() {
+    // Both commands retain all existing required guards and bounds.
+    for action in ["plan", "execute"] {
+        let mut input = args();
+        input[3] = action;
+        assert!(Cli::try_parse_from(input.clone()).is_ok());
+        assert!(Cli::try_parse_from(input.into_iter().chain(["--include-packages"])).is_ok());
+    }
+    assert!(
+        Cli::try_parse_from([
+            "cueward",
+            "files",
+            "copy-tree",
+            "receipt",
+            "--operation-id",
+            "id",
+            "--include-packages"
+        ])
+        .is_err()
+    );
+    let mut single_file = args();
+    single_file.remove(2);
+    single_file[2] = "copy";
+    assert!(Cli::try_parse_from(single_file.clone()).is_ok());
+    assert!(Cli::try_parse_from(single_file.into_iter().chain(["--include-packages"])).is_err());
+}

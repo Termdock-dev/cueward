@@ -14,6 +14,7 @@ struct Hook {
     cross: bool,
     unknown: Option<String>,
     invalid_names: bool,
+    package_state: Option<ResourceValue<bool>>,
 }
 impl FilePlatform for Hook {
     fn stamp(&self, metadata: &Metadata) -> FileStamp {
@@ -37,6 +38,11 @@ impl FilePlatform for Hook {
             resources.finder_tags = ResourceValue::Available {
                 value: vec!["x".repeat(65536)],
             };
+        }
+        if path.ends_with("Owned.app") {
+            if let Some(state) = &self.package_state {
+                resources.is_package = state.clone();
+            }
         }
         Ok(resources)
     }
@@ -70,6 +76,7 @@ fn hook(action: impl Fn(&Path) + 'static) -> Hook {
         cross: false,
         unknown: None,
         invalid_names: false,
+        package_state: None,
     }
 }
 #[test]
@@ -270,4 +277,47 @@ fn copy_tree_parent_ancestry_uses_identity_not_case_sensitive_path_prefixes() {
         plan.issues
             .contains(&CopyTreeIssue::DestinationWithinSource)
     );
+}
+
+#[test]
+fn package_opt_in_never_treats_unknown_resource_states_as_known_packages() {
+    let root = fixture();
+    fs::create_dir(root.path().join("source/Owned.app")).unwrap();
+    fs::write(
+        root.path().join("source/Owned.app/PRIVATE-descendant"),
+        b"not traversed",
+    )
+    .unwrap();
+    let mut selected = request(root.path());
+    selected.include_packages = true;
+    for state in [
+        ResourceValue::Unavailable,
+        ResourceValue::Unsupported,
+        ResourceValue::NotApplicable,
+        ResourceValue::Error {
+            error: MetadataError {
+                domain: "owned".into(),
+                code: 1,
+                message: "unknown".into(),
+            },
+        },
+    ] {
+        let mut platform = hook(|_| {});
+        platform.package_state = Some(state.clone());
+        let plan = copy_tree::plan(&platform, &selected).unwrap();
+        assert!(plan.has_blockers && !plan.enumeration_complete);
+        assert!(
+            !plan
+                .entries
+                .iter()
+                .any(|e| e.source.name == "PRIVATE-descendant")
+        );
+        let entry = plan
+            .entries
+            .iter()
+            .find(|e| e.source.name == "Owned.app")
+            .unwrap();
+        assert!(entry.error.is_some());
+        assert_eq!(entry.resources.as_ref().unwrap().is_package, state);
+    }
 }

@@ -114,3 +114,6 @@ fn json(value: &impl Serialize) -> Result<serde_json::Value, FileError> {
 mod tests;
 #[cfg(test)]
 mod safety_tests;
+
+#[cfg(test)]
+mod package_tests;
