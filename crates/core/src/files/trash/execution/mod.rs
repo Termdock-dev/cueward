@@ -1,7 +1,7 @@
 //! Verified backup, guarded private quarantine, then native trash with actual-result verification.
 mod model;
 mod context;
-mod verification;
+pub(super) mod verification;
 mod quarantine;
 use crate::files::mutation::*;
 use crate::files::scope::{Scope, text};

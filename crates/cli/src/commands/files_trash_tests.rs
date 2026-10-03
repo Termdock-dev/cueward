@@ -75,7 +75,7 @@ fn trash_execute_requires_confirmation_parent_guard_and_accepts_bounded_backup()
     }
 }
 #[test]
-fn trash_receipt_requires_an_id_and_exposes_no_resume_or_restore() {
+fn trash_receipt_requires_an_id_and_exposes_no_resume() {
     assert!(
         Cli::try_parse_from([
             "cueward",
@@ -94,4 +94,77 @@ fn trash_receipt_requires_an_id_and_exposes_no_resume_or_restore() {
                 .is_err()
         );
     }
+}
+
+fn restore_args() -> Vec<&'static str> {
+    vec![
+        "cueward",
+        "files",
+        "trash",
+        "restore",
+        "--operation-id",
+        "id",
+        "--root",
+        "/owned",
+        "--expected-parent-version",
+        "parent",
+    ]
+}
+#[test]
+fn trash_restore_requires_original_id_root_and_fresh_parent_and_has_no_overwrite_or_delete_flags() {
+    assert!(Cli::try_parse_from(restore_args()).is_ok());
+    for option in ["--operation-id", "--root", "--expected-parent-version"] {
+        let mut args = restore_args();
+        let index = args.iter().position(|a| *a == option).unwrap();
+        args.drain(index..index + 2);
+        assert!(Cli::try_parse_from(args).is_err());
+    }
+    for flag in [
+        "--confirm",
+        "--force",
+        "--recursive",
+        "--follow-links",
+        "--path",
+        "--destination",
+        "--max-bytes",
+    ] {
+        assert!(Cli::try_parse_from(restore_args().into_iter().chain([flag])).is_err());
+    }
+    for value in ["1", "30000"] {
+        assert!(
+            Cli::try_parse_from(restore_args().into_iter().chain(["--timeout-ms", value])).is_ok()
+        );
+    }
+    for value in ["0", "30001"] {
+        assert!(
+            Cli::try_parse_from(restore_args().into_iter().chain(["--timeout-ms", value])).is_err()
+        );
+    }
+}
+#[test]
+fn trash_restore_receipt_is_read_only_and_requires_its_own_id() {
+    assert!(
+        Cli::try_parse_from([
+            "cueward",
+            "files",
+            "trash",
+            "restore-receipt",
+            "--operation-id",
+            "id"
+        ])
+        .is_ok()
+    );
+    assert!(Cli::try_parse_from(["cueward", "files", "trash", "restore-receipt"]).is_err());
+    assert!(
+        Cli::try_parse_from([
+            "cueward",
+            "files",
+            "trash",
+            "restore-receipt",
+            "--operation-id",
+            "id",
+            "--retry"
+        ])
+        .is_err()
+    );
 }

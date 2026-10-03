@@ -56,7 +56,7 @@ pub(super) fn check_backup<P: TrashPlatform>(
     verify_file(context.platform, &info, verification)?;
     Ok(())
 }
-pub(super) fn verify_file(
+pub(in crate::files::trash) fn verify_file(
     platform: &impl TrashPlatform,
     info: &FileInfo,
     verification: &CopyVerification,

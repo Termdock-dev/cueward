@@ -7,7 +7,14 @@ pub(crate) enum TrashCommand {
     Plan(TrashPlanArgs),
     /// Back up one ordinary file, verify and move it once into existing system Trash.
     Execute(TrashExecuteArgs),
-    /// Read saved evidence only; never resume, retry, restore or clean up.
+    /// Restore verified retained backup to the original path; never overwrite or remove Trash.
+    Restore(RestoreArgs),
+    /// Read a saved restore receipt only; no retry, rollback or cleanup.
+    RestoreReceipt {
+        #[arg(long)]
+        operation_id: String,
+    },
+    /// Read saved trash evidence only; no retry or cleanup.
     Receipt {
         #[arg(long)]
         operation_id: String,
@@ -39,6 +46,19 @@ pub(crate) struct TrashExecuteArgs {
     #[arg(long, default_value_t=67108864, value_parser=clap::value_parser!(u64).range(1..=268435456))]
     max_bytes: u64,
 }
+#[derive(Args)]
+pub(crate) struct RestoreArgs {
+    /// Original completed trash receipt UUID, not a restore UUID.
+    #[arg(long)]
+    operation_id: String,
+    /// Explicit original root; recorded canonical path and identity must match.
+    #[arg(long)]
+    root: PathBuf,
+    #[arg(long)]
+    expected_parent_version: String,
+    #[arg(long,default_value_t=10000,value_parser=clap::value_parser!(u64).range(1..=30000))]
+    timeout_ms: u64,
+}
 #[derive(serde::Serialize)]
 struct Response {
     operation: &'static str,
@@ -48,6 +68,14 @@ struct Response {
 pub(super) fn dispatch(command: TrashCommand) {
     match command {
         TrashCommand::Plan(args) => plan(args),
+        TrashCommand::Restore(args) => restore(args),
+        TrashCommand::RestoreReceipt { operation_id } => output(
+            "files",
+            trash::restore::read_receipt(&operation_id).map(|result| RestoreResponse {
+                operation: "trash_restore_receipt",
+                result,
+            }),
+        ),
         TrashCommand::Execute(args) => execute(args),
         TrashCommand::Receipt { operation_id } => output(
             "files",
@@ -125,5 +153,42 @@ pub(crate) fn execute_worker() {
         "files/worker",
         trash::execution::read_supervised_request()
             .and_then(|r| trash::execution::execute_worker(&r)),
+    );
+}
+
+#[derive(serde::Serialize)]
+struct RestoreResponse {
+    operation: &'static str,
+    result: trash::restore::RestoreReceipt,
+}
+fn restore(args: RestoreArgs) {
+    let request = trash::restore::Request {
+        trash_operation_id: args.operation_id,
+        root: args.root,
+        expected_parent_version: args.expected_parent_version,
+    };
+    let result = std::env::current_exe()
+        .map_err(FileError::from)
+        .and_then(|exe| trash::restore::run(&exe, &request, args.timeout_ms));
+    let success = result.as_ref().is_ok_and(|r| {
+        r.status == cueward_core::files::mutation::MutationStatus::Completed
+            && r.completion_verified
+    });
+    output(
+        "files",
+        result.map(|result| RestoreResponse {
+            operation: "trash_restore",
+            result,
+        }),
+    );
+    if !success {
+        std::process::exit(1);
+    }
+}
+/// Arm lifetime monitoring before any restore worker claim or filesystem work.
+pub(crate) fn restore_worker() {
+    output(
+        "files/worker",
+        trash::restore::read_supervised_request().and_then(|r| trash::restore::execute_worker(&r)),
     );
 }

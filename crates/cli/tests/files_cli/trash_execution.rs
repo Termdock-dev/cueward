@@ -2,7 +2,7 @@ use super::mutation::version;
 use super::*;
 use std::os::unix::fs::MetadataExt;
 
-fn execute(root: &Path, path: &str, guard: &str, parent: &str) -> std::process::Output {
+pub(super) fn execute(root: &Path, path: &str, guard: &str, parent: &str) -> std::process::Output {
     command()
         .args(["files", "trash", "execute", "--root"])
         .arg(root)
@@ -18,7 +18,7 @@ fn execute(root: &Path, path: &str, guard: &str, parent: &str) -> std::process::
         .output()
         .unwrap()
 }
-fn remove_owned_receipt(receipt: &Value) {
+pub(super) fn remove_owned_receipt(receipt: &Value) {
     let directory = Path::new(receipt["receipt_path"].as_str().unwrap())
         .parent()
         .unwrap();
