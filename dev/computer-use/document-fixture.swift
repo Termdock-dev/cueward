@@ -54,7 +54,8 @@ func saveState() {
     let state: [String: Any] = ["pid": getpid(), "window_id": document.windowControllers[0].window?.windowNumber ?? 0,
         "active": app.isActive, "activations": activations, "foreground_changes": foregroundChanges,
         "save_requests": document.saveRequests, "contents": document.editor?.string ?? "",
-        "file_created": FileManager.default.fileExists(atPath: destination.appendingPathComponent("artifact.txt").path)]
+        "file_created": FileManager.default.fileExists(atPath: destination.appendingPathComponent("artifact.txt").path),
+        "panel_window_id": document.windowControllers[0].window?.attachedSheet?.windowNumber ?? 0]
     if let data = try? JSONSerialization.data(withJSONObject: state) { try? data.write(to: stateURL, options: .atomic) }
 }
 let observationTimer = startDocumentObserver { _ in saveState() }
