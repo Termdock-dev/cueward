@@ -77,6 +77,27 @@ pub(super) fn payload(request: &impl Serialize, timeout_ms: u64) -> Result<Vec<u
     Ok(payload)
 }
 
+/// Require the immutable prepared anchors and the complete saved worker evidence to agree.
+/// Callers load the receipt through their typed schema/identity checks before calling this.
+pub(super) fn verify_receipt<T: Serialize>(
+    prepared: &T,
+    receipt: T,
+    stored: &T,
+    mismatch: &str,
+) -> Result<T, FileError> {
+    let prepared = serde_json::to_value(prepared).map_err(internal)?;
+    let returned = serde_json::to_value(&receipt).map_err(internal)?;
+    let stored = serde_json::to_value(stored).map_err(internal)?;
+    if ["operation_id", "receipt_path", "request"]
+        .iter()
+        .any(|field| returned.get(field) != prepared.get(field))
+        || returned != stored
+    {
+        return Err(internal(mismatch));
+    }
+    Ok(receipt)
+}
+
 fn internal(error: impl std::fmt::Display) -> FileError {
     FileError::new(FileErrorCode::Internal, error.to_string())
 }
@@ -97,6 +118,37 @@ fn parse<T: DeserializeOwned>(bytes: &[u8]) -> Result<Result<T, FileError>, File
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn receipt_verification_allows_progress_but_rejects_changed_anchors_or_unsaved_results() {
+        let prepared = serde_json::json!({
+            "operation_id": "owned-id", "receipt_path": "/owned/receipt.json",
+            "request": {"path": "source"}, "status": "not_started"
+        });
+        let mut completed = prepared.clone();
+        completed["status"] = "completed".into();
+        assert_eq!(
+            verify_receipt(&prepared, completed.clone(), &completed, "mismatch").unwrap(),
+            completed
+        );
+        for field in ["operation_id", "receipt_path", "request"] {
+            let mut changed = completed.clone();
+            changed[field] = "changed".into();
+            assert_eq!(
+                verify_receipt(&prepared, changed.clone(), &changed, "mismatch")
+                    .unwrap_err()
+                    .code,
+                FileErrorCode::Internal,
+                "changed prepared anchor: {field}"
+            );
+        }
+        assert_eq!(
+            verify_receipt(&prepared, completed, &prepared, "mismatch")
+                .unwrap_err()
+                .code,
+            FileErrorCode::Internal
+        );
+    }
 
     #[test]
     fn blocking_worker_is_stopped_at_the_deadline() {

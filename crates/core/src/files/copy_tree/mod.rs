@@ -24,8 +24,6 @@ pub trait CopyTreePlatform: FilePlatform {
     fn tree_names(&self, directory: &File, maximum: usize) -> Result<Vec<OsString>, FileError>;
     /// Check the metadata preservation subset without reading the data fork.
     fn validate_tree_metadata(&self, file: &File, info: &FileInfo) -> Result<(), FileError>;
-    /// Compare devices without claiming cross-volume publication support.
-    fn same_tree_filesystem(&self, left: &File, right: &File) -> Result<bool, FileError>;
 }
 
 /// Plan one new directory tree, retaining unsupported nodes and refusing partial scans.
@@ -39,7 +37,7 @@ pub fn plan(
     let source = select_source(&scope, request)?;
     let selected = select_destination(&scope, request, &source)?;
     let issues = selected.issues;
-    let mut scan = traversal::Scan::new(&scope, request, &selected.file);
+    let mut scan = traversal::Scan::new(&scope, request);
     scan.visit(&request.path, Path::new("."), 0)?;
     if scan
         .entries

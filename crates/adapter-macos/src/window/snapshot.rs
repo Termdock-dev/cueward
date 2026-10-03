@@ -7,9 +7,10 @@ use serde::{Deserialize, Serialize};
 use super::input_target::InputTarget;
 use super::target::WindowIdentity;
 use crate::MacosError;
+use crate::cache::ensure_cache_dir;
 use crate::screenshot::{
     CapturableWindow, ScreenshotResult, WindowBounds, WindowScope, capture_window_frame,
-    ensure_cache_dir, list_windows, validate_user_output_path,
+    list_windows, validate_user_output_path,
 };
 
 #[derive(Debug, Serialize)]

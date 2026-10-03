@@ -48,7 +48,14 @@ pub fn run(
         },
         timeout,
     )
-    .and_then(|receipt: TagsReceipt| verify_response(&prepared, receipt));
+    .and_then(|receipt: TagsReceipt| {
+        protocol::verify_receipt(
+            &prepared,
+            receipt,
+            &read_receipt(&prepared.operation_id)?,
+            "tag worker result differs from prepared/stored evidence",
+        )
+    });
     match result {
         Ok(receipt) => Ok(receipt),
         Err(mut error) => {
@@ -64,20 +71,7 @@ pub fn run(
         }
     }
 }
-fn verify_response(prepared: &TagsReceipt, receipt: TagsReceipt) -> Result<TagsReceipt, FileError> {
-    let stored = read_receipt(&prepared.operation_id)?;
-    if receipt.operation_id != prepared.operation_id
-        || receipt.receipt_path != prepared.receipt_path
-        || json(&receipt.request)? != json(&prepared.request)?
-        || json(&receipt)? != json(&stored)?
-    {
-        return Err(FileError::new(
-            FileErrorCode::Internal,
-            "tag worker result differs from prepared/stored evidence",
-        ));
-    }
-    Ok(receipt)
-}
+
 /// Read saved evidence only, without resuming or restoring original tags.
 pub fn read_receipt(id: &str) -> Result<TagsReceipt, FileError> {
     let receipt: TagsReceipt = STORE.load(id)?;
@@ -141,8 +135,4 @@ fn record_error(receipt: &mut TagsReceipt, error: FileError) {
     };
     receipt.completion_verified = false;
     receipt.error = Some(error);
-}
-
-fn json(value: &impl serde::Serialize) -> Result<serde_json::Value, FileError> {
-    serde_json::to_value(value).map_err(|e| FileError::new(FileErrorCode::Internal, e.to_string()))
 }

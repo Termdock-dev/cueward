@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Component, Path};
 use std::process::Command;
 
@@ -7,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::MacosError;
 
-const CACHE_DIR: &str = ".cueward/cache/screenshots";
+use crate::cache::ensure_cache_dir;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScreenshotResult {
@@ -54,14 +53,6 @@ pub fn ensure_screenshot_file_exists(path: &Path) -> Result<(), String> {
             path.display()
         ))
     }
-}
-
-pub(crate) fn ensure_cache_dir() -> Result<String, MacosError> {
-    let home = std::env::var("HOME").map_err(|_| MacosError::Other("HOME not set".into()))?;
-    let dir = format!("{home}/{CACHE_DIR}");
-    fs::create_dir_all(&dir)
-        .map_err(|e| MacosError::Other(format!("failed to create {dir}: {e}")))?;
-    Ok(dir)
 }
 
 fn capture_to_path(

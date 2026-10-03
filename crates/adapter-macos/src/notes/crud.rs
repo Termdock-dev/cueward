@@ -90,6 +90,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
+    #[ignore = "requires explicit authorization to create and delete a note in the real Notes app"]
     fn create_note_supports_multiline_body() {
         let suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)

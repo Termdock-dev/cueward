@@ -37,7 +37,7 @@ fn open_request(
     request["action"] = json!("open");
     request["file"] = json!(file);
     request["new_instance"] = json!(new_instance);
-    request["lock_dir"] = json!(crate::screenshot::ensure_cache_dir()?);
+    request["lock_dir"] = json!(crate::cache::ensure_cache_dir()?);
     Ok(request)
 }
 

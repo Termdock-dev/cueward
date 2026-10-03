@@ -39,9 +39,6 @@ impl CopyTreePlatform for Racing {
     fn validate_tree_metadata(&self, file: &File, info: &FileInfo) -> Result<(), FileError> {
         MacFiles.validate_tree_metadata(file, info)
     }
-    fn same_tree_filesystem(&self, a: &File, b: &File) -> Result<bool, FileError> {
-        MacFiles.same_tree_filesystem(a, b)
-    }
 }
 impl TreeExecutionPlatform for Racing {
     fn tree_attribute_digest(&self, file: &File) -> Result<(String, usize), FileError> {
@@ -213,8 +210,8 @@ fn tree_execute_initial_manifest_overflow_refuses_without_oversized_saved_eviden
     assert!(value.receipt.nodes.is_empty() && value.receipt.staging_path.is_none());
     assert!(fs::metadata(&value.receipt.receipt_path).unwrap().len() < 256 * 1024);
     assert_eq!(
-        json(&read_receipt(&value.receipt.operation_id).unwrap()).unwrap(),
-        json(&value.receipt).unwrap()
+        serde_json::to_value(read_receipt(&value.receipt.operation_id).unwrap()).unwrap(),
+        serde_json::to_value(&value.receipt).unwrap()
     );
 }
 #[test]

@@ -1,6 +1,6 @@
 # 檔案瀏覽與讀取
 
-`cueward files list/info/read` 提供指定目錄內的唯讀操作，是 [#40](https://github.com/Termdock-dev/cueward/issues/40) 的第一批功能。`files search` 接續提供有界的名稱與 metadata 搜尋，契約見 [filesystem search](files-search.md)。`files metadata` 查詢原生 UTType、Finder tags 與 package／alias 旗標，逐欄狀態見 [resource metadata](files-metadata.md)。所有操作都要指定絕對路徑 `--root`；list／info／read／search／metadata 的 `--path` 是相對路徑，預設為 `.`，不能包含 `..`。`files spotlight` 另提供選用的索引內容候選，契約見 [Spotlight search](files-spotlight.md)；索引覆蓋未知，零筆結果不代表不存在；它以 root 指定起始目錄，不接受 `--path`。上述檔案 API 操作不會自動搜尋 home，也不會要求 Finder 改變位置或 selection。另見 [Finder context／reveal](files-finder.md)：context 限範圍讀取 Finder 脈絡；reveal 明確要求前景與 selection 改變，且必須指定 path。
+`cueward files list/info/read` 提供指定目錄內的唯讀操作，實作 [#40](https://github.com/Termdock-dev/cueward/issues/40) 的唯讀基礎。`files search` 接續提供有界的名稱與 metadata 搜尋，契約見 [filesystem search](files-search.md)。`files metadata` 查詢原生 UTType、Finder tags 與 package／alias 旗標，逐欄狀態見 [resource metadata](files-metadata.md)。所有操作都要指定絕對路徑 `--root`；list／info／read／search／metadata 的 `--path` 是相對路徑，預設為 `.`，不能包含 `..`。`files spotlight` 另提供選用的索引內容候選，契約見 [Spotlight search](files-spotlight.md)；索引覆蓋未知，零筆結果不代表不存在；它以 root 指定起始目錄，不接受 `--path`。上述檔案 API 操作不會自動搜尋 home，也不會要求 Finder 改變位置或 selection。另見 [Finder context／reveal](files-finder.md)：context 限範圍讀取 Finder 脈絡；reveal 明確要求前景與 selection 改變，且必須指定 path。
 
 ```bash
 cueward files list --root /Users/me/Documents --limit 100
@@ -60,4 +60,4 @@ line 模式以 `--start-line` 從 1 計算，只接受 utf8，不能與 `--offse
 
 ## 後續範圍
 
-#40／#41 的實機 provider、Finder／preview 驗收仍有未驗證情境。#42 的管理指令集中於 [mkdir／copy／duplicate](files-mutations.md)、[rename／跨磁碟 move](files-relocation.md)、[tags 增刪](files-tags.md)、[垃圾桶](files-trash-execution.md) 及 [備份復原](files-trash-restore.md)。目錄／package、symlink reference 與 opaque alias 會依類型處理，不跟隨連結；移除前保留驗證後的副本。批次 rename 的 [逐項 link 選取](files-batch-link-rename.md) 已於 PR #65 合併。使用前檢查已安裝 help；外接實體磁碟、卸載、TCC、iCloud／第三方 provider 及較舊 macOS 仍未完整驗收，不能把本地合成資料通過當成這些平台情境也通過。永久刪除不在這一期。
+#40／#41 的瀏覽、搜尋、讀取與預覽功能已實作；實機 provider、Finder reveal 畫面交付及部分預覽格式仍有未驗證情境。#42 的管理指令集中於 [mkdir／copy／duplicate](files-mutations.md)、[rename／跨磁碟 move](files-relocation.md)、[tags 增刪](files-tags.md)、[垃圾桶](files-trash-execution.md) 及 [備份復原](files-trash-restore.md)。目錄／package、symlink reference 與 opaque alias 會依類型處理，不跟隨連結；移除前保留驗證後的副本。批次 rename 的 [逐項 link 選取](files-batch-link-rename.md) 已於 PR #65 合併。使用前檢查已安裝 help；外接實體磁碟、卸載、TCC、iCloud／第三方 provider 及較舊 macOS 仍未完整驗收，不能把本地合成資料通過當成這些平台情境也通過。永久刪除不在這一期。

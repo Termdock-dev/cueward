@@ -51,7 +51,14 @@ pub fn run(
     };
     supervision::announce(&prepared.operation_id, "receipt")?;
     let result = supervision::run(executable, "files-mutation-worker", &input, timeout_ms)
-        .and_then(|receipt| verify_response(&prepared, receipt));
+        .and_then(|receipt| {
+            protocol::verify_receipt(
+                &prepared,
+                receipt,
+                &journal::load(&prepared.operation_id)?,
+                "worker result differs from its durable operation receipt",
+            )
+        });
     match result {
         Ok(receipt) => Ok(receipt),
         Err(mut error) => {
@@ -64,31 +71,6 @@ pub fn run(
             Ok(receipt)
         }
     }
-}
-
-fn verify_response(
-    prepared: &MutationReceipt,
-    receipt: MutationReceipt,
-) -> Result<MutationReceipt, FileError> {
-    let stored = journal::load(&prepared.operation_id)?;
-    let json = |value| {
-        serde_json::to_value(value)
-            .map_err(|e| FileError::new(FileErrorCode::Internal, e.to_string()))
-    };
-    if receipt.operation_id != prepared.operation_id
-        || receipt.receipt_path != prepared.receipt_path
-        || json(&receipt.request)? != json(&prepared.request)?
-        || serde_json::to_value(&receipt)
-            .map_err(|e| FileError::new(FileErrorCode::Internal, e.to_string()))?
-            != serde_json::to_value(stored)
-                .map_err(|e| FileError::new(FileErrorCode::Internal, e.to_string()))?
-    {
-        return Err(FileError::new(
-            FileErrorCode::Internal,
-            "worker result differs from its durable operation receipt",
-        ));
-    }
-    Ok(receipt)
 }
 
 /// Read saved evidence only; this does not resume, retry or reconcile current filesystem state.

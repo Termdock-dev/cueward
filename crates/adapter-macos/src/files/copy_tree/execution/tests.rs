@@ -168,7 +168,10 @@ fn tree_execute_verified_nested_hidden_empty_xattrs_and_independent_hardlinks() 
             .ino()
     );
     let loaded = read_receipt(&value.receipt.operation_id).unwrap();
-    assert_eq!(json(&loaded).unwrap(), json(&value.receipt).unwrap());
+    assert_eq!(
+        serde_json::to_value(&loaded).unwrap(),
+        serde_json::to_value(&value.receipt).unwrap()
+    );
     assert!(crate::files::mutation::read_receipt(&value.receipt.operation_id).is_err());
     assert!(
         execute_worker(&TreeWorkerRequest {

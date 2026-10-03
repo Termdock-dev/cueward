@@ -9,6 +9,8 @@ pub mod tags;
 pub mod trash;
 mod store;
 mod guarded_rename;
+#[cfg(test)]
+mod lifetime_test_support;
 pub mod preview;
 pub mod finder;
 pub mod spotlight;

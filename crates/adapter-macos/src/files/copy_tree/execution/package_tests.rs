@@ -92,7 +92,10 @@ fn package_execute_uses_verified_tree_copy_with_independent_nodes_and_persistent
     );
     let saved = read_receipt(&value.receipt.operation_id).unwrap();
     assert!(saved.request.include_packages);
-    assert_eq!(json(&saved).unwrap(), json(&value.receipt).unwrap());
+    assert_eq!(
+        serde_json::to_value(&saved).unwrap(),
+        serde_json::to_value(&value.receipt).unwrap()
+    );
 }
 #[test]
 fn package_execute_copies_link_objects_and_refuses_missing_opt_in_limits_or_conflicts() {

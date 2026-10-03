@@ -11,7 +11,6 @@ use std::os::unix::fs::symlink;
 struct Hook {
     action: Box<dyn Fn(&Path)>,
     wide: bool,
-    cross: bool,
     unknown: Option<String>,
     invalid_names: bool,
     package_state: Option<ResourceValue<bool>>,
@@ -64,19 +63,11 @@ impl CopyTreePlatform for Hook {
     fn validate_tree_metadata(&self, file: &File, info: &FileInfo) -> Result<(), FileError> {
         MacFiles.validate_tree_metadata(file, info)
     }
-    fn same_tree_filesystem(&self, left: &File, right: &File) -> Result<bool, FileError> {
-        if self.cross {
-            Ok(false)
-        } else {
-            MacFiles.same_tree_filesystem(left, right)
-        }
-    }
 }
 fn hook(action: impl Fn(&Path) + 'static) -> Hook {
     Hook {
         action: Box::new(action),
         wide: false,
-        cross: false,
         unknown: None,
         invalid_names: false,
         package_state: None,
@@ -162,7 +153,7 @@ fn copy_tree_stable_root_alias_uses_initial_canonical_root_and_retarget_is_rejec
     assert!(plan_worker(&request).is_ok());
 }
 #[test]
-fn copy_tree_unknown_availability_prunes_directories_but_cross_volume_copy_can_be_planned() {
+fn copy_tree_unknown_availability_prunes_directories_and_recovery_restores_a_complete_plan() {
     let root = fixture();
     let request = request(root.path());
     let info = super::super::observe(root.path(), Path::new("source/sub"), false, None).unwrap();
@@ -177,9 +168,8 @@ fn copy_tree_unknown_availability_prunes_directories_but_cross_volume_copy_can_b
             .any(|e| e.relative_path != Path::new("sub") && e.relative_path.starts_with("sub"))
     );
     platform.unknown = None;
-    platform.cross = true;
     let plan = copy_tree::plan(&platform, &request).unwrap();
-    assert!(!plan.has_blockers && !plan.issues.contains(&CopyTreeIssue::DifferentFilesystem));
+    assert!(!plan.has_blockers && plan.enumeration_complete);
 }
 #[test]
 fn copy_tree_entry_boundary_output_budget_and_descriptor_enumeration_are_bounded() {

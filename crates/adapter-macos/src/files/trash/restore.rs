@@ -36,7 +36,14 @@ pub fn run(
         },
         timeout,
     )
-    .and_then(|receipt| verify_response(&prepared, receipt));
+    .and_then(|receipt| {
+        protocol::verify_receipt(
+            &prepared,
+            receipt,
+            &read_receipt(&prepared.operation_id)?,
+            "restore worker response differs from prepared/stored evidence",
+        )
+    });
     match result {
         Ok(receipt) => Ok(receipt),
         Err(mut error) => {
@@ -49,23 +56,7 @@ pub fn run(
         }
     }
 }
-fn verify_response(
-    prepared: &RestoreReceipt,
-    receipt: RestoreReceipt,
-) -> Result<RestoreReceipt, FileError> {
-    let stored = read_receipt(&prepared.operation_id)?;
-    if receipt.operation_id != prepared.operation_id
-        || receipt.receipt_path != prepared.receipt_path
-        || json(&receipt.request)? != json(&prepared.request)?
-        || json(&receipt)? != json(&stored)?
-    {
-        return Err(FileError::new(
-            FileErrorCode::Internal,
-            "restore worker response differs from prepared/stored evidence",
-        ));
-    }
-    Ok(receipt)
-}
+
 /// Load typed saved evidence only, without resuming, reconciling or rolling back.
 pub fn read_receipt(id: &str) -> Result<RestoreReceipt, FileError> {
     let receipt: RestoreReceipt = STORE.load(id)?;
@@ -117,9 +108,6 @@ fn execute_prepared(
 }
 fn save(receipt: &RestoreReceipt) -> Result<(), FileError> {
     STORE.save(&receipt.operation_id, &receipt.receipt_path, receipt)
-}
-fn json(value: &impl Serialize) -> Result<serde_json::Value, FileError> {
-    serde_json::to_value(value).map_err(|e| FileError::new(FileErrorCode::Internal, e.to_string()))
 }
 
 #[cfg(test)]

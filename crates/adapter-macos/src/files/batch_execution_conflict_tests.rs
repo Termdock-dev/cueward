@@ -70,7 +70,7 @@ fn batch_execute_count_ceiling_conflicts_save_not_started_without_any_child() {
     cleanup(&stored);
     let receipt =
         result.expect("every accepted dense-conflict request must save authoritative evidence");
-    let value = json(&receipt).unwrap();
+    let value = serde_json::to_value(&receipt).unwrap();
     assert_eq!(receipt.status, RelocationStatus::NotStarted);
     assert_eq!(
         receipt.error.as_ref().unwrap().code,
@@ -88,7 +88,7 @@ fn batch_execute_count_ceiling_conflicts_save_not_started_without_any_child() {
         receipt.issues.len() + value["omitted_issue_count"].as_u64().unwrap() as usize,
         3 * 64 * 63 / 2
     );
-    assert_eq!(json(&stored).unwrap(), value);
+    assert_eq!(serde_json::to_value(&stored).unwrap(), value);
     assert!(bytes <= 256 * 1024);
     assert_eq!(fs::read(root.path().join("a")).unwrap(), b"OWNED a\0");
     assert_eq!(fs::read_dir(root.path()).unwrap().count(), 2);

@@ -2,6 +2,7 @@ pub mod applescript;
 pub mod apps;
 pub mod bookmarks;
 pub mod calendar;
+mod cache;
 pub mod clipboard;
 pub mod doctor;
 mod error;

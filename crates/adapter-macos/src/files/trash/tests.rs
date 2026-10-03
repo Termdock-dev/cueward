@@ -328,7 +328,10 @@ fn trash_execute_verifies_independent_backup_and_native_move_with_exact_original
     assert!(!value.root.path().join(name).exists());
     assert!(!value.receipt.finder_put_back_supported && !value.receipt.recovery_supported);
     let loaded = read_receipt(&value.receipt.operation_id).unwrap();
-    assert_eq!(json(&loaded).unwrap(), json(&value.receipt).unwrap());
+    assert_eq!(
+        serde_json::to_value(&loaded).unwrap(),
+        serde_json::to_value(&value.receipt).unwrap()
+    );
     assert!(crate::files::mutation::read_receipt(&value.receipt.operation_id).is_err());
     assert!(loaded.validate_fresh().is_err());
 }
@@ -424,7 +427,7 @@ fn trash_execute_replay_is_claimed_once_and_typed_receipt_rejects_modified_schem
         )
         .is_err()
     );
-    let mut schema = json(&value.receipt).unwrap();
+    let mut schema = serde_json::to_value(&value.receipt).unwrap();
     schema["unknown"] = serde_json::json!(true);
     STORE
         .save(

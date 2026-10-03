@@ -115,7 +115,7 @@ fn act(token: &str, action: &str, value: Option<&str>) -> Result<AppAXActionResu
     super::run_source(
         json!({"action": action, "pid": target.app.pid,
             "target": target, "value": value, "caller_pid": std::process::id(),
-            "lock_dir": crate::screenshot::ensure_cache_dir()?,
+            "lock_dir": crate::cache::ensure_cache_dir()?,
         }),
         &source(include_str!("app_action.swift")),
     )

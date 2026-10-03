@@ -5,7 +5,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::MacosError;
-use crate::screenshot::ensure_cache_dir;
+use crate::cache::ensure_cache_dir;
 
 unsafe extern "C" {
     fn flock(fd: std::ffi::c_int, operation: std::ffi::c_int) -> std::ffi::c_int;

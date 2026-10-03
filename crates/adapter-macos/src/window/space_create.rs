@@ -16,7 +16,7 @@ pub struct SpaceCreateResult {
 
 /// Request a new native desktop without switching Spaces, then verify its identity and visibility.
 pub fn create_space() -> Result<SpaceCreateResult, MacosError> {
-    let directory = crate::screenshot::ensure_cache_dir()?;
+    let directory = crate::cache::ensure_cache_dir()?;
     let directory = std::path::Path::new(&directory);
     // Cover compilation as well as readback. The helper retains its separate
     // submission lock if this caller exits after submitting creation.

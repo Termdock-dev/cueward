@@ -6,7 +6,6 @@ use std::ffi::{CStr, OsString};
 use std::fs::File;
 use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
 use std::os::unix::ffi::OsStringExt;
-use std::os::unix::fs::MetadataExt;
 
 impl CopyTreePlatform for MacFiles {
     fn open_tree_link(&self, path: &Path) -> Result<File, FileError> {
@@ -53,9 +52,6 @@ impl CopyTreePlatform for MacFiles {
     }
     fn validate_tree_metadata(&self, file: &File, info: &FileInfo) -> Result<(), FileError> {
         self.validate_copy_source(file, info)
-    }
-    fn same_tree_filesystem(&self, left: &File, right: &File) -> Result<bool, FileError> {
-        Ok(left.metadata()?.dev() == right.metadata()?.dev())
     }
 }
 struct Stream(*mut libc::DIR);

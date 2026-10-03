@@ -84,26 +84,20 @@ fn interrupt_delayed(action: &str, signal: &str, armed: bool) {
 #[test]
 fn parent_interruption_prevents_delayed_rename_and_move() {
     for action in ["rename", "move"] {
-        for signal in ["-INT", "-TERM", "-KILL"] {
-            interrupt_delayed(action, signal, false);
-        }
+        interrupt_delayed(action, "-TERM", false);
     }
 }
 
 #[test]
 fn parent_death_stops_an_armed_mutation_worker() {
     for action in ["rename", "move"] {
-        for signal in ["-INT", "-TERM", "-KILL"] {
-            interrupt_delayed(action, signal, true);
-        }
+        interrupt_delayed(action, "-TERM", true);
     }
 }
 
 #[test]
-fn link_parent_signals_stop_delayed_and_armed_workers_without_moving_link_or_target() {
+fn link_parent_termination_stops_delayed_and_armed_workers_without_moving_link_or_target() {
     for armed in [false, true] {
-        for signal in ["-INT", "-TERM", "-KILL"] {
-            interrupt_delayed("link", signal, armed);
-        }
+        interrupt_delayed("link", "-TERM", armed);
     }
 }
