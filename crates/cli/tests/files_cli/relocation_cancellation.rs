@@ -32,7 +32,13 @@ fn cancellation_worker_helper() {
 
 use super::cancellation::wait_for;
 fn prepare(root: &Path, action: &str) -> RelocationRequest {
-    fs::write(root.join("source"), b"owned source bytes").unwrap();
+    let link_itself = action == "link";
+    if link_itself {
+        fs::write(root.join("owned-target"), b"owned source bytes").unwrap();
+        std::os::unix::fs::symlink("owned-target", root.join("source")).unwrap();
+    } else {
+        fs::write(root.join("source"), b"owned source bytes").unwrap();
+    }
     let parent = super::mutation::version(root, ".");
     let action = if action == "rename" {
         RelocationAction::Rename
@@ -46,6 +52,7 @@ fn prepare(root: &Path, action: &str) -> RelocationRequest {
         destination: "destination".into(),
         expected_parent_version: parent,
         action,
+        link_itself,
     }
 }
 fn interrupt_delayed(action: &str, signal: &str, armed: bool) {
@@ -53,6 +60,10 @@ fn interrupt_delayed(action: &str, signal: &str, armed: bool) {
     let root = fixture.path().join("root");
     fs::create_dir(&root).unwrap();
     let request = prepare(&root, action);
+    let target_version = request
+        .link_itself
+        .then(|| super::mutation::version(&root, "owned-target"));
+    let link_version = request.expected_version.clone();
     super::cancellation_harness::Harness {
         module: "relocation_cancellation",
         worker: "files-relocation-worker",
@@ -60,6 +71,14 @@ fn interrupt_delayed(action: &str, signal: &str, armed: bool) {
         lookup: "relocation",
     }
     .interrupt(fixture.path(), &root, &request, signal, armed);
+    if let Some(before) = target_version {
+        assert_eq!(super::mutation::version(&root, "owned-target"), before);
+        assert_eq!(super::mutation::version(&root, "source"), link_version);
+        assert_eq!(
+            fs::read_link(root.join("source")).unwrap(),
+            Path::new("owned-target")
+        );
+    }
 }
 
 #[test]
@@ -76,6 +95,15 @@ fn parent_death_stops_an_armed_mutation_worker() {
     for action in ["rename", "move"] {
         for signal in ["-INT", "-TERM", "-KILL"] {
             interrupt_delayed(action, signal, true);
+        }
+    }
+}
+
+#[test]
+fn link_parent_signals_stop_delayed_and_armed_workers_without_moving_link_or_target() {
+    for armed in [false, true] {
+        for signal in ["-INT", "-TERM", "-KILL"] {
+            interrupt_delayed("link", signal, armed);
         }
     }
 }

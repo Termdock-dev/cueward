@@ -7,7 +7,7 @@ use cueward_adapter_macos::files::relocation::{
 pub(crate) struct RelocationScope {
     #[arg(long)]
     root: PathBuf,
-    /// Existing relative file/directory/package; no links, aliases or downloads.
+    /// Existing relative entry; links require link-itself, aliases/downloads remain unsupported.
     #[arg(long)]
     path: PathBuf,
     #[arg(long)]
@@ -18,6 +18,9 @@ pub(crate) struct RelocationScope {
     /// Observe only, including conflicts; no receipt or reusable execution token.
     #[arg(long)]
     dry_run: bool,
+    /// Move or rename only a leaf symlink; never follow its target or ancestor links.
+    #[arg(long)]
+    link_itself: bool,
     #[arg(long, default_value_t=10000, value_parser=clap::value_parser!(u64).range(1..=30000))]
     timeout_ms: u64,
 }
@@ -76,6 +79,7 @@ fn dispatch(scope: RelocationScope, destination: PathBuf, action: RelocationActi
         expected_version: scope.expected_version,
         expected_parent_version: scope.expected_parent_version,
         action,
+        link_itself: scope.link_itself,
     };
     let exe = std::env::current_exe().map_err(FileError::from);
     if scope.dry_run {

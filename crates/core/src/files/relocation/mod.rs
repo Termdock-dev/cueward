@@ -18,6 +18,13 @@ pub use validation::rename_destination;
 pub trait RelocationPlatform: FilePlatform {
     /// Open a directory without following links or materializing data.
     fn open_directory(&self, path: &Path) -> Result<File, FileError>;
+    /// Hold a leaf symlink descriptor without opening its target; unsupported by default.
+    fn open_symlink(&self, _path: &Path) -> Result<File, FileError> {
+        Err(FileError::new(
+            FileErrorCode::UnsupportedType,
+            "link descriptors unavailable",
+        ))
+    }
     /// Compare observed filesystem devices, not inferred identity-string formatting.
     fn same_filesystem(&self, source: &Metadata, destination_parent: &Metadata) -> bool;
     /// Establish guarded/exclusive rename support without changing selected objects.

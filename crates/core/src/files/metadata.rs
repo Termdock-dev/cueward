@@ -47,7 +47,8 @@ impl ResourceMetadata {
         }
     }
 
-    fn not_applicable() -> Self {
+    /// Link-object observations do not query resource metadata for their targets.
+    pub(crate) fn not_applicable() -> Self {
         Self {
             content_type: ResourceValue::NotApplicable,
             finder_tags: ResourceValue::NotApplicable,

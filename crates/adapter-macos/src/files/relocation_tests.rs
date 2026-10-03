@@ -17,6 +17,7 @@ pub(super) fn fixture() -> (tempfile::TempDir, RelocationRequest) {
         expected_version: source.version,
         expected_parent_version: parent.version,
         action: RelocationAction::Move,
+        link_itself: false,
     };
     (root, request)
 }
