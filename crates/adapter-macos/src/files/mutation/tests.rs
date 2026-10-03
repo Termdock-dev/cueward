@@ -198,16 +198,48 @@ fn byte_revision_scope_and_parent_guards_fail_before_creation() {
 }
 
 #[test]
-fn directories_packages_and_symlinks_never_become_copy_sources() {
+fn directories_packages_and_symlinks_copy_without_following_link_ancestors() {
     let (root, mut request) = fixture();
     fs::create_dir(root.path().join("folder.app")).unwrap();
+    fs::write(root.path().join("folder.app/data"), b"OWNED nested payload").unwrap();
+    symlink("/outside/missing", root.path().join("folder.app/broken")).unwrap();
     symlink("source.txt", root.path().join("link")).unwrap();
     for path in ["folder.app", "link"] {
         if let MutationAction::Copy { path: p, .. } = &mut request.action {
             *p = path.into();
         }
+        request.destination = format!("copy-{path}").into();
         fresh(&mut request);
-        assert_not_started(&request, FileErrorCode::UnsupportedType);
+        let receipt = run_request(&request);
+        assert_eq!(
+            receipt.status,
+            MutationStatus::Completed,
+            "{:?}",
+            receipt.error
+        );
+        assert_eq!(
+            fs::symlink_metadata(root.path().join(&request.destination))
+                .unwrap()
+                .file_type(),
+            fs::symlink_metadata(root.path().join(path))
+                .unwrap()
+                .file_type()
+        );
+        if path == "link" {
+            assert_eq!(
+                fs::read_link(root.path().join(&request.destination)).unwrap(),
+                Path::new("source.txt")
+            );
+        } else {
+            assert_eq!(
+                fs::read(root.path().join(&request.destination).join("data")).unwrap(),
+                b"OWNED nested payload"
+            );
+            assert_eq!(
+                fs::read_link(root.path().join(&request.destination).join("broken")).unwrap(),
+                Path::new("/outside/missing")
+            );
+        }
     }
     let outside = tempfile::tempdir().unwrap();
     symlink(outside.path(), root.path().join("parent-link")).unwrap();
@@ -292,7 +324,7 @@ fn permission_denial_is_known_not_started_not_a_completed_empty_copy() {
 }
 
 #[test]
-fn a_real_finder_alias_is_not_resolved_or_copied() {
+fn a_real_finder_alias_is_copied_as_opaque_bytes_without_resolving_target() {
     use objc2_foundation::{NSString, NSURL, NSURLBookmarkCreationOptions};
     let (root, mut request) = fixture();
     let outside = tempfile::tempdir().unwrap();
@@ -316,7 +348,17 @@ fn a_real_finder_alias_is_not_resolved_or_copied() {
     }
     fresh(&mut request);
     let original = fs::read(root.path().join("alias")).unwrap();
-    assert_not_started(&request, FileErrorCode::UnsupportedType);
+    let receipt = run_request(&request);
+    assert_eq!(
+        receipt.status,
+        MutationStatus::Completed,
+        "{:?}",
+        receipt.error
+    );
+    assert_eq!(
+        fs::read(root.path().join(&request.destination)).unwrap(),
+        original
+    );
     assert_eq!(fs::read(root.path().join("alias")).unwrap(), original);
     assert_eq!(
         fs::read(outside.path().join("secret")).unwrap(),

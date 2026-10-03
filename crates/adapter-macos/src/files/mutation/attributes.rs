@@ -22,27 +22,26 @@ const MAX_BYTES: usize = 4 * 1024 * 1024;
 pub(in crate::files) fn digest(file: &File) -> Result<(String, usize), FileError> {
     digest_filtered(file, false).map(|(digest, bytes, _)| (digest, bytes))
 }
-/// Native trash may add only a zero-byte com.apple.macl marker; still read every bounded value.
+/// Native trash may add a bounded OS-managed com.apple.macl; original attributes remain exact.
 pub(in crate::files) fn trash_digest(file: &File) -> Result<(String, usize, bool), FileError> {
     digest_filtered(file, true)
 }
-fn digest_filtered(
-    file: &File,
-    allow_empty_macl: bool,
-) -> Result<(String, usize, bool), FileError> {
+fn digest_filtered(file: &File, allow_macl: bool) -> Result<(String, usize, bool), FileError> {
     let names = names(file)?;
     let mut values: Vec<_> = names.split(|b| *b == 0).filter(|s| !s.is_empty()).collect();
     values.sort_unstable();
     let mut hash = Sha256::new();
     let mut total = 0;
-    let mut excluded_empty_macl = false;
+    let mut excluded_macl = false;
+    let mut excluded_bytes = 0;
     for name in values {
         let c_name = CString::new(name).map_err(|_| invalid())?;
         let value = read_value(file, &c_name, MAX_BYTES - total)?;
         let size = value.len();
         total += size;
-        if allow_empty_macl && name == b"com.apple.macl" && size == 0 {
-            excluded_empty_macl = true;
+        if allow_macl && name == b"com.apple.macl" {
+            excluded_bytes = size;
+            excluded_macl = true;
             continue;
         }
         hash.update((name.len() as u64).to_be_bytes());
@@ -56,7 +55,11 @@ fn digest_filtered(
             "attribute names changed while reading",
         ));
     }
-    Ok((format!("{:x}", hash.finalize()), total, excluded_empty_macl))
+    Ok((
+        format!("{:x}", hash.finalize()),
+        total - excluded_bytes,
+        excluded_macl,
+    ))
 }
 
 fn read_value(file: &File, name: &CString, maximum: usize) -> Result<Vec<u8>, FileError> {

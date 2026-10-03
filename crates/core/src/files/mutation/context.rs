@@ -36,6 +36,19 @@ pub(super) fn prepare<'a, P: MutationPlatform>(
     }
     let destination = prepare_destination(&scope, receipt)?;
     let source = source(&scope, &receipt.request.action)?;
+    if let Some(selected) = &source
+        && selected.info.kind == FileKind::Directory
+        && crate::files::copy_tree::parent_within_source(
+            &scope,
+            parent_path(&receipt.request),
+            &selected.info.identity,
+        )?
+    {
+        return Err(FileError::new(
+            FileErrorCode::Conflict,
+            "destination must not be inside source directory",
+        ));
+    }
     receipt.source_before = source.as_ref().map(|s| s.info.clone());
     Ok(Context {
         scope,
@@ -159,7 +172,7 @@ fn source<P: MutationPlatform>(
     let info = scope.info(&resolved)?;
     check_version(&Some(expected_version.clone()), &info.version)?;
     validate_source_info(&info, *max_bytes)?;
-    let file = scope.platform.open_regular(&resolved.path)?;
+    let file = scope.platform.open_object(&info)?;
     check_source(scope.platform, &file, &info)?;
     scope.platform.validate_copy_source(&file, &info)?;
     check_source(scope.platform, &file, &info)?;
@@ -167,10 +180,13 @@ fn source<P: MutationPlatform>(
 }
 
 fn validate_source_info(info: &FileInfo, maximum: u64) -> Result<(), FileError> {
-    if info.kind != FileKind::File {
+    if !matches!(
+        info.kind,
+        FileKind::File | FileKind::Directory | FileKind::Symlink
+    ) {
         return Err(FileError::new(
             FileErrorCode::UnsupportedType,
-            "copy/duplicate accept one regular file, not directories/packages/links",
+            "copy/duplicate accept available files, directories or symlink objects",
         ));
     }
     if info.data_state != DataState::NotDataless {
@@ -179,7 +195,7 @@ fn validate_source_info(info: &FileInfo, maximum: u64) -> Result<(), FileError> 
             "copy/duplicate never download placeholder data",
         ));
     }
-    if info.size > maximum {
+    if info.kind != FileKind::Directory && info.size > maximum {
         return Err(FileError::new(
             FileErrorCode::ScanLimit,
             "source exceeds max-bytes",
@@ -195,11 +211,18 @@ pub(super) fn check_source(
 ) -> Result<(), FileError> {
     let metadata = file.metadata()?;
     let stamp = platform.stamp(&metadata);
-    if !metadata.is_file()
-        || stamp.version != info.version
-        || stamp.data_state != DataState::NotDataless
+    let kind_matches = match info.kind {
+        FileKind::File => metadata.is_file(),
+        FileKind::Directory => metadata.is_dir(),
+        FileKind::Symlink => metadata.file_type().is_symlink(),
+        _ => false,
+    };
+    if !kind_matches || stamp.version != info.version || stamp.data_state != DataState::NotDataless
     {
-        return Err(changed("source descriptor changed"));
+        return Err(changed(&format!(
+            "source descriptor changed: expected {} ({:?}), observed {} ({:?})",
+            info.version, info.kind, stamp.version, stamp.data_state
+        )));
     }
     Ok(())
 }
@@ -228,7 +251,7 @@ impl<P: MutationPlatform> Context<'_, P> {
             path: self.path.clone(),
             requested: self.path.clone(),
             metadata: file.metadata()?,
-            link: false,
+            link: file.metadata()?.file_type().is_symlink(),
         })
     }
 
@@ -243,16 +266,7 @@ impl<P: MutationPlatform> Context<'_, P> {
         let destination = self.post_destination(&root, &receipt.request, file)?;
         if let Some(source) = &self.source {
             receipt.source_after = Some(self.check_source_path(source)?);
-            let reopened = self.scope.platform.open_regular(&self.path)?;
-            copying::verify_readable(
-                self.scope.platform,
-                &reopened,
-                &destination,
-                receipt
-                    .verification
-                    .as_ref()
-                    .ok_or_else(|| changed("missing copy verification"))?,
-            )?;
+            self.verify_copy(source, &destination, receipt)?;
         } else if destination.kind != FileKind::Directory
             || fs::read_dir(&self.path)?.next().is_some()
         {
@@ -277,6 +291,36 @@ impl<P: MutationPlatform> Context<'_, P> {
         root.revalidate_root()?;
         receipt.parent_after = Some(final_parent);
         receipt.destination_after = Some(final_destination);
+        Ok(())
+    }
+
+    fn verify_copy(
+        &self,
+        source: &Source,
+        destination: &FileInfo,
+        receipt: &MutationReceipt,
+    ) -> Result<(), FileError> {
+        if destination.kind != source.info.kind
+            || destination.mode != source.info.mode
+            || destination.modified != source.info.modified
+        {
+            return Err(changed("copied entry metadata differs from source"));
+        }
+        let reopened = self.scope.platform.open_object(destination)?;
+        let proof = receipt
+            .verification
+            .as_ref()
+            .ok_or_else(|| changed("missing copy verification"))?;
+        copying::verify_readable(self.scope.platform, &reopened, destination, proof)?;
+        if source.info.kind != FileKind::File
+            && self.scope.platform.read_copy_attributes(&reopened)?
+                != (
+                    proof.extended_attributes_sha256.clone(),
+                    proof.extended_attributes_bytes,
+                )
+        {
+            return Err(changed("published copy attributes differ"));
+        }
         Ok(())
     }
 
@@ -313,7 +357,7 @@ impl<P: MutationPlatform> Context<'_, P> {
         request: &MutationRequest,
         file: &File,
     ) -> Result<FileInfo, FileError> {
-        let destination = root.info(&root.resolve(&request.destination, false, false)?)?;
+        let destination = root.info(&root.resolve(&request.destination, false, true)?)?;
         if destination.path != text(&self.path)?
             || destination.version != self.scope.platform.stamp(&file.metadata()?).version
         {
@@ -327,7 +371,7 @@ impl<P: MutationPlatform> Context<'_, P> {
         let path = Path::new(&source.info.path)
             .strip_prefix(&self.scope.root)
             .map_err(|_| changed("source escaped root"))?;
-        let after = self.scope.info(&self.scope.resolve(path, false, false)?)?;
+        let after = self.scope.info(&self.scope.resolve(path, false, true)?)?;
         if after.path != source.info.path || after.version != source.info.version {
             return Err(changed("source path changed"));
         }

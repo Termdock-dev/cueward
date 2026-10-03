@@ -107,11 +107,15 @@ fn copy_tree_keeps_links_and_special_nodes_but_never_follows_them() {
             .iter()
             .find(|e| e.relative_path == Path::new(name))
             .unwrap();
-        assert_eq!(
-            entry.error.as_ref().unwrap().code,
-            FileErrorCode::UnsupportedType
-        );
-        assert!(entry.resources.is_none());
+        if name == "pipe" {
+            assert_eq!(
+                entry.error.as_ref().unwrap().code,
+                FileErrorCode::UnsupportedType
+            );
+            assert!(entry.resources.is_none());
+        } else {
+            assert!(entry.error.is_none());
+        }
     }
     assert!(!serde_json::to_string(&plan).unwrap().contains("PRIVATE"));
     assert!(!root.path().join("copy").exists());
@@ -272,11 +276,8 @@ fn copy_tree_real_finder_alias_is_not_resolved_and_selected_metadata_is_preserve
         .iter()
         .find(|e| e.relative_path == Path::new("alias"))
         .unwrap();
-    assert!(plan.has_blockers && plan.enumeration_complete);
-    assert_eq!(
-        entry.error.as_ref().unwrap().code,
-        FileErrorCode::UnsupportedType
-    );
+    assert!(!plan.has_blockers && plan.enumeration_complete);
+    assert!(entry.error.is_none());
     assert_eq!(
         entry.resources.as_ref().unwrap().is_alias_file,
         ResourceValue::Available { value: true }

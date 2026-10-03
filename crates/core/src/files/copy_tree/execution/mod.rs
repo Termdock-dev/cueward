@@ -36,8 +36,8 @@ pub fn execute(
     checkpoint: &mut impl FnMut(&TreeReceipt) -> Result<(), FileError>,
 ) -> Result<(), FileError> {
     receipt.validate_fresh()?;
-    let context = context::Context::prepare(platform, receipt)?;
-    let mut staged = population::prepare(&context, receipt, checkpoint)?;
+    let mut context = context::Context::prepare(platform, receipt)?;
+    let mut staged = population::prepare(&mut context, receipt, checkpoint)?;
     population::populate(&context, &mut staged, receipt, checkpoint)?;
     verification::verify_private(&context, &staged, receipt)?;
     context.revalidate(receipt, false)?;

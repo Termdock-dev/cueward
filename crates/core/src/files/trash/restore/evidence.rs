@@ -30,7 +30,7 @@ pub(super) fn validate<'a>(
         || original.trash_attributes.is_none()
     {
         return Err(invalid(
-            "restore accepts only a completed verified ordinary-file trash receipt",
+            "restore accepts only a completed verified trash receipt",
         ));
     }
     super::super::execution::validate_request(&original.request)?;
@@ -64,7 +64,12 @@ fn validate_paths(original: &TrashReceipt, evidence: &Evidence<'_>) -> Result<()
         || store.file_name().and_then(|s| s.to_str()) != Some(&original.operation_id)
         || Path::new(&evidence.source.path) != root.join(&original.request.path)
         || Path::new(&evidence.parent.path) != parent
-        || Path::new(&evidence.backup.path) != store.join("staged-object")
+        || (Path::new(&evidence.backup.path) != store.join("staged-object")
+            && Path::new(&evidence.backup.path)
+                .parent()
+                .and_then(Path::file_name)
+                .and_then(|n| n.to_str())
+                != Some(format!(".cueward-stage-{}", original.operation_id).as_str()))
         || original.backup_path.as_deref() != Some(&evidence.backup.path)
         || evidence.root.kind != FileKind::Directory
         || evidence.parent.kind != FileKind::Directory
@@ -76,13 +81,19 @@ fn validate_paths(original: &TrashReceipt, evidence: &Evidence<'_>) -> Result<()
     Ok(())
 }
 fn validate_copy(e: &Evidence<'_>) -> Result<(), FileError> {
-    if e.source.kind != FileKind::File
-        || e.backup.kind != FileKind::File
+    if !matches!(
+        e.source.kind,
+        FileKind::File | FileKind::Directory | FileKind::Symlink
+    ) || e.backup.kind != e.source.kind
         || e.source.data_state != DataState::NotDataless
         || e.backup.data_state != DataState::NotDataless
         || e.source.identity == e.backup.identity
-        || e.source.size != e.proof.bytes
-        || e.backup.size != e.proof.bytes
+        || (e.source.kind != FileKind::Directory
+            && (e.source.size != e.proof.bytes || e.backup.size != e.proof.bytes))
+        || (e.source.kind == FileKind::Directory && e.proof.children.is_none())
+        || (e.source.kind == FileKind::Symlink
+            && (e.proof.link_target != e.source.link_target
+                || e.backup.link_target != e.source.link_target))
         || e.source.mode != e.backup.mode
         || e.source.modified != e.backup.modified
         || !e.proof.permissions_equal

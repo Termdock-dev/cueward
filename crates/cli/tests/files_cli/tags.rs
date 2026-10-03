@@ -47,7 +47,7 @@ fn snapshot(root: &Path) -> Value {
     invoke(root, "read", &["--path", "owned\n<external>"], true)
 }
 #[test]
-fn tags_cli_initial_add_rejected_edits_receipts_and_stale_guards_preserve_payload() {
+fn tags_cli_existing_add_remove_noops_receipts_and_stale_guards_preserve_payload() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("owned\n<external>");
     let bytes = b"OWNED tag content\0";
@@ -64,20 +64,25 @@ fn tags_cli_initial_add_rejected_edits_receipts_and_stale_guards_preserve_payloa
     assert_eq!(stale["status"], "not_started");
     let no_op = edit(root.path(), "add", &snapshot(root.path()), name, true);
     assert_eq!(no_op["changed_by_operation"], false);
-    let current = snapshot(root.path());
-    let rejected_add = edit(root.path(), "add", &current, "Other", false);
-    let removed = edit(root.path(), "remove", &current, name, false);
-    for rejected in [&rejected_add, &removed] {
-        assert_eq!(rejected["status"], "not_started");
-        assert_eq!(rejected["error"]["code"], "unsupported_type");
-        assert_eq!(rejected["mutation_attempted"], false);
-        verify_receipt(rejected);
+    let added_other = edit(root.path(), "add", &snapshot(root.path()), "Other", true);
+    assert_eq!(added_other["status"], "completed");
+    let removed = edit(root.path(), "remove", &snapshot(root.path()), name, true);
+    assert_eq!(removed["status"], "completed");
+    assert_eq!(
+        removed["after"]["tags"],
+        json!([{ "name": "Other", "color": 0 }])
+    );
+    for receipt in [&added_other, &removed] {
+        assert_eq!(receipt["changed_by_operation"], true);
+        assert!(receipt["original_attribute_base64"].is_string());
+        verify_receipt(receipt);
     }
+    let current = snapshot(root.path());
     let missing = edit(root.path(), "remove", &current, "Missing", true);
     assert_eq!(missing["changed_by_operation"], false);
     assert_eq!(snapshot(root.path())["tags"], current["tags"]);
     assert_eq!(fs::read(path).unwrap(), bytes);
-    for receipt in [&added, &stale, &no_op, &rejected_add, &removed, &missing] {
+    for receipt in [&added, &stale, &no_op, &added_other, &removed, &missing] {
         super::mutation::cleanup(receipt);
     }
 }

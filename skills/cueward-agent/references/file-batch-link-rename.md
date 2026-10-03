@@ -1,6 +1,6 @@
 # Rename explicitly selected link objects in a batch
 
-New per-entry `link_itself` JSON support is pending review. Check installed `files rename-batch plan/execute --help` for that field; single-item `--link-itself` support is insufficient. Read [batch rename](file-batch-rename.md) for authorization, scope, bounds, fail-stop execution and receipt semantics, and [link-object relocation](file-link-relocation.md) for the target boundary.
+New per-entry `link_itself` JSON support is merged in PR #65. Check installed `files rename-batch plan/execute --help` for that field; single-item `--link-itself` support is insufficient. Read [batch rename](file-batch-rename.md) for authorization, scope, bounds, fail-stop execution and receipt semantics, and [link-object relocation](file-link-relocation.md) for the target boundary.
 
 Observe each link itself with `files info` without `--follow-links`, plus its current parent. Serialize the user's explicit entries:
 
@@ -18,4 +18,4 @@ Inspect every plan error/issue; `execution_supported=false` remains true of all 
 
 Use the same compatible binary for both lookups. Old batch entry decoders reject unknown `link_itself`, including aggregate receipts, instead of silently dropping it. Pre-#64 child relocation readers can still omit the flag while exiting successfully; their output is incomplete evidence. Preserve raw `receipt_path` JSON and never strip fields, migrate namespaces or replay to make an older reader accept it. New readers accept legacy omission as false.
 
-Sequential revision checks are not source-inode CAS, isolation or provider coordination. Copy/tree/trash link support, dependency-aware swaps/chains and real provider/TCC/external-volume/older-macOS acceptance remain outside this capability.
+Sequential checks are not source-inode CAS, an atomic batch or provider coordination. Dependency swaps/chains remain rejected. Copy/duplicate/trash and cross-volume move support link objects separately, never target resolution.

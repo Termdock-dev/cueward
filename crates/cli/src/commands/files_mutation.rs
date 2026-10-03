@@ -25,7 +25,7 @@ pub(crate) struct MkdirArgs {
 pub(crate) struct CopyArgs {
     #[command(flatten)]
     scope: WriteScope,
-    /// Source regular file relative to root; symlinks/aliases are unsupported.
+    /// Source file, directory/package or symlink object relative to root; targets are not followed.
     #[arg(long)]
     path: PathBuf,
     /// New destination relative to the same root; no overwriting or auto-renaming.

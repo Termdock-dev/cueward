@@ -13,6 +13,13 @@ use std::path::{Component, Path};
 pub trait CopyTreePlatform: FilePlatform {
     /// Open a directory without following any symlink component.
     fn open_tree_directory(&self, path: &Path) -> Result<File, FileError>;
+    /// Hold a leaf link without opening its target.
+    fn open_tree_link(&self, _path: &Path) -> Result<File, FileError> {
+        Err(FileError::new(
+            FileErrorCode::UnsupportedType,
+            "link copying unavailable",
+        ))
+    }
     /// Enumerate the held directory, refusing more than the remaining entry budget.
     fn tree_names(&self, directory: &File, maximum: usize) -> Result<Vec<OsString>, FileError>;
     /// Check the metadata preservation subset without reading the data fork.
@@ -31,7 +38,7 @@ pub fn plan(
     let root = scope.info(&scope.resolve(Path::new("."), false, false)?)?;
     let source = select_source(&scope, request)?;
     let selected = select_destination(&scope, request, &source)?;
-    let mut issues = selected.issues;
+    let issues = selected.issues;
     let mut scan = traversal::Scan::new(&scope, request, &selected.file);
     scan.visit(&request.path, Path::new("."), 0)?;
     if scan
@@ -41,9 +48,7 @@ pub fn plan(
     {
         return Err(changed());
     }
-    if scan.different_filesystem {
-        issues.push(CopyTreeIssue::DifferentFilesystem);
-    }
+    // Copying does not remove sources; destination-local staging supports different devices.
     scan.revalidate()?;
     recheck(&scope, &selected.path, &selected.parent, &selected.file)?;
     if destination(&scope, &request.destination)?
@@ -137,7 +142,7 @@ fn select_destination(
     })
 }
 
-fn parent_within_source(
+pub(super) fn parent_within_source(
     scope: &Scope<'_, impl FilePlatform>,
     parent: &Path,
     source_id: &str,

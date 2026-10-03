@@ -98,6 +98,23 @@ impl FilePlatform for Controlled {
     }
 }
 impl MutationPlatform for Controlled {
+    fn open_link(&self, path: &Path) -> Result<File, FileError> {
+        MacFiles.open_link(path)
+    }
+    fn create_link(&self, parent: &File, name: &OsStr, target: &str) -> Creation {
+        MacFiles.create_link(parent, name, target)
+    }
+    fn copy_names(
+        &self,
+        file: &File,
+        maximum: usize,
+    ) -> Result<Vec<std::ffi::OsString>, FileError> {
+        MacFiles.copy_names(file, maximum)
+    }
+    fn read_copy_attributes(&self, file: &File) -> Result<(String, usize), FileError> {
+        MacFiles.read_copy_attributes(file)
+    }
+
     fn prepare_staging(
         &self,
         receipt: &MutationReceipt,
@@ -105,8 +122,13 @@ impl MutationPlatform for Controlled {
     ) -> Result<Staging, FileError> {
         if self.storage_inside {
             return Ok(Staging {
-                directory: MacFiles.open_directory(&receipt.request.root.canonicalize()?)?,
-                path: receipt.request.root.canonicalize()?.join("owned-backup"),
+                directory: MacFiles
+                    .open_directory(&receipt.request.root.canonicalize()?.join("source"))?,
+                path: receipt
+                    .request
+                    .root
+                    .canonicalize()?
+                    .join("source/owned-backup"),
             });
         }
         MacFiles.prepare_staging(receipt, root)
@@ -311,7 +333,7 @@ fn trash_execute_verifies_independent_backup_and_native_move_with_exact_original
     assert!(loaded.validate_fresh().is_err());
 }
 #[test]
-fn trash_execute_preflight_refuses_unconfirmed_stale_parent_large_unknown_package_links_and_hardlinks()
+fn trash_execute_refuses_unconfirmed_stale_large_unknown_and_hardlinked_sources_but_supports_directories_and_links()
  {
     for mode in 0..10 {
         let mut value = fixture();
@@ -352,6 +374,25 @@ fn trash_execute_preflight_refuses_unconfirmed_stale_parent_large_unknown_packag
                     .version;
         }
         direct(&mut value, &platform, |_| Ok(()));
+        if mode == 6 || mode == 7 {
+            assert_eq!(
+                value.receipt.status,
+                MutationStatus::Completed,
+                "mode={mode} {:?}",
+                value.receipt.error
+            );
+            assert!(value.receipt.backup_verified && value.receipt.completion_verified);
+            assert!(fs::symlink_metadata(value.root.path().join("source")).is_err());
+            let after = fs::symlink_metadata(trashed(&value)).unwrap();
+            assert_eq!(after.is_dir(), mode == 6);
+            if mode == 7 {
+                assert_eq!(
+                    fs::read_link(trashed(&value)).unwrap(),
+                    Path::new("missing")
+                );
+            }
+            continue;
+        }
         assert_eq!(
             value.receipt.status,
             MutationStatus::NotStarted,

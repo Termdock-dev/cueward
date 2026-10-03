@@ -7,7 +7,7 @@ pub(super) struct Backup {
 }
 /// Build a private independent copy. It is never deleted, even after success.
 pub(super) fn backup<P: TrashPlatform>(
-    context: &context::Context<'_, P>,
+    context: &mut context::Context<'_, P>,
     receipt: &mut TrashReceipt,
     checkpoint: &mut impl FnMut(&TrashReceipt) -> Result<(), FileError>,
 ) -> Result<Backup, FileError> {
@@ -18,7 +18,7 @@ pub(super) fn backup<P: TrashPlatform>(
         .ok_or_else(|| changed("backup leaf missing"))?;
     let mut file = context
         .platform
-        .create_file(&storage.directory, leaf)
+        .create_object(&storage.directory, leaf, &context.plan.source)
         .file?;
     let verification = copy_file_verified(
         context.platform,
@@ -61,7 +61,7 @@ pub(in crate::files::trash) fn verify_file(
     info: &FileInfo,
     verification: &CopyVerification,
 ) -> Result<(), FileError> {
-    let file = platform.open_regular(Path::new(&info.path))?;
+    let file = platform.open_object(info)?;
     verify_readable(platform, &file, info, verification)?;
     if platform.trash_attribute_digest(&file)?
         != (
@@ -96,7 +96,7 @@ pub(super) fn finish<P: TrashPlatform>(
     }
     let after = observe(context.platform, &path)?;
     receipt.trash_after = Some(after.clone());
-    verify_moved(context, receipt, &path, &after)?;
+    verify_moved(context, receipt, &after)?;
     observe_source_absence(context, receipt)?;
     check_staging_absent(receipt)?;
     let stable = observe(context.platform, &path)?;
@@ -146,7 +146,7 @@ pub(super) fn observe_source_absence<P: TrashPlatform>(
 }
 
 fn prepare_backup<P: TrashPlatform>(
-    context: &context::Context<'_, P>,
+    context: &mut context::Context<'_, P>,
     receipt: &mut TrashReceipt,
     checkpoint: &mut impl FnMut(&TrashReceipt) -> Result<(), FileError>,
 ) -> Result<Staging, FileError> {
@@ -161,17 +161,26 @@ fn prepare_backup<P: TrashPlatform>(
         receipt.receipt_path.clone(),
     );
     let storage = context.platform.prepare_staging(&proxy, &context.root)?;
+    crate::files::mutation::objects::advance_staging(
+        context.platform,
+        &storage,
+        &receipt.request.root,
+        &context.root,
+        &context.parent,
+        &mut context.plan.root,
+        &mut context.plan.source_parent,
+    )?;
     let directory = storage
         .path
         .parent()
         .ok_or_else(|| changed("backup parent missing"))?
         .canonicalize()?;
-    if directory.starts_with(&context.plan.root.path)
+    if directory.starts_with(&context.plan.source.path)
         || directory.starts_with(&context.trash_info.path)
     {
         return Err(FileError::new(
             FileErrorCode::UnsupportedType,
-            "backup store must be outside selected root and Trash",
+            "backup store must be outside selected source tree and Trash",
         ));
     }
     receipt.backup_path = Some(text(&storage.path)?);
@@ -185,11 +194,10 @@ fn prepare_backup<P: TrashPlatform>(
 fn verify_moved<P: TrashPlatform>(
     context: &context::Context<'_, P>,
     receipt: &mut TrashReceipt,
-    path: &Path,
     after: &FileInfo,
 ) -> Result<(), FileError> {
     if after.identity != context.plan.source.identity
-        || after.kind != FileKind::File
+        || after.kind != context.plan.source.kind
         || after.data_state != DataState::NotDataless
         || after.size != context.plan.source.size
         || after.mode != context.plan.source.mode
@@ -204,7 +212,7 @@ fn verify_moved<P: TrashPlatform>(
         .backup_verification
         .as_ref()
         .ok_or_else(|| changed("missing backup digest"))?;
-    let file = context.platform.open_regular(path)?;
+    let file = context.platform.open_object(after)?;
     verify_readable(context.platform, &file, after, verification)?;
     receipt.trash_attributes = Some(
         context
@@ -212,8 +220,10 @@ fn verify_moved<P: TrashPlatform>(
             .verify_trashed_attributes(&file, verification)?,
     );
     // Rename changes ctime; identity/data/mtime/mode, not the old full version, must match.
-    let mut held = &context.source;
-    held.seek(SeekFrom::Start(0))?;
+    if after.kind == FileKind::File {
+        let mut held = &context.source;
+        held.seek(SeekFrom::Start(0))?;
+    }
     verify_readable(
         context.platform,
         &context.source,

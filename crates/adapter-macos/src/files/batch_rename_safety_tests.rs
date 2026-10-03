@@ -116,7 +116,6 @@ fn batch_rename_alias_and_availability_failures_are_explicit_item_errors() {
     let root = fixture();
     let request = request(root.path(), &[("a", "new")]);
     for (alias, available, code) in [
-        (Some(true), true, FileErrorCode::UnsupportedType),
         (None, true, FileErrorCode::Unavailable),
         (Some(false), false, FileErrorCode::Unavailable),
     ] {
@@ -128,6 +127,10 @@ fn batch_rename_alias_and_availability_failures_are_explicit_item_errors() {
         assert_eq!(plan.items[0].error.as_ref().unwrap().code, code);
         assert!(plan.items[0].proposal.is_none());
     }
+    let mut platform = inspecting(|| {});
+    platform.alias = Some(true);
+    let plan = batch::plan(&platform, &request).unwrap();
+    assert!(!plan.has_conflicts && plan.items[0].error.is_none());
     assert!(root.path().join("a").exists());
     assert!(!root.path().join("new").exists());
 }

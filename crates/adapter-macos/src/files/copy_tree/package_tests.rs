@@ -62,17 +62,15 @@ fn package_inclusion_does_not_follow_links_and_still_enforces_tree_budgets() {
     let mut selected = request(root.path());
     selected.include_packages = true;
     let plan = plan_worker(&selected).unwrap();
-    assert!(plan.has_blockers);
+    assert!(!plan.has_blockers);
     assert!(!serde_json::to_string(&plan).unwrap().contains("PRIVATE"));
     let link = plan
         .entries
         .iter()
         .find(|e| e.relative_path == Path::new("Owned.app/link"))
         .unwrap();
-    assert_eq!(
-        link.error.as_ref().unwrap().code,
-        FileErrorCode::UnsupportedType
-    );
+    assert!(link.error.is_none());
+    assert_eq!(link.source.link_target.as_deref(), outside.path().to_str());
     for mode in 0..3 {
         let mut limited = selected.clone();
         match mode {

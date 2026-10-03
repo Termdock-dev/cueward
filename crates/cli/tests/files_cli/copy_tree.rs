@@ -107,8 +107,8 @@ fn copy_tree_cli_ok_can_carry_namespace_and_source_blockers() {
         entries
             .iter()
             .find(|e| e["relative_path"] == "broken")
-            .unwrap()["error"]["code"],
-        "unsupported_type"
+            .unwrap()["error"],
+        Value::Null
     );
     let value = plan(root.path(), "source/sub/copy", &[], true);
     assert_eq!(

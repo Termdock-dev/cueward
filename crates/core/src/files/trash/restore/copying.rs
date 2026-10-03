@@ -2,11 +2,20 @@ use super::*;
 
 /// Verify an independent candidate in separate private same-volume staging.
 pub(super) fn prepare<P: TrashPlatform>(
-    context: &context::Context<'_, P>,
+    context: &mut context::Context<'_, P>,
     receipt: &mut RestoreReceipt,
     checkpoint: &mut impl FnMut(&RestoreReceipt) -> Result<(), FileError>,
 ) -> Result<(Staging, File), FileError> {
     let storage = storage(context, receipt)?;
+    crate::files::mutation::objects::advance_staging(
+        context.platform,
+        &storage,
+        &receipt.request.root,
+        &context.root,
+        &context.parent,
+        &mut context.root_info,
+        &mut context.parent_info,
+    )?;
     receipt.staging_path = Some(text(&storage.path)?);
     receipt.stage = RestoreStage::Copying;
     bound(receipt, 128 * 1024)?;
@@ -18,7 +27,7 @@ pub(super) fn prepare<P: TrashPlatform>(
         .ok_or_else(|| changed("staging leaf missing"))?;
     let mut candidate = context
         .platform
-        .create_file(&storage.directory, leaf)
+        .create_object(&storage.directory, leaf, &context.backup_info)
         .file?;
     let proof = copy_file_verified(
         context.platform,
@@ -54,8 +63,8 @@ pub(super) fn verify_candidate<P: TrashPlatform>(
         || context.platform.stamp(&candidate.metadata()?).version != now.version
         || now.mode != context.backup_info.mode
         || now.modified != context.backup_info.modified
-        || now.size != context.backup_info.size
-        || now.kind != FileKind::File
+        || (now.kind != FileKind::Directory && now.size != context.backup_info.size)
+        || now.kind != context.backup_info.kind
         || now.data_state != DataState::NotDataless
     {
         return Err(changed("restored candidate path or metadata changed"));
@@ -110,7 +119,7 @@ fn storage<P: TrashPlatform>(
         .parent()
         .ok_or_else(|| changed("restore staging parent missing"))?
         .canonicalize()?;
-    if parent.starts_with(&context.root_info.path)
+    if parent.starts_with(&context.backup_info.path)
         || parent
             == Path::new(&context.backup_info.path)
                 .parent()

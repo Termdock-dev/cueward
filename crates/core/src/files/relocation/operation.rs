@@ -1,7 +1,7 @@
 use super::*;
 use context::Context;
 
-/// Execute once with checkpointed evidence; never copy/delete, overwrite or rollback.
+/// Execute once with checkpointed evidence; never overwrite, permanently delete or rollback.
 pub fn execute<P: RelocationPlatform>(
     platform: &P,
     receipt: &mut RelocationReceipt,
@@ -10,6 +10,19 @@ pub fn execute<P: RelocationPlatform>(
     validation::validate(&receipt.request)?;
     let context = Context::prepare(platform, &receipt.request)?;
     receipt.before = Some(build_plan(platform, &receipt.request, &context)?);
+    let before = receipt
+        .before
+        .as_ref()
+        .ok_or_else(|| invalid("missing observations"))?;
+    if !before.same_filesystem {
+        if before.destination_before.is_some() {
+            return Err(FileError::new(
+                FileErrorCode::Conflict,
+                "destination exists; nothing overwritten",
+            ));
+        }
+        return platform.cross_volume_move(receipt, checkpoint);
+    }
     let no_op = prepare(platform, receipt)?;
     receipt.stage = RelocationStage::Prepared;
     receipt.renamed = Some(false);

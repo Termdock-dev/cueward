@@ -1,6 +1,6 @@
 # Inspect a selected trash proposal
 
-Read-only planning was merged in PR #60. Check installed `files trash plan --help`. Use this read-only command to explain the exact entry and scope before a removal decision; separately confirmed ordinary-file trash uses [file-trash-execution.md](file-trash-execution.md), while completed ordinary-file receipts have separate [backup restoration](file-trash-restore.md). Never substitute permanent deletion or `files move` to an invented Trash path.
+Read-only planning was merged in PR #60. Check installed `files trash plan --help`. Use this read-only command to explain the exact entry and scope before a removal decision; separately confirmed selected-object trash uses [file-trash-execution.md](file-trash-execution.md), while completed verified receipts have separate [backup restoration](file-trash-restore.md). Never substitute permanent deletion or `files move` to an invented Trash path.
 
 Observe the exact entry with `files info`, then pass its revision:
 

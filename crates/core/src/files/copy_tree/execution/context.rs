@@ -41,9 +41,11 @@ impl<'a, P: TreeExecutionPlatform> Context<'a, P> {
         }
         let mut request = receipt.request.clone();
         request.root = self.plan.root.path.clone().into();
-        if published {
-            request.expected_parent_version = self.platform.stamp(&self.parent.metadata()?).version;
-        }
+        request.expected_parent_version = if published {
+            self.platform.stamp(&self.parent.metadata()?).version
+        } else {
+            self.plan.destination_parent.version.clone()
+        };
         let fresh = super::super::plan(self.platform, &request)?;
         require_supported(&fresh, published)?;
         if fresh.root.path != self.plan.root.path
@@ -99,7 +101,7 @@ impl<'a, P: TreeExecutionPlatform> Context<'a, P> {
         let path = Path::new(&before.path)
             .strip_prefix(&scope.root)
             .map_err(|_| changed("source escaped root"))?;
-        let now = scope.info(&scope.resolve(path, false, false)?)?;
+        let now = scope.info(&scope.resolve(path, false, true)?)?;
         if now.version != before.version
             || now.path != before.path
             || self

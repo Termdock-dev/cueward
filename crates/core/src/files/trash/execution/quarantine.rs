@@ -54,7 +54,7 @@ pub(super) fn check_staged<P: TrashPlatform>(
     if after.path != before.path
         || after.version != before.version
         || after.identity != context.plan.source.identity
-        || after.kind != FileKind::File
+        || after.kind != context.plan.source.kind
         || after.data_state != DataState::NotDataless
         || after.size != context.plan.source.size
         || after.mode != context.plan.source.mode

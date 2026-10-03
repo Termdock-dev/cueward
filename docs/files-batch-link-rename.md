@@ -1,6 +1,6 @@
 # Explicit symlink objects in independent batch rename
 
-This #42 slice extends [batch planning](files-batch-rename.md) and [independent execution](files-batch-execution.md) with per-entry symlink-object selection. The new JSON field is pending review. Check installed `files rename-batch plan/execute --help` for `link_itself` before using it; single-item `--link-itself` support does not establish batch support.
+This #42 slice extends [batch planning](files-batch-rename.md) and [independent execution](files-batch-execution.md) with per-entry symlink-object selection. Per-entry link permission was merged in PR #65. Check installed `files rename-batch plan/execute --help` for `link_itself` before using it; single-item `--link-itself` support does not establish batch support.
 
 ## Request only the selected link objects
 
@@ -43,4 +43,4 @@ Child evidence retains the existing relocation schema. Pre-#64 relocation reader
 
 Owned macOS 27.0.1 tests cover default refusal, explicit boolean parsing/legacy omission, mixed files/links, broken/outside/relative references, nested parents, no-ops, inode/reference retention, unchanged outside target bytes/revisions, saved aggregate/child lookups, one-use refusal, stale/non-link/conflict/dependency preflight refusal, pending and completed link replacements, independent target edits, and parent SIGINT/SIGTERM/SIGKILL after the first actual native rename. Actual CLI/worker tests check escaped Unicode/newline names, permission propagation and no child allocation on failed whole-batch preflight. Only disposable owned files and exact newly allocated receipt directories are cleaned up. A release CLI/worker probe on 2026-10-03 passed help discovery, read-only mixed plans, default whole-batch refusal, mixed native rename/no-op, inode/reference preservation, unchanged outside target bytes/revision and aggregate/child saved lookup.
 
-These checks are not source-inode CAS, an atomic namespace transaction, provider coordination or full real-platform acceptance. File Provider/TCC/read-only/unmount/external-volume and older macOS scenarios remain unverified. #42 stays open for cross-volume operations, copy/tree link support, broader package/metadata and trash/recovery support, safe existing-tag edits and platform acceptance. Permanent deletion is excluded.
+Current copy/duplicate, different-volume moves, existing-tag edits and directory/link trash/restore are described in [file mutations](files-mutations.md), [relocation](files-relocation.md), [tags](files-tags.md) and [trash](files-trash-execution.md). File Provider/TCC/read-only/unmount, arbitrary external volumes and older macOS remain unverified. Permanent deletion is excluded.

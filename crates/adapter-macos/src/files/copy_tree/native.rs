@@ -9,6 +9,9 @@ use std::os::unix::ffi::OsStringExt;
 use std::os::unix::fs::MetadataExt;
 
 impl CopyTreePlatform for MacFiles {
+    fn open_tree_link(&self, path: &Path) -> Result<File, FileError> {
+        self.open_link(path)
+    }
     fn open_tree_directory(&self, path: &Path) -> Result<File, FileError> {
         self.open_directory(path)
     }

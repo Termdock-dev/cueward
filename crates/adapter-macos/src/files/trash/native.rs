@@ -16,7 +16,10 @@ unsafe extern "C" {
 impl TrashPlatform for MacFiles {
     fn trash_directory(&self, source: &FileInfo) -> Result<PathBuf, FileError> {
         autoreleasepool(|_| {
-            let url = NSURL::fileURLWithPath_isDirectory(&NSString::from_str(&source.path), false);
+            let url = NSURL::fileURLWithPath_isDirectory(
+                &NSString::from_str(&source.path),
+                source.kind == FileKind::Directory,
+            );
             let directory = NSFileManager::defaultManager()
                 .URLForDirectory_inDomain_appropriateForURL_create_error(
                     NSSearchPathDirectory::TrashDirectory,
@@ -43,21 +46,23 @@ impl TrashPlatform for MacFiles {
         })
     }
     fn validate_trash(&self, root: &File, source: &File, trash: &File) -> Result<(), FileError> {
-        let (root, source, trash) = (root.metadata()?, source.metadata()?, trash.metadata()?);
+        let (source, trash) = (source.metadata()?, trash.metadata()?);
+        let _ = root;
         // SAFETY: geteuid has no arguments or mutable memory requirements.
         let owner = unsafe { geteuid() };
         if !trash.is_dir()
             || trash.uid() != owner
             || trash.mode() & 0o077 != 0
             || self.stamp(&trash).data_state != DataState::NotDataless
-            || root.dev() != trash.dev()
             || source.dev() != trash.dev()
         {
             return Err(unavailable(
                 "selected root, source and private user Trash must share an available filesystem",
             ));
         }
-        if !source.is_file() || source.nlink() != 1 {
+        if !(source.is_file() || source.is_dir() || source.file_type().is_symlink())
+            || (source.is_file() && source.nlink() != 1)
+        {
             return Err(FileError::new(
                 FileErrorCode::UnsupportedType,
                 "trash execution excludes hard links and non-regular files",
@@ -75,7 +80,10 @@ impl TrashPlatform for MacFiles {
     }
     fn trash_staged(&self, source: &FileInfo) -> NativeTrashResult {
         autoreleasepool(|_| {
-            let url = NSURL::fileURLWithPath_isDirectory(&NSString::from_str(&source.path), false);
+            let url = NSURL::fileURLWithPath_isDirectory(
+                &NSString::from_str(&source.path),
+                source.kind == FileKind::Directory,
+            );
             let mut resulting = None;
             match NSFileManager::defaultManager()
                 .trashItemAtURL_resultingItemURL_error(&url, Some(&mut resulting))
@@ -136,7 +144,11 @@ impl TrashPlatform for MacFiles {
             accepted_platform_additions: if exact {
                 Vec::new()
             } else {
-                vec!["com.apple.macl (added, zero bytes)".into()]
+                vec![if full.1 == filtered.1 {
+                    "com.apple.macl (added, zero bytes)".into()
+                } else {
+                    format!("com.apple.macl (added, {} bytes)", full.1 - filtered.1)
+                }]
             },
         })
     }

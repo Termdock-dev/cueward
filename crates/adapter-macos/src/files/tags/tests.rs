@@ -73,11 +73,11 @@ fn read_and_noop_preserve_colors_payload_inode_permissions_and_mtime() {
     refresh(&mut request);
     assert_eq!(
         direct(&request, &mut |_| Ok(())).status,
-        TagsStatus::NotStarted
+        TagsStatus::Completed
     );
     assert_eq!(
         read(root.path(), &request.path, None).unwrap().tags,
-        initial
+        initial[..1]
     );
     let after = file.metadata().unwrap();
     assert_eq!(fs::read(path).unwrap(), payload);
@@ -342,7 +342,7 @@ fn unrelated_xattrs_finder_info_and_existing_color_entries_are_unchanged() {
     let unrelated = attrs("com.cueward.owned");
     assert_eq!(
         direct(&request, &mut |_| Ok(())).status,
-        TagsStatus::NotStarted
+        TagsStatus::Completed
     );
     assert_eq!(attrs("com.apple.FinderInfo"), finder);
     assert_eq!(attrs("com.cueward.owned"), unrelated);
@@ -353,7 +353,7 @@ fn unrelated_xattrs_finder_info_and_existing_color_entries_are_unchanged() {
     assert_eq!(rejected.error.unwrap().code, FileErrorCode::UnsupportedType);
     assert_eq!(
         read(root.path(), &request.path, None).unwrap().tags.len(),
-        1
+        2
     );
 }
 

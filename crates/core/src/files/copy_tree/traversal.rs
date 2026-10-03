@@ -120,25 +120,34 @@ impl<'a, 'b, P: CopyTreePlatform> Scan<'a, 'b, P> {
         &self,
         source: &FileInfo,
     ) -> Result<(Option<ResourceMetadata>, Option<FileError>), FileError> {
-        if !matches!(source.kind, FileKind::File | FileKind::Directory)
-            || source.data_state != DataState::NotDataless
+        if !matches!(
+            source.kind,
+            FileKind::File | FileKind::Directory | FileKind::Symlink
+        ) || source.data_state != DataState::NotDataless
         {
             return Ok((
                 None,
                 Some(unsupported(
-                    "links, special files and unavailable data are not planned for copying",
+                    "special files and unavailable data are not planned for copying",
                 )),
             ));
         }
         let file = open(self.scope.platform, source)?;
+        if source.kind == FileKind::Symlink {
+            return Ok((
+                Some(ResourceMetadata::not_applicable()),
+                self.scope
+                    .platform
+                    .validate_tree_metadata(&file, source)
+                    .err(),
+            ));
+        }
         let resources = self
             .scope
             .platform
             .resource_metadata(Path::new(&source.path), &file.metadata()?)?;
-        let error = if resources.is_alias_file != (ResourceValue::Available { value: false }) {
-            Some(unsupported(
-                "Finder aliases or unknown alias state cannot be copied",
-            ))
+        let error = if !matches!(resources.is_alias_file, ResourceValue::Available { .. }) {
+            Some(unsupported("unknown alias state cannot be copied"))
         } else if source.kind == FileKind::Directory
             && resources.is_package != (ResourceValue::Available { value: false })
             && !(self.request.include_packages
@@ -182,6 +191,7 @@ pub(super) fn open(platform: &impl CopyTreePlatform, info: &FileInfo) -> Result<
     let file = match info.kind {
         FileKind::File => platform.open_regular(Path::new(&info.path))?,
         FileKind::Directory => platform.open_tree_directory(Path::new(&info.path))?,
+        FileKind::Symlink => platform.open_tree_link(Path::new(&info.path))?,
         _ => {
             return Err(unsupported(
                 "copy-tree requires a regular file or directory",

@@ -106,20 +106,22 @@ fn destination_content_change_and_new_conflicts_during_planning_are_rejected() {
     }
 }
 #[test]
-fn unavailable_alias_state_and_actual_aliases_are_not_validated_as_regular_sources() {
+fn alias_state_must_be_known_but_alias_relocation_keeps_the_object_opaque() {
     let (_root, request) = fixture();
-    for (alias, code) in [
-        (None, FileErrorCode::Unavailable),
-        (Some(true), FileErrorCode::UnsupportedType),
-    ] {
-        let mut platform = inspecting(|| {});
-        platform.alias = alias;
-        assert_eq!(
-            relocation::plan(&platform, &request).unwrap_err().code,
-            code
-        );
-    }
+    let mut platform = inspecting(|| {});
+    platform.alias = None;
+    assert_eq!(
+        relocation::plan(&platform, &request).unwrap_err().code,
+        FileErrorCode::Unavailable
+    );
+    platform.alias = Some(true);
+    let plan = relocation::plan(&platform, &request).unwrap();
+    assert_eq!(
+        plan.source_resources.is_alias_file,
+        ResourceValue::Available { value: true }
+    );
 }
+
 #[test]
 fn different_filesystem_is_reported_without_copy_or_source_removal() {
     let (root, request) = fixture();

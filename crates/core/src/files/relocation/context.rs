@@ -79,7 +79,7 @@ impl<'a, P: RelocationPlatform> Context<'a, P> {
         }
     }
 
-    /// Query native source metadata and reject aliases or unknown alias state.
+    /// Query native source metadata and keep aliases opaque and reject unknown alias state.
     pub(super) fn resources(&self, platform: &P) -> Result<ResourceMetadata, FileError> {
         if self.source.info.kind == FileKind::Symlink {
             return Ok(ResourceMetadata::not_applicable());
@@ -89,11 +89,7 @@ impl<'a, P: RelocationPlatform> Context<'a, P> {
             &self.source.file.metadata()?,
         )?;
         match resources.is_alias_file {
-            ResourceValue::Available { value: false } => Ok(resources),
-            ResourceValue::Available { value: true } => Err(FileError::new(
-                FileErrorCode::UnsupportedType,
-                "Finder aliases are not planned as relocation targets",
-            )),
+            ResourceValue::Available { .. } => Ok(resources),
             _ => Err(FileError::new(
                 FileErrorCode::Unavailable,
                 "cannot establish whether source is a Finder alias",

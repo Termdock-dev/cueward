@@ -175,21 +175,43 @@ fn duplicate_checks_source_parent_versions_and_byte_budgets() {
     assert!(!root.path().join(&request.destination).exists());
 }
 #[test]
-fn duplicate_rejects_directories_packages_links_and_special_permission_bits() {
+fn duplicate_supports_directory_package_and_link_objects_but_rejects_special_permission_bits() {
     let (root, mut request) = fixture();
     for name in ["directory", "Owned.app"] {
         fs::create_dir(root.path().join(name)).unwrap();
     }
     symlink("source.txt", root.path().join("link")).unwrap();
     for path in ["directory", "Owned.app", "link"] {
+        request.destination = format!("duplicate-{path}").into();
         select_source(&mut request, path, 1024);
-        assert_not_started(&request, FileErrorCode::UnsupportedType);
+        let receipt = run_request(&request);
+        assert_eq!(
+            receipt.status,
+            MutationStatus::Completed,
+            "{:?}",
+            receipt.error
+        );
+        assert_eq!(
+            fs::symlink_metadata(root.path().join(&request.destination))
+                .unwrap()
+                .file_type(),
+            fs::symlink_metadata(root.path().join(path))
+                .unwrap()
+                .file_type()
+        );
+        if path == "link" {
+            assert_eq!(
+                fs::read_link(root.path().join(&request.destination)).unwrap(),
+                Path::new("source.txt")
+            );
+        }
     }
     fs::set_permissions(
         root.path().join("source.txt"),
         fs::Permissions::from_mode(0o4640),
     )
     .unwrap();
+    request.destination = "unsupported-copy".into();
     select_source(&mut request, "source.txt", 1024);
     assert_not_started(&request, FileErrorCode::UnsupportedType);
     assert!(!root.path().join(&request.destination).exists());

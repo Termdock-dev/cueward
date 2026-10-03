@@ -48,6 +48,9 @@ impl FilePlatform for Hook {
     }
 }
 impl CopyTreePlatform for Hook {
+    fn open_tree_link(&self, path: &Path) -> Result<File, FileError> {
+        MacFiles.open_tree_link(path)
+    }
     fn open_tree_directory(&self, path: &Path) -> Result<File, FileError> {
         MacFiles.open_tree_directory(path)
     }
@@ -159,7 +162,7 @@ fn copy_tree_stable_root_alias_uses_initial_canonical_root_and_retarget_is_rejec
     assert!(plan_worker(&request).is_ok());
 }
 #[test]
-fn copy_tree_unknown_availability_prunes_directories_and_different_devices_block() {
+fn copy_tree_unknown_availability_prunes_directories_but_cross_volume_copy_can_be_planned() {
     let root = fixture();
     let request = request(root.path());
     let info = super::super::observe(root.path(), Path::new("source/sub"), false, None).unwrap();
@@ -176,7 +179,7 @@ fn copy_tree_unknown_availability_prunes_directories_and_different_devices_block
     platform.unknown = None;
     platform.cross = true;
     let plan = copy_tree::plan(&platform, &request).unwrap();
-    assert!(plan.has_blockers && plan.issues.contains(&CopyTreeIssue::DifferentFilesystem));
+    assert!(!plan.has_blockers && !plan.issues.contains(&CopyTreeIssue::DifferentFilesystem));
 }
 #[test]
 fn copy_tree_entry_boundary_output_budget_and_descriptor_enumeration_are_bounded() {
@@ -241,7 +244,7 @@ fn copy_tree_rejects_non_utf8_names_without_lossy_conversion() {
     );
 }
 #[test]
-fn copy_tree_unsupported_source_revision_changes_are_still_rechecked() {
+fn copy_tree_link_revision_changes_are_rechecked_without_following_targets() {
     let root = fixture();
     symlink("missing", root.path().join("source/a-link")).unwrap();
     let request = request(root.path());

@@ -1,6 +1,6 @@
 # Independent batch rename execution
 
-`files rename-batch execute` continues [issue #42](https://github.com/Termdock-dev/cueward/issues/42) with fail-stop execution of explicitly selected independent sibling renames. Check installed command help; new [per-entry link-object selection](files-batch-link-rename.md) is pending review. [Planning](files-batch-rename.md) remains read-only and never authorizes execution.
+`files rename-batch execute` continues [issue #42](https://github.com/Termdock-dev/cueward/issues/42) with fail-stop execution of explicitly selected independent sibling renames. Check installed command help; new [per-entry link-object selection](files-batch-link-rename.md) was merged in PR #65. [Planning](files-batch-rename.md) remains read-only and never authorizes execution.
 
 ## Request and authorization
 
@@ -59,4 +59,4 @@ One parent-owned socket lifeline covers the entire worker, including every child
 
 Owned disposable tests cover sibling parent-revision advancement, original root-alias preservation, separate parents, packages, no-ops, full-batch conflict/item-error refusal, dense conflicts at native 50-entry and short-opaque-revision 64-entry request bounds with saved not-started evidence, stale pending sources, late targets/parent changes, root-alias retargeting, child root-anchor mismatch, known native rejection/unknown submission, checkpoint failures, final destination changes, saved aggregate/child lookup, replay/shape refusal, escaped JSON and timeout. Delayed and armed workers are stopped by parent signals, including an armed worker after its first actual native rename; later items remain untouched and partial evidence survives.
 
-Real File Provider/TCC, external/read-only/unmounted volumes and older macOS acceptance remain unverified. Dependency-aware swaps/chains, execution resume/rollback, package duplication, broader trash types/restore, cross-volume operations and safe existing-tag edits remain separate work. Ordinary tree copies use the separate [execution contract](files-copy-tree-execution.md) merged in PR #59; check installed help. Confirmed ordinary-file trash uses [verified trash execution](files-trash-execution.md). Permanent deletion is excluded.
+Real File Provider/TCC, arbitrary external/read-only/unmounted volumes and older macOS remain unverified. Dependency swaps/chains, automatic resume/rollback and permanent deletion are excluded. File/directory/link copy, different-volume move, existing tags and confirmed trash/restore are documented in [file mutations](files-mutations.md), [relocation](files-relocation.md), [tags](files-tags.md) and [trash](files-trash-execution.md).

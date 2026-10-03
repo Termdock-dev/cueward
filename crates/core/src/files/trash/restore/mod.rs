@@ -32,9 +32,9 @@ pub fn execute(
     checkpoint: &mut impl FnMut(&RestoreReceipt) -> Result<(), FileError>,
 ) -> Result<(), FileError> {
     receipt.validate_fresh()?;
-    let context = context::Context::prepare(platform, receipt, original)?;
+    let mut context = context::Context::prepare(platform, receipt, original)?;
     checkpoint(receipt)?;
-    let (storage, candidate) = copying::prepare(&context, receipt, checkpoint)?;
+    let (storage, candidate) = copying::prepare(&mut context, receipt, checkpoint)?;
     context.revalidate(receipt, false)?;
     copying::verify_candidate(&context, receipt, &candidate, &storage.path)?;
     receipt.stage = RestoreStage::Staged;
@@ -137,7 +137,7 @@ fn observe(platform: &impl FilePlatform, path: &Path) -> Result<FileInfo, FileEr
     let info = scope.info(&scope.resolve(
         Path::new(path.file_name().ok_or_else(|| changed("missing leaf"))?),
         false,
-        false,
+        true,
     )?)?;
     scope.revalidate_root()?;
     Ok(info)

@@ -23,6 +23,9 @@ pub fn copy_file_verified(
     destination: &mut File,
     maximum: u64,
 ) -> Result<CopyVerification, FileError> {
+    if info.kind != FileKind::File {
+        return super::objects::copy(platform, source, info, destination, maximum);
+    }
     context::check_source(platform, source, info)?;
     let mut reader = source;
     let (bytes, digest) = transfer(&mut reader, destination, maximum)?;
@@ -54,6 +57,8 @@ pub fn copy_file_verified(
         modified_equal,
         extended_attributes_sha256: attributes,
         extended_attributes_bytes: attribute_bytes,
+        link_target: None,
+        children: None,
     })
 }
 
@@ -94,6 +99,9 @@ pub fn verify_readable(
     info: &FileInfo,
     verification: &CopyVerification,
 ) -> Result<(), FileError> {
+    if info.kind != FileKind::File {
+        return super::objects::verify(platform, file, info, verification);
+    }
     context::check_source(platform, file, info)?;
     let (bytes, digest) = hash(&mut &*file, verification.bytes)?;
     context::check_source(platform, file, info)?;

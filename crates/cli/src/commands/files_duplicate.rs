@@ -5,7 +5,7 @@ use cueward_core::files::mutation::{MutationAction, MutationRequest, duplicate_d
 pub(crate) struct DuplicateArgs {
     #[arg(long)]
     root: PathBuf,
-    /// Source available regular file relative to root; directories/packages/links are unsupported.
+    /// Source file, directory/package or symlink object relative to root; links are not followed.
     #[arg(long)]
     path: PathBuf,
     /// One exact new filename in the source's existing parent; no automatic conflict naming.

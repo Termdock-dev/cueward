@@ -1,4 +1,4 @@
-//! Read tags and atomically create only an absent attribute on the observed inode.
+//! Read and edit bounded tags on the held inode, with observed revision guards.
 use super::*;
 use std::ffi::{c_char, c_void};
 use std::os::fd::AsRawFd;
@@ -71,15 +71,9 @@ fn read_attribute(file: &File, name: &std::ffi::CStr) -> Result<Option<Vec<u8>>,
     }
     Ok(Some(bytes))
 }
-/// Create only an absent attribute; existing-value replacement has no safe revision guard.
+/// Create or replace one attribute; caller rechecks revision and saves original bytes first.
 pub(super) fn write(file: &File, bytes: &[u8], existed: bool) -> Result<(), FileError> {
-    if existed {
-        return Err(FileError::new(
-            FileErrorCode::UnsupportedType,
-            "existing tag attributes cannot be replaced atomically against an observed revision",
-        ));
-    }
-    // SAFETY: valid descriptor/name and bounded readable payload. XATTR_CREATE never overwrites.
+    // SAFETY: valid descriptor/name and bounded readable payload. CREATE/REPLACE conditions on presence, not atomic value revision.
     let result = unsafe {
         fsetxattr(
             file.as_raw_fd(),
@@ -87,7 +81,7 @@ pub(super) fn write(file: &File, bytes: &[u8], existed: bool) -> Result<(), File
             bytes.as_ptr().cast(),
             bytes.len(),
             0,
-            2, // Darwin XATTR_CREATE: the absence revision is checked by the setter.
+            if existed { 4 } else { 2 }, // Darwin XATTR_REPLACE / XATTR_CREATE.
         )
     };
     if result != 0 {

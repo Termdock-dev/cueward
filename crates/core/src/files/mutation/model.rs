@@ -11,7 +11,7 @@ pub struct MutationRequest {
     pub action: MutationAction,
 }
 
-/// Copy/duplicate require a prior source revision; directory trees are not copied.
+/// Copy/duplicate require a prior source revision and preserve entry objects without following links.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case")]
 pub enum MutationAction {
@@ -21,7 +21,7 @@ pub enum MutationAction {
         expected_version: String,
         max_bytes: u64,
     },
-    /// An independent regular-file copy in the source's existing parent.
+    /// An independent entry copy in the source's existing parent.
     Duplicate {
         path: PathBuf,
         expected_version: String,
@@ -61,6 +61,22 @@ pub struct CopyVerification {
     pub modified_equal: bool,
     pub extended_attributes_sha256: String,
     pub extended_attributes_bytes: usize,
+    /// Opaque link reference, not target contents; absent on legacy regular-file evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link_target: Option<String>,
+    /// Verified direct children; nested evidence retains exact names and supported metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub children: Option<Vec<CopyNode>>,
+}
+
+/// One independently verified copied child, without retaining source path assumptions.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CopyNode {
+    pub name: String,
+    pub kind: crate::files::FileKind,
+    pub mode: Option<u32>,
+    pub modified: Option<String>,
+    pub verification: CopyVerification,
 }
 
 /// Durable operation evidence; non-completed results must not be replayed automatically.

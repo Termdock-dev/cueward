@@ -178,7 +178,7 @@ fn tree_execute_verified_nested_hidden_empty_xattrs_and_independent_hardlinks() 
     );
 }
 #[test]
-fn tree_execute_preflight_refuses_conflicts_links_packages_and_limits_without_staging() {
+fn tree_execute_copies_link_objects_but_refuses_conflicts_packages_and_limits() {
     for mode in 0..6 {
         let root = fixture();
         match mode {
@@ -197,6 +197,19 @@ fn tree_execute_preflight_refuses_conflicts_links_packages_and_limits_without_st
         }
         let mut value = owned(root, selected);
         perform(&mut value);
+        if mode == 2 {
+            assert_eq!(
+                value.receipt.status,
+                MutationStatus::Completed,
+                "{:?}",
+                value.receipt.error
+            );
+            assert_eq!(
+                fs::read_link(value.root.path().join("destination/link")).unwrap(),
+                Path::new("missing")
+            );
+            continue;
+        }
         assert_eq!(value.receipt.status, MutationStatus::NotStarted);
         assert!(
             !value.receipt.mutation_attempted
