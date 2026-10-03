@@ -3,6 +3,7 @@ import WebKit
 
 let stateURL = URL(fileURLWithPath: CommandLine.arguments[1])
 let htmlURL = URL(fileURLWithPath: CommandLine.arguments[2])
+let lifetime = CommandLine.arguments.count > 3 ? min(max(Double(CommandLine.arguments[3]) ?? 180, 1), 900) : 180
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 let window = NSWindow(contentRect: NSRect(x: 100, y: 160, width: 500, height: 340),
@@ -48,6 +49,6 @@ window.orderFront(nil)
 let observer = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
     object: app, queue: .main) { _ in activations += 1 }
 Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { _ in save() }
-DispatchQueue.main.asyncAfter(deadline: .now() + 180) { app.terminate(nil) }
+DispatchQueue.main.asyncAfter(deadline: .now() + lifetime) { app.terminate(nil) }
 save()
 app.run()

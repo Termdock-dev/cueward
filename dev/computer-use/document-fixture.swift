@@ -2,6 +2,8 @@ import AppKit
 
 let stateURL = URL(fileURLWithPath: CommandLine.arguments[1])
 let destination = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
+let artifactName = CommandLine.arguments.count > 3 ? CommandLine.arguments[3] : "artifact.txt"
+let lifetime = CommandLine.arguments.count > 4 ? min(max(Double(CommandLine.arguments[4]) ?? 180, 1), 900) : 180
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 final class Draft: NSDocument {
@@ -14,7 +16,7 @@ final class Draft: NSDocument {
         // Only the disposable destination and default filename are prepared.
         // No enabled state, activation, Space or event acceptance behavior is changed.
         savePanel.directoryURL = destination
-        savePanel.nameFieldStringValue = "artifact.txt"
+        savePanel.nameFieldStringValue = artifactName
         return super.prepareSavePanel(savePanel)
     }
     @objc func requestSave(_ sender: Any?) { saveRequests += 1; save(sender) }
@@ -54,11 +56,11 @@ func saveState() {
     let state: [String: Any] = ["pid": getpid(), "window_id": document.windowControllers[0].window?.windowNumber ?? 0,
         "active": app.isActive, "activations": activations, "foreground_changes": foregroundChanges,
         "save_requests": document.saveRequests, "contents": document.editor?.string ?? "",
-        "file_created": FileManager.default.fileExists(atPath: destination.appendingPathComponent("artifact.txt").path),
+        "file_created": FileManager.default.fileExists(atPath: destination.appendingPathComponent(artifactName).path),
         "panel_window_id": document.windowControllers[0].window?.attachedSheet?.windowNumber ?? 0]
     if let data = try? JSONSerialization.data(withJSONObject: state) { try? data.write(to: stateURL, options: .atomic) }
 }
 let observationTimer = startDocumentObserver { _ in saveState() }
-DispatchQueue.main.asyncAfter(deadline: .now() + 180) { app.terminate(nil) }
+DispatchQueue.main.asyncAfter(deadline: .now() + lifetime) { app.terminate(nil) }
 saveState()
 app.run()

@@ -1,0 +1,163 @@
+{
+  "kind": "fresh_agent",
+  "date": "2026-10-03",
+  "macos": "27.0.1",
+  "build": "26A434",
+  "architecture": "arm64",
+  "agent_role": "luna",
+  "agent_context": "Goals and generic tool documentation only; no fixture/source/oracle/history access instructed. Separate fresh receiver per task; operator separately read disk/receiver records. This is task acceptance, not independent code review.",
+  "online_displays": 3,
+  "summary": {
+    "passed": 0,
+    "failed": 3,
+    "blocked": 0,
+    "unverified": 5
+  },
+  "denominator": 8,
+  "support_matrix": {
+    "native_ax": {
+      "passed": 0,
+      "failed": 1,
+      "blocked": 0,
+      "unverified": 4
+    },
+    "webview_pointer": {
+      "passed": 0,
+      "failed": 2,
+      "blocked": 0,
+      "unverified": 1
+    }
+  },
+  "attempted_tasks": [
+    {
+      "task_id": "new_document",
+      "status": "failed",
+      "command_count": 63,
+      "transport_execution_wall_ms": 536589.5,
+      "tool_wall_ms": 53888.2,
+      "maximum_sample_gap_ms": 54.6,
+      "distinct_foregrounds": 3,
+      "distinct_pointer_positions": 1507,
+      "distinct_visible_space_maps": 1,
+      "receiver_activation_events": 0,
+      "observer_errors": 0,
+      "checks": [
+        {
+          "name": "artifact",
+          "status": "failed",
+          "reason": "Expected artifact was not created."
+        },
+        {
+          "name": "save_once",
+          "status": "passed",
+          "reason": "receiver observed one save submission"
+        },
+        {
+          "name": "interference_trace",
+          "status": "failed",
+          "reason": "foreground, pointer or visible Space changed"
+        }
+      ],
+      "save_requests": 1,
+      "artifact_created": false,
+      "save_control_disabled_observed": true,
+      "transport_request_budget_reached": true
+    },
+    {
+      "task_id": "webview_first_click",
+      "status": "failed",
+      "command_count": 4,
+      "transport_execution_wall_ms": 150546.7,
+      "tool_wall_ms": 3158.1,
+      "maximum_sample_gap_ms": 42.6,
+      "distinct_foregrounds": 1,
+      "distinct_pointer_positions": 1,
+      "distinct_visible_space_maps": 1,
+      "receiver_activation_events": 0,
+      "observer_errors": 0,
+      "checks": [
+        {
+          "name": "preserved:seeds/original.txt",
+          "status": "passed",
+          "reason": "baseline hash comparison"
+        },
+        {
+          "name": "one_increment",
+          "status": "failed",
+          "reason": "fresh counter increased exactly once"
+        },
+        {
+          "name": "interference_trace",
+          "status": "passed",
+          "reason": "sampled execution coverage within 100 ms; shorter transients remain outside resolution"
+        }
+      ],
+      "dispatch_count": 1,
+      "dom_event_count": 0,
+      "clicks": 0,
+      "object": {
+        "y": 80,
+        "x": 100
+      },
+      "releases": 0,
+      "dragging": false
+    },
+    {
+      "task_id": "canvas_drag",
+      "status": "failed",
+      "command_count": 3,
+      "transport_execution_wall_ms": 202573.9,
+      "tool_wall_ms": 3287.4,
+      "maximum_sample_gap_ms": 47.6,
+      "distinct_foregrounds": 2,
+      "distinct_pointer_positions": 531,
+      "distinct_visible_space_maps": 1,
+      "receiver_activation_events": 0,
+      "observer_errors": 0,
+      "checks": [
+        {
+          "name": "preserved:seeds/original.txt",
+          "status": "passed",
+          "reason": "baseline hash comparison"
+        },
+        {
+          "name": "release",
+          "status": "failed",
+          "reason": "one observed down/up pair and no retained drag"
+        },
+        {
+          "name": "fresh_canvas",
+          "status": "passed",
+          "reason": "separate fresh receiver with no prior drag events"
+        },
+        {
+          "name": "displacement",
+          "status": "failed",
+          "reason": "fresh object moved by the requested 80 × 40 pixels"
+        },
+        {
+          "name": "interference_trace",
+          "status": "failed",
+          "reason": "foreground, pointer or visible Space changed"
+        }
+      ],
+      "dispatch_count": 1,
+      "dom_event_count": 0,
+      "clicks": 0,
+      "object": {
+        "x": 100,
+        "y": 80
+      },
+      "releases": 0,
+      "dragging": false
+    }
+  ],
+  "unrun_tasks": [
+    "existing_document",
+    "cross_app",
+    "window_dialog",
+    "calculation",
+    "canvas_interrupted"
+  ],
+  "limitations": "Three synthetic tasks attempted, none passed. Native task hit the 64-request budget including rejected requests; final trace was archived. Execution intervals include transport/agent-start waiting, not agent-only inference latency. Receiver modifications are limited to filename/deadline/observational fixture setup, not event acceptance. Other native tasks, controlled interruption, real-app and physical-input/lock experiments remain unrun. Sampling cannot exclude sub-sample transients. Pointer motion is unattributed. Initial transport setup failures were retained locally and are not task successes."
+}
