@@ -23,7 +23,7 @@ Put `execution` into the task evidence alongside actual receipts and independent
 
 ## Coverage and limits
 
-- Markers and samples use one observer `systemUptime` timebase. Each marker is bracketed by immediate samples; caller wall clocks are not substituted. The evaluator checks actual gaps against its existing 100 ms maximum, not the requested timer interval.
+- Markers and samples use one observer `systemUptime` timebase. Readiness also includes `system_uptime_origin` for correlation with independently observed receiver event uptimes. Each marker is bracketed by immediate samples; caller wall clocks are not substituted. The evaluator checks actual gaps against its existing 100 ms maximum, not the requested timer interval.
 - Each sample includes `sample_end_ms` so the desktop-read duration is retained. Channels are read sequentially, not as one atomic desktop snapshot.
 - Every sample correlates CoreGraphics online display identities with the dynamically discovered read-only `SLSCopyManagedDisplaySpaces` catalog. Missing, duplicate or uncorrelated identities produce an observation error. Mirrored displays or shared-Space configurations without a per-online-display mapping remain incomplete rather than being silently skipped or inferred.
 - Foreground PID, pointer coordinates, receiver active state and lock state are sampled. Workspace activation notifications also record transient receiver activations between samples. Events, errors and lock observations are checked by the acceptance evaluator when native-observer metadata is supplied. Provenance is not authenticated; sub-sample transitions and notification delivery limits remain explicit.

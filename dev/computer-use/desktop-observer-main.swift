@@ -72,6 +72,7 @@ import Darwin
 
     func run() {
         emit(["type": "ready", "schema": 1, "clock": "observer_system_uptime_ms",
+              "system_uptime_origin": initial,
               "receiver_pids": configuration.pids, "interval_ms": configuration.intervalMS,
               "duration_ms": configuration.durationMS,
               "macos": ProcessInfo.processInfo.operatingSystemVersionString])

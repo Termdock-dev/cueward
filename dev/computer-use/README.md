@@ -6,6 +6,8 @@ The [read-only desktop observer](desktop-observer.md) supplies timestamped task 
 
 The [interactive agent transport](agent-session.md) records commands chosen by a fresh Agent rather than scripted task steps. Its first three synthetic task attempts failed; all eight tasks remain in the denominator.
 
+The [physical-input overlap diagnostic](physical-overlap.md) records the actual #31 human round and separate idle/first-mouse contrasts. #31 remains incomplete; idle effects do not replace physical overlap.
+
 Run on an unlocked macOS desktop with Accessibility and Screen Recording permissions:
 
 ```sh

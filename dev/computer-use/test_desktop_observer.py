@@ -220,6 +220,9 @@ import Foundation
             end = observer.mark("end")
             execution = observer.execution(start, end)
             self.assertEqual(observation_checks(execution, [200])["status"], "passed")
+            origin = execution["observer"]["system_uptime_origin"]
+            self.assertGreater(origin, 0)
+            self.assertAlmostEqual(origin + execution["end_ms"] / 1000, time.monotonic(), delta=0.2)
         self.assertEqual(observer.records[-1]["reason"], "stopped")
 
     def test_deadline_without_controls_does_not_hang(self):
