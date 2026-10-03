@@ -1,6 +1,6 @@
 # Rename or move a symlink object
 
-`files rename/move --link-itself` adds explicit leaf-symlink relocation for [#42](https://github.com/Termdock-dev/cueward/issues/42). This new flag is pending review; check installed help. It reuses the [same-volume relocation](files-relocation.md) worker, revisions, guarded exclusive native rename and receipts. Without the flag, initial source links remain rejected. Recursive copy, single-file copy, batch rename and trash do not gain link support.
+`files rename/move --link-itself` adds explicit leaf-symlink relocation for [#42](https://github.com/Termdock-dev/cueward/issues/42). This flag was merged in [PR #64](https://github.com/Termdock-dev/cueward/pull/64); check installed help. It reuses the [same-volume relocation](files-relocation.md) worker, revisions, guarded exclusive native rename and receipts. Without the flag, initial source links remain rejected. Recursive copy, single-file copy and trash do not gain link support. Batch rename uses separate [per-entry JSON permission](files-batch-link-rename.md), pending review, not this global flag.
 
 ## Observe the link, not its target
 

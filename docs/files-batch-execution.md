@@ -1,6 +1,6 @@
 # Independent batch rename execution
 
-`files rename-batch execute` continues [issue #42](https://github.com/Termdock-dev/cueward/issues/42) with fail-stop execution of explicitly selected independent sibling renames. This source capability is pending review; check installed command help. [Planning](files-batch-rename.md) remains read-only and never authorizes execution.
+`files rename-batch execute` continues [issue #42](https://github.com/Termdock-dev/cueward/issues/42) with fail-stop execution of explicitly selected independent sibling renames. Check installed command help; new [per-entry link-object selection](files-batch-link-rename.md) is pending review. [Planning](files-batch-rename.md) remains read-only and never authorizes execution.
 
 ## Request and authorization
 
@@ -18,7 +18,7 @@ Use a JSON serializer for external filenames. Input order is execution order. Th
 
 The entire batch is preflighted before any selected-path mutation. Any item error or issue rejects execution, including stale/missing/unavailable sources, existing targets, duplicate sources/destinations, selected hardlinks sharing an identity, conservative case/Unicode collisions, swaps/chains, nested sources and different-device observations. There is no dependency ordering, intermediate filename, overwrite, suffix generation, manifest-file read, resume, retry or rollback option. Same-path no-ops may complete without a native call.
 
-Sources and platform restrictions are inherited from [single-item relocation](files-relocation.md): available regular files/directories/packages and independently selected hardlinked entries, no initial source links/link traversal, Finder aliases/unknown alias state, placeholders/unknown availability or special files. There is no payload copy, permanent deletion, recursive inspection, download or Finder activation.
+Sources and platform restrictions are inherited from [single-item relocation](files-relocation.md): available regular files/directories/packages and independently selected hardlinked entries. Source links are rejected by default, with explicit per-entry `link_itself=true` selecting only leaf symlink objects under the [batch link contract](files-batch-link-rename.md). Intermediate link traversal, Finder aliases/unknown alias state, placeholders/unknown availability and special files remain rejected. There is no payload copy, permanent deletion, recursive inspection, download or Finder activation.
 
 ## Revision advancement and root boundary
 

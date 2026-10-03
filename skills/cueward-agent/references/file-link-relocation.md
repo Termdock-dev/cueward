@@ -1,6 +1,6 @@
 # Relocate only a selected symlink object
 
-New `files rename/move --link-itself` capability pending review. Check installed help. Use only when the requested operation moves or renames the symlink itself, not its target. Read [relocation](file-relocation.md) for required scope, revisions, receipt statuses and interruption rules.
+`files rename/move --link-itself` was merged in PR #64. Check installed help. Use only when the requested operation moves or renames the symlink itself, not its target. Read [relocation](file-relocation.md) for required scope, revisions, receipt statuses and interruption rules.
 
 ```bash
 cueward files info --root /absolute/directory --path from/link
@@ -23,4 +23,4 @@ Plans and receipts save `link_itself=true`; legacy omission means no link permis
 
 Older pre-#64 receipt readers silently ignore `link_itself=true` and omit it from typed output, including `before.request`, while still exiting successfully. That output is incomplete authorization evidence; omission does not prove the original request had no opt-in. Lookup does not rewrite the stored receipt. Read with the same binary whose `files rename/move --help` supports `--link-itself`, and preserve the raw `receipt_path` JSON unchanged. Do not strip fields, move receipt namespaces or replay to work around version skew. New readers accept legacy omission as false; old workers still reject initially selected links. Older-binary lookup is not fail-closed.
 
-Preserve the announced receipt ID, inspect actual paths on failure and reobserve before a new decision. No overwrite, retry, rollback, deletion, reference repair, payload backup or cross-volume copy/delete fallback is added. Copy/duplicate/tree copy, batch rename, trash and Finder alias resolution still do not support this flag. Synthetic fixtures and actual workers do not establish provider/TCC/external-volume/older-macOS acceptance.
+Preserve the announced receipt ID, inspect actual paths on failure and reobserve before a new decision. No overwrite, retry, rollback, deletion, reference repair, payload backup or cross-volume copy/delete fallback is added. Copy/duplicate/tree copy, trash and Finder alias resolution do not support this flag. Batch rename has separate [per-entry JSON permission](file-batch-link-rename.md), pending review; it has no global link flag. Synthetic fixtures and actual workers do not establish provider/TCC/external-volume/older-macOS acceptance.

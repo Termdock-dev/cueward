@@ -23,7 +23,7 @@ Use `cueward doctor --json` when an available operation reports a permission/pre
 | Explicitly confirmed ordinary-file trash or saved trash receipts | [file-trash-execution.md](references/file-trash-execution.md), then check installed command help |
 | Selected-entry trash proposals before a removal decision | [file-trash.md](references/file-trash.md), then check installed command help |
 | Finder tag names, initial tagging, no-op checks, or receipts | [file-tags.md](references/file-tags.md), then check installed command help |
-| Explicit batch rename plans and authorized independent execution/receipts | [file-batch-rename.md](references/file-batch-rename.md), then check installed command help |
+| Explicit batch rename plans and authorized independent execution/receipts, including per-entry symlink-object selection | [file-batch-rename.md](references/file-batch-rename.md), then check installed command help |
 | Requested same-volume rename/move or their saved receipts | [file-relocation.md](references/file-relocation.md), then check installed command help |
 | Explicit symlink-object rename/move | [file-link-relocation.md](references/file-link-relocation.md), then check installed command help |
 | Explicit package-content copy or sibling duplication | [file-package-copy.md](references/file-package-copy.md), then check installed command help |

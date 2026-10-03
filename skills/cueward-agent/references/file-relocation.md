@@ -1,6 +1,6 @@
 # Authorized same-volume rename and move
 
-Use installed `files rename/move` only for the requested source and new name/destination. Check installed `--help`; the new [explicit symlink-object option](file-link-relocation.md) is pending review. Observe the source and the existing destination parent with `files info`, then supply their exact versions. One absolute root bounds both relative paths.
+Use installed `files rename/move` only for the requested source and new name/destination. Check installed `--help`; the [explicit symlink-object option](file-link-relocation.md) was merged in PR #64. Observe the source and the existing destination parent with `files info`, then supply their exact versions. One absolute root bounds both relative paths.
 
 ```bash
 cueward files info --root /absolute/directory --path from/report.txt

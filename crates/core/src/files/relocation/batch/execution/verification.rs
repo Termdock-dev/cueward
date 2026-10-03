@@ -42,24 +42,7 @@ pub(super) fn finish(
     root(platform, held, original, expected)?;
     let scope = Scope::new(platform, Path::new(&expected.path))?;
     for child in completed {
-        let after = child
-            .destination_after
-            .as_ref()
-            .ok_or_else(|| changed("missing verified destination"))?;
-        same(
-            &scope.info(&scope.resolve(&child.request.destination, false, false)?)?,
-            after,
-        )?;
-        if child.request.path != child.request.destination {
-            match scope.resolve(&child.request.path, false, true) {
-                Err(e) if e.code == FileErrorCode::NotFound => (),
-                _ => {
-                    return Err(changed(
-                        "a completed source path is occupied or unobservable",
-                    ));
-                }
-            }
-        }
+        completed_child(&scope, child)?;
     }
     for item in &plan.items {
         let before = item
@@ -73,4 +56,34 @@ pub(super) fn finish(
         )?;
     }
     root(platform, held, original, expected)
+}
+
+fn completed_child(
+    scope: &Scope<'_, impl BatchRenamePlatform>,
+    child: &RelocationReceipt,
+) -> Result<(), FileError> {
+    let after = child
+        .destination_after
+        .as_ref()
+        .ok_or_else(|| changed("missing verified destination"))?;
+    let current = scope.info(&scope.resolve(
+        &child.request.destination,
+        false,
+        child.request.link_itself,
+    )?)?;
+    same(&current, after)?;
+    if child.request.link_itself && current.link_target != after.link_target {
+        return Err(changed("completed link reference changed"));
+    }
+    if child.request.path != child.request.destination {
+        match scope.resolve(&child.request.path, false, true) {
+            Err(e) if e.code == FileErrorCode::NotFound => (),
+            _ => {
+                return Err(changed(
+                    "a completed source path is occupied or unobservable",
+                ));
+            }
+        }
+    }
+    Ok(())
 }

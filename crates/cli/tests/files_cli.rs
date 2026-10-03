@@ -31,6 +31,8 @@ mod duplicate;
 mod batch_rename;
 #[path = "files_cli/batch_execution.rs"]
 mod batch_execution;
+#[path = "files_cli/batch_link_rename.rs"]
+mod batch_link_rename;
 #[path = "files_cli/batch_execution_cancellation.rs"]
 mod batch_execution_cancellation;
 #[path = "files_cli/tags.rs"]
