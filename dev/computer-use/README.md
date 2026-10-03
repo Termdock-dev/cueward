@@ -60,3 +60,7 @@ The initial matching wait uncovered unconditional reads of irrelevant AXDescript
 # First-save context comparison
 
 See [first-save-context.md](first-save-context.md) for the observer-backed diagnostic and its current-build limitations.
+
+# Background pointer repair
+
+The draft repair work and rejected sender hypotheses are recorded in [background-pointer-repair.md](background-pointer-repair.md). Diagnostic tooling and passing evaluator tests do not establish a functional fix.

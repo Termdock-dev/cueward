@@ -40,3 +40,7 @@ The evidence supports two distinct receiver-side hurdles: native first-mouse ref
 ## Verification
 
 The fixture compiled with warnings as errors and the actual ordinary/observation/control matrix executed through the unchanged CLI. Offline tests require exact click counts, independent first/subsequent outcomes, displacement plus held-button and release evidence, bounded delayed-terminal observation, and rejection of prior events. They are not compatibility or fresh-agent acceptance.
+
+## Repair work in progress
+
+See [background-pointer-repair.md](background-pointer-repair.md) for sender candidates that failed the ordinary baseline, the timestamp hypothesis rejected by receiver evidence, and the conditions required before a functional correction is ready.

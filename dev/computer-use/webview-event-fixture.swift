@@ -47,6 +47,8 @@ let eventObservation = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDow
     if event.windowNumber == window.windowNumber && nativeEvents.count < 5000 {
         let hit = web.hitTest(web.superview?.convert(event.locationInWindow, from: nil) ?? event.locationInWindow)
         nativeEvents.append(["type": event.type.rawValue, "uptime": ProcessInfo.processInfo.systemUptime,
+            "timestamp": event.timestamp, "cg_timestamp": event.cgEvent?.timestamp ?? 0,
+            "cg_subtype": event.cgEvent?.getIntegerValueField(.mouseEventSubtype) ?? -1,
             "window_point": [event.locationInWindow.x, event.locationInWindow.y],
             "tag": event.cgEvent?.getIntegerValueField(.eventSourceUserData) ?? 0,
             "source_pid": event.cgEvent?.getIntegerValueField(.eventSourceUnixProcessID) ?? -1,
@@ -61,6 +63,7 @@ let eventObservation = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDow
 func save() {
     let value: [String: Any] = ["pid": getpid(), "window_id": window.windowNumber,
         "active": app.isActive, "activations": activations, "variant": variant,
+        "key": window.isKeyWindow, "main": window.isMainWindow,
         "uptime": ProcessInfo.processInfo.systemUptime, "dom": dom,
         "content_top": window.frame.height - (window.contentView?.frame.height ?? 0),
         "native_events": nativeEvents, "native_log_full": nativeEvents.count >= 5000,

@@ -1,0 +1,292 @@
+{
+  "schema": 1,
+  "kind": "sender_candidate_diagnostic_not_product_fix",
+  "date": "2026-10-04",
+  "timezone": "Asia/Taipei",
+  "platform": {
+    "macos": "27.0.1",
+    "build": "26A434",
+    "arch": "arm64",
+    "webkit_bundle": "22625.1.29.11.28"
+  },
+  "baseline_sender_sha256": "8117a1ba7d5a2b2516b9e868bd01e545a0a281f4f5324279f254b12a3bb23e5d",
+  "baseline_reference": "2026-10-04-webview-context.json",
+  "candidates": [
+    {
+      "candidate": "cg_default_subtype",
+      "receiver": "ordinary_unmodified_wkwebview",
+      "context": "inactive",
+      "cases": [
+        {
+          "status": "recorded",
+          "desktop_status": "passed",
+          "maximum_sample_gap_ms": 45.199458341812715,
+          "owned_processes_stopped": true,
+          "actions": [
+            {
+              "name": "first_single_click",
+              "dispatch_status": "sent_unverified",
+              "events_sent": 2,
+              "app_events_received": 2,
+              "effect": {
+                "status": "failed",
+                "click_increment": 0,
+                "object_delta": {
+                  "x": 0,
+                  "y": 0
+                },
+                "release_increment": 0,
+                "dom_event_count": 0,
+                "dragging": false,
+                "dom_buttons_by_type": {
+                  "mousedown": [],
+                  "mousemove": [],
+                  "mouseup": [],
+                  "click": []
+                }
+              },
+              "settling": {
+                "status": "no_terminal_dom_within_budget",
+                "wait_ms": 3052.101749985013,
+                "budget_ms": 3000
+              }
+            },
+            {
+              "name": "subsequent_single_click",
+              "dispatch_status": "sent_unverified",
+              "events_sent": 2,
+              "app_events_received": 2,
+              "effect": {
+                "status": "failed",
+                "click_increment": 0,
+                "object_delta": {
+                  "x": 0,
+                  "y": 0
+                },
+                "release_increment": 0,
+                "dom_event_count": 0,
+                "dragging": false,
+                "dom_buttons_by_type": {
+                  "mousedown": [],
+                  "mousemove": [],
+                  "mouseup": [],
+                  "click": []
+                }
+              },
+              "settling": {
+                "status": "no_terminal_dom_within_budget",
+                "wait_ms": 3046.855208987836,
+                "budget_ms": 3000
+              }
+            }
+          ]
+        },
+        {
+          "status": "recorded",
+          "desktop_status": "passed",
+          "maximum_sample_gap_ms": 40.932791656814516,
+          "owned_processes_stopped": true,
+          "actions": [
+            {
+              "name": "canvas_drag",
+              "dispatch_status": "sent_unverified",
+              "events_sent": 27,
+              "app_events_received": 27,
+              "effect": {
+                "status": "failed",
+                "click_increment": 0,
+                "object_delta": {
+                  "x": 0,
+                  "y": 0
+                },
+                "release_increment": 0,
+                "dom_event_count": 0,
+                "dragging": false,
+                "dom_buttons_by_type": {
+                  "mousedown": [],
+                  "mousemove": [],
+                  "mouseup": [],
+                  "click": []
+                }
+              },
+              "settling": {
+                "status": "no_terminal_dom_within_budget",
+                "wait_ms": 3047.2654159821104,
+                "budget_ms": 3000
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "candidate": "nsevent_private_source",
+      "receiver": "ordinary_unmodified_wkwebview",
+      "context": "inactive",
+      "cases": [
+        {
+          "status": "recorded",
+          "desktop_status": "passed",
+          "maximum_sample_gap_ms": 42.64674999285489,
+          "owned_processes_stopped": true,
+          "actions": [
+            {
+              "name": "first_single_click",
+              "dispatch_status": "sent_unverified",
+              "events_sent": 2,
+              "app_events_received": 2,
+              "effect": {
+                "status": "failed",
+                "click_increment": 0,
+                "object_delta": {
+                  "x": 0,
+                  "y": 0
+                },
+                "release_increment": 0,
+                "dom_event_count": 0,
+                "dragging": false,
+                "dom_buttons_by_type": {
+                  "mousedown": [],
+                  "mousemove": [],
+                  "mouseup": [],
+                  "click": []
+                }
+              },
+              "settling": {
+                "status": "no_terminal_dom_within_budget",
+                "wait_ms": 3048.674707999453,
+                "budget_ms": 3000
+              }
+            },
+            {
+              "name": "subsequent_single_click",
+              "dispatch_status": "sent_unverified",
+              "events_sent": 2,
+              "app_events_received": 2,
+              "effect": {
+                "status": "failed",
+                "click_increment": 0,
+                "object_delta": {
+                  "x": 0,
+                  "y": 0
+                },
+                "release_increment": 0,
+                "dom_event_count": 0,
+                "dragging": false,
+                "dom_buttons_by_type": {
+                  "mousedown": [],
+                  "mousemove": [],
+                  "mouseup": [],
+                  "click": []
+                }
+              },
+              "settling": {
+                "status": "no_terminal_dom_within_budget",
+                "wait_ms": 3036.653124989243,
+                "budget_ms": 3000
+              }
+            }
+          ]
+        },
+        {
+          "status": "recorded",
+          "desktop_status": "passed",
+          "maximum_sample_gap_ms": 37.498916673939675,
+          "owned_processes_stopped": true,
+          "actions": [
+            {
+              "name": "canvas_drag",
+              "dispatch_status": "sent_unverified",
+              "events_sent": 27,
+              "app_events_received": 27,
+              "effect": {
+                "status": "failed",
+                "click_increment": 0,
+                "object_delta": {
+                  "x": 0,
+                  "y": 0
+                },
+                "release_increment": 0,
+                "dom_event_count": 0,
+                "dragging": false,
+                "dom_buttons_by_type": {
+                  "mousedown": [],
+                  "mousemove": [],
+                  "mouseup": [],
+                  "click": []
+                }
+              },
+              "settling": {
+                "status": "no_terminal_dom_within_budget",
+                "wait_ms": 3035.0455830048304,
+                "budget_ms": 3000
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "timestamp_contrast": {
+    "receiver": "ordinary_unmodified_wkwebview",
+    "sender": "unchanged_production",
+    "app_events_received": 27,
+    "timestamps_strictly_increasing": true,
+    "event_duration_ms": 617.5536249938887,
+    "maximum_delivery_age_ms": 22.250167006859556,
+    "native_and_cg_timestamp_agree": true,
+    "window_key_after": false,
+    "window_main_after": false,
+    "effect_status": "failed",
+    "desktop_status": "passed",
+    "owned_processes_stopped": true,
+    "conclusion": "receiver timestamps are current; sender field inspection alone does not demonstrate a stale timestamp bug"
+  },
+  "ax_contrast": {
+    "receiver": "ordinary_unmodified_wkwebview",
+    "context": "inactive",
+    "attributes": [
+      {
+        "element": "app",
+        "name": "AXFocusedWindow",
+        "settable": false,
+        "query_status": 0,
+        "read_status": 0
+      },
+      {
+        "element": "app",
+        "name": "AXMainWindow",
+        "settable": false,
+        "query_status": 0,
+        "read_status": 0
+      },
+      {
+        "element": "window",
+        "name": "AXFocused",
+        "settable": false,
+        "query_status": 0,
+        "read_status": 0
+      },
+      {
+        "element": "window",
+        "name": "AXMain",
+        "settable": true,
+        "query_status": 0,
+        "read_status": 0
+      }
+    ],
+    "window_focused": false,
+    "window_main": true,
+    "setter_calls": 0,
+    "desktop_status": "passed",
+    "owned_processes_stopped": true
+  },
+  "functional_fix_status": "not_established",
+  "raw_evidence": "private_local_only",
+  "not_verified": [
+    "safe generic first-mouse bypass",
+    "correct private-source DOM held-button state",
+    "ordinary interrupted drag acceptance",
+    "physical WebView overlap"
+  ]
+}
