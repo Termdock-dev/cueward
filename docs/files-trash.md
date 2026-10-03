@@ -1,6 +1,6 @@
 # Read-only trash proposals
 
-`cueward files trash plan` implements the planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Read-only planning was merged in PR #60; check installed `--help`. It describes one selected filesystem entry before the user decides whether to trash it. Separately confirmed ordinary-file removal uses [verified trash execution](files-trash-execution.md); recovery is not implemented. Permanent deletion is excluded.
+`cueward files trash plan` implements the planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Read-only planning was merged in PR #60; check installed `--help`. It describes one selected filesystem entry before the user decides whether to trash it. Separately confirmed ordinary-file removal uses [verified trash execution](files-trash-execution.md); completed ordinary-file receipts have separate [backup restoration](files-trash-restore.md). Permanent deletion is excluded.
 
 ## Select and observe
 
@@ -12,7 +12,7 @@ cueward files trash plan --root /Users/me/Documents --path Reports/old.txt \
   --expected-version '<observed entry version>'
 ```
 
-The plan accepts no default selection, root-directory target, batch/glob expansion, link-following, destination or confirmation flag. Separate execute/receipt commands do not change its read-only contract; restore and permanent deletion are unavailable. A filename containing `*` is one literal filename, not a match pattern. This command never moves/removes the selected entry, opens payloads through Cueward's reading engine, enumerates descendants, stages a backup, creates a mutation receipt, looks up a Trash directory, activates Finder or requests a download. Native resource inspection reuses `files metadata`; read access times are not promised unchanged.
+The plan accepts no default selection, root-directory target, batch/glob expansion, link-following, destination or confirmation flag. Separate execution and [backup restoration](files-trash-restore.md) do not change its read-only contract; permanent deletion is unavailable. A filename containing `*` is one literal filename, not a match pattern. This command never moves/removes the selected entry, opens payloads through Cueward's reading engine, enumerates descendants, stages a backup, creates a mutation receipt, looks up a Trash directory, activates Finder or requests a download. Native resource inspection reuses `files metadata`; read access times are not promised unchanged.
 
 A successful plan is not authorization or proof that native trashing, deleting permissions or recovery are available. Present the exact selected path, entry kind and warnings to the user. Removal requires a separate explicitly confirmed execution request and fresh observations, not replay of this JSON.
 
@@ -52,4 +52,4 @@ Resolution is anchored to the initially canonical root. The original supplied sp
 
 Disposable native tests cover unchanged bytes/inode/link count/mode/mtime/ctime, exact Unicode/newline names, directories/packages, outside/broken leaf links, FIFO, read-only mode, stale/invalid/missing selection, stable/retargeted root aliases and ancestor-link refusal. Controlled platform seams cover aliases, unknown/dataless availability, per-field errors, unknown package state, source/parent changes during metadata inspection and result overflow. Actual CLI/worker tests cover JSON envelopes/escaping, failure exits, unavailable mutation options, strict request decoding and oversize/malformed input. A blocking-worker test covers the whole-worker deadline. No personal files or Trash items are moved or deleted.
 
-Separate [ordinary-file execution](files-trash-execution.md) performs verified backup and guarded private quarantine before native Foundation trash, recording its actual resulting location. Planning itself still does not call that API or create receipts. Real provider/TCC/read-only/unmount/external-volume and older macOS acceptance remain unverified. #42 remains open for restore, broader trash types and other unfinished management work.
+Separate [ordinary-file execution](files-trash-execution.md) performs verified backup and guarded private quarantine before native Foundation trash, recording its actual resulting location. Planning itself still does not call that API or create receipts. Real provider/TCC/read-only/unmount/external-volume and older macOS acceptance remain unverified. #42 remains open for partial-operation recovery, broader trash/recovery types and other unfinished management work.

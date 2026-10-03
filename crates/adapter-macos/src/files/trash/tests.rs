@@ -5,7 +5,7 @@ use std::fs::{self, File, Metadata};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
-pub(super) struct Owned {
+pub(in crate::files::trash) struct Owned {
     pub root: tempfile::TempDir,
     pub trash: tempfile::TempDir,
     pub receipt: TrashReceipt,
@@ -20,7 +20,7 @@ impl Drop for Owned {
         fs::remove_dir_all(directory).unwrap();
     }
 }
-pub(super) fn request(root: &Path) -> TrashRequest {
+pub(in crate::files::trash) fn request(root: &Path) -> TrashRequest {
     let observed = |path| {
         crate::files::observe(root, Path::new(path), false, None)
             .unwrap()
@@ -35,7 +35,7 @@ pub(super) fn request(root: &Path) -> TrashRequest {
         max_bytes: 67108864,
     }
 }
-pub(super) fn fixture() -> Owned {
+pub(in crate::files::trash) fn fixture() -> Owned {
     let root = tempfile::tempdir().unwrap();
     let trash = tempfile::tempdir().unwrap();
     fs::set_permissions(trash.path(), fs::Permissions::from_mode(0o700)).unwrap();
@@ -50,7 +50,7 @@ pub(super) fn fixture() -> Owned {
         receipt,
     }
 }
-pub(super) struct Controlled {
+pub(in crate::files::trash) struct Controlled {
     pub trash: PathBuf,
     pub race: Option<Box<dyn Fn()>>,
     pub uncertain: bool,
@@ -61,7 +61,7 @@ pub(super) struct Controlled {
     pub native_pause: u8,
     pub storage_inside: bool,
 }
-pub(super) fn platform(value: &Owned) -> Controlled {
+pub(in crate::files::trash) fn platform(value: &Owned) -> Controlled {
     Controlled {
         trash: value.trash.path().canonicalize().unwrap(),
         race: None,
@@ -112,7 +112,21 @@ impl MutationPlatform for Controlled {
         MacFiles.prepare_staging(receipt, root)
     }
     fn publish(&self, root: &File, staging: &Staging, destination: &Path) -> Publication {
-        MacFiles.publish(root, staging, destination)
+        if let Some(race) = &self.race {
+            race();
+        }
+        let pause = |phase| {
+            if self.native_pause == phase {
+                if let Some(control) = &self.pause {
+                    fs::write(control.join("ready"), b"").unwrap();
+                    super::lifetime_tests::wait_for(|| control.join("release").exists());
+                }
+            }
+        };
+        pause(3);
+        let publication = MacFiles.publish(root, staging, destination);
+        pause(4);
+        publication
     }
     fn open_directory(&self, path: &Path) -> Result<File, FileError> {
         MacFiles.open_directory(path)
@@ -212,7 +226,7 @@ impl TrashPlatform for Controlled {
         MacFiles.trash_attribute_digest(file)
     }
 }
-pub(super) fn direct(
+pub(in crate::files::trash) fn direct(
     value: &mut Owned,
     platform: &Controlled,
     mut check: impl FnMut(&TrashReceipt) -> Result<(), FileError>,
@@ -227,10 +241,10 @@ pub(super) fn direct(
     }
     save(&value.receipt).unwrap();
 }
-pub(super) fn backup(value: &Owned) -> Vec<u8> {
+pub(in crate::files::trash) fn backup(value: &Owned) -> Vec<u8> {
     fs::read(value.receipt.backup_path.as_ref().unwrap()).unwrap()
 }
-pub(super) fn trashed(value: &Owned) -> PathBuf {
+pub(in crate::files::trash) fn trashed(value: &Owned) -> PathBuf {
     PathBuf::from(value.receipt.trash_path.as_ref().unwrap())
 }
 #[test]

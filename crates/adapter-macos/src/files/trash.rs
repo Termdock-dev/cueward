@@ -1,5 +1,6 @@
 //! Read-only trash proposals and separately confirmed, backed-up native trash execution.
 pub mod execution;
+pub mod restore;
 use super::{MacFiles, policy, protocol};
 use cueward_core::files::{FileError, trash};
 use std::path::Path;

@@ -113,7 +113,7 @@ fn json(value: &impl Serialize) -> Result<serde_json::Value, FileError> {
 
 #[cfg(test)]
 #[path = "tests.rs"]
-mod tests;
+pub(super) mod tests;
 #[cfg(test)]
 #[path = "safety_tests.rs"]
 mod safety_tests;

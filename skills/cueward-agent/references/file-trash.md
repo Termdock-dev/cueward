@@ -1,6 +1,6 @@
 # Inspect a selected trash proposal
 
-Read-only planning was merged in PR #60. Check installed `files trash plan --help`. Use this read-only command to explain the exact entry and scope before a removal decision; separately confirmed ordinary-file trash uses [file-trash-execution.md](file-trash-execution.md), while recovery is unavailable. Never substitute permanent deletion or `files move` to an invented Trash path.
+Read-only planning was merged in PR #60. Check installed `files trash plan --help`. Use this read-only command to explain the exact entry and scope before a removal decision; separately confirmed ordinary-file trash uses [file-trash-execution.md](file-trash-execution.md), while completed ordinary-file receipts have separate [backup restoration](file-trash-restore.md). Never substitute permanent deletion or `files move` to an invented Trash path.
 
 Observe the exact entry with `files info`, then pass its revision:
 
@@ -9,7 +9,7 @@ cueward files trash plan --root /absolute/directory --path Reports/old.txt \
   --expected-version '<observed entry version>'
 ```
 
-Root is absolute; path is an explicit non-root relative entry without parent traversal. Planning has no default `.` target, glob/batch expansion, follow-links, destination or confirmation flag. Separate execute/receipt commands do not authorize or mutate a plan; restore is unavailable. A literal filename containing `*` does not select other names. Planning does not move/remove anything, read payloads through Cueward's reading engine, enumerate descendants, stage a copy, allocate operation receipts, inspect Trash, activate Finder or request downloads.
+Root is absolute; path is an explicit non-root relative entry without parent traversal. Planning has no default `.` target, glob/batch expansion, follow-links, destination or confirmation flag. Separate execute/receipt and [backup restoration](file-trash-restore.md) do not authorize or mutate a plan. A literal filename containing `*` does not select other names. Planning does not move/remove anything, read payloads through Cueward's reading engine, enumerate descendants, stage a copy, allocate operation receipts, inspect Trash, activate Finder or request downloads.
 
 Operation is `trash_plan`. Outer `Ok` / exit zero establishes observations, not deletion permission, completed trashing or recoverability. Inspect source/root/source-parent path/identity/revision, resources, target_kind and warnings. `requires_confirmation=true` describes a future removal decision; planning neither accepts nor remembers approval. `execution_supported` and `recovery_supported` are always false; `trash_destination=null` is unobserved, not an available or empty Trash directory. There is no receipt ID, status, content hash or execution token. Before removal, obtain explicit confirmation for the exact scope and fresh observations; never replay this JSON as a write.
 
