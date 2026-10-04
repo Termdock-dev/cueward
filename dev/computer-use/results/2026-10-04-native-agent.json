@@ -1,0 +1,292 @@
+{
+  "kind": "fresh_agent",
+  "date": "2026-10-04",
+  "timezone": "Asia/Taipei",
+  "macos": "27.0.1",
+  "build": "26A434",
+  "architecture": "arm64",
+  "online_displays": 3,
+  "agent_role": "luna",
+  "agent_context": "Each task used a separate fresh Agent and receiver. Only goal, owned scope and generic tool documentation were provided; no source/state/oracle/prior-attempt access was instructed. Operator separately checked native records and disk bytes. This is task acceptance, not independent code review.",
+  "transport": "Corrected external-content boundary, scoped 0600 socket, 64-request/800-second broker and 900-second receiver/observer deadlines. No task action script or new product adapter.",
+  "fixture": {
+    "type": "Synthetic ordinary AppKit NSDocument with NSTextView",
+    "initial_document_unopened": true,
+    "initial_editor_blank": true,
+    "explicit_text_accessibility_identifier": false,
+    "agent_performs_open": true,
+    "native_file_dialog_coverage": false,
+    "first_save_panel_coverage": false,
+    "receiver_acceptance_override": false,
+    "calculation_route": "Agent calculation using permitted document app; setup created only a blank named result file, never the answer."
+  },
+  "pre_fix": {
+    "product_commit": "f367a52c936e1f82326adf658f81ba9f4411bd05",
+    "summary": {
+      "passed": 0,
+      "failed": 1,
+      "blocked": 0,
+      "unverified": 7
+    },
+    "denominator": 8,
+    "support_matrix": {
+      "native_ax": {
+        "passed": 0,
+        "failed": 1,
+        "blocked": 0,
+        "unverified": 4
+      },
+      "webview_pointer": {
+        "passed": 0,
+        "failed": 0,
+        "blocked": 0,
+        "unverified": 3
+      }
+    },
+    "attempted_tasks": [
+      {
+        "task_id": "existing_document",
+        "status": "failed",
+        "broker_request_count": 13,
+        "actual_cli_command_count": 11,
+        "termination_reason": "finished",
+        "transport_execution_wall_ms": 228176.1,
+        "tool_wall_ms": 6458.2,
+        "sample_count": 11448,
+        "maximum_sample_gap_ms": 42.4,
+        "distinct_foregrounds": 2,
+        "distinct_pointer_positions": 1739,
+        "distinct_visible_space_maps": 1,
+        "receiver_activation_events": 0,
+        "observer_errors": 0,
+        "checks": [
+          {
+            "name": "preserved:seeds/original.txt",
+            "status": "passed",
+            "reason": "baseline hash comparison"
+          },
+          {
+            "name": "preserved:work/existing_document/bystander.txt",
+            "status": "passed",
+            "reason": "baseline hash comparison"
+          },
+          {
+            "name": "artifact",
+            "status": "failed",
+            "reason": "exact UTF-8 byte comparison"
+          },
+          {
+            "name": "workspace_scope",
+            "status": "passed",
+            "reason": "only the prepared files may be present"
+          },
+          {
+            "name": "receiver",
+            "status": "passed",
+            "reason": "independent receiver identity supplied; result checked from disk"
+          },
+          {
+            "name": "interference_trace",
+            "status": "failed",
+            "reason": "foreground, pointer or visible Space changed"
+          }
+        ],
+        "receiver": {
+          "read_requests": 1,
+          "save_requests": 0,
+          "data_requests": 0,
+          "active_at_final_read": false,
+          "activation_count": 0,
+          "error_present": false,
+          "save_panel_present": false
+        },
+        "owned_process_stopped": true
+      }
+    ],
+    "unrun_tasks": [
+      "new_document",
+      "cross_app",
+      "window_dialog",
+      "calculation",
+      "webview_first_click",
+      "canvas_drag",
+      "canvas_interrupted"
+    ]
+  },
+  "post_fix": {
+    "product_commit": "9e5338d417c0ff151050c2dacb25c5549a5a0abd",
+    "summary": {
+      "passed": 0,
+      "failed": 2,
+      "blocked": 0,
+      "unverified": 6
+    },
+    "denominator": 8,
+    "support_matrix": {
+      "native_ax": {
+        "passed": 0,
+        "failed": 2,
+        "blocked": 0,
+        "unverified": 3
+      },
+      "webview_pointer": {
+        "passed": 0,
+        "failed": 0,
+        "blocked": 0,
+        "unverified": 3
+      }
+    },
+    "attempted_tasks": [
+      {
+        "task_id": "existing_document",
+        "status": "failed",
+        "broker_request_count": 11,
+        "actual_cli_command_count": 10,
+        "termination_reason": "finished",
+        "transport_execution_wall_ms": 179167.7,
+        "tool_wall_ms": 5574.0,
+        "sample_count": 8991,
+        "maximum_sample_gap_ms": 43.8,
+        "distinct_foregrounds": 4,
+        "distinct_pointer_positions": 2864,
+        "distinct_visible_space_maps": 1,
+        "receiver_activation_events": 0,
+        "observer_errors": 0,
+        "checks": [
+          {
+            "name": "preserved:seeds/original.txt",
+            "status": "passed",
+            "reason": "baseline hash comparison"
+          },
+          {
+            "name": "preserved:work/existing_document/bystander.txt",
+            "status": "passed",
+            "reason": "baseline hash comparison"
+          },
+          {
+            "name": "artifact",
+            "status": "passed",
+            "reason": "exact UTF-8 byte comparison"
+          },
+          {
+            "name": "workspace_scope",
+            "status": "passed",
+            "reason": "only the prepared files may be present"
+          },
+          {
+            "name": "receiver",
+            "status": "passed",
+            "reason": "independent receiver identity supplied; result checked from disk"
+          },
+          {
+            "name": "interference_trace",
+            "status": "failed",
+            "reason": "foreground, pointer or visible Space changed"
+          }
+        ],
+        "receiver": {
+          "read_requests": 1,
+          "save_requests": 1,
+          "data_requests": 1,
+          "active_at_final_read": false,
+          "activation_count": 0,
+          "error_present": false,
+          "save_panel_present": false
+        },
+        "owned_process_stopped": true
+      },
+      {
+        "task_id": "calculation",
+        "status": "failed",
+        "broker_request_count": 18,
+        "actual_cli_command_count": 16,
+        "termination_reason": "finished",
+        "transport_execution_wall_ms": 248123.6,
+        "tool_wall_ms": 15131.9,
+        "sample_count": 12421,
+        "maximum_sample_gap_ms": 64.2,
+        "distinct_foregrounds": 2,
+        "distinct_pointer_positions": 3013,
+        "distinct_visible_space_maps": 1,
+        "receiver_activation_events": 0,
+        "observer_errors": 0,
+        "checks": [
+          {
+            "name": "preserved:seeds/original.txt",
+            "status": "passed",
+            "reason": "baseline hash comparison"
+          },
+          {
+            "name": "artifact",
+            "status": "passed",
+            "reason": "exact UTF-8 byte comparison"
+          },
+          {
+            "name": "receiver",
+            "status": "passed",
+            "reason": "independent receiver identity supplied; result checked from disk"
+          },
+          {
+            "name": "interference_trace",
+            "status": "failed",
+            "reason": "foreground, pointer or visible Space changed"
+          }
+        ],
+        "receiver": {
+          "read_requests": 1,
+          "save_requests": 1,
+          "data_requests": 1,
+          "active_at_final_read": false,
+          "activation_count": 0,
+          "error_present": false,
+          "save_panel_present": false
+        },
+        "owned_process_stopped": true
+      }
+    ],
+    "unrun_tasks": [
+      "new_document",
+      "cross_app",
+      "window_dialog",
+      "webview_first_click",
+      "canvas_drag",
+      "canvas_interrupted"
+    ]
+  },
+  "functional_regression": {
+    "observed_problem": "AXIdentifier returned failure on the ordinary text view. Value read correctly, but app inspection cleared independently read settable_value/actions and issued no usable text target.",
+    "fix": "Allow optional AXIdentifier failure alongside the existing AXDescription exception. Preserve unavailable marker in target fingerprints and all required/security/lock/foreground/disabled guards.",
+    "test_only_commit": "bfc65e0eedb04787ba15c83587e487e60bc89cf8",
+    "red": {
+      "passed": 0,
+      "failed": 2,
+      "exit_status": 101
+    },
+    "green_accessibility_suite": {
+      "passed": 19,
+      "failed": 0,
+      "ignored": 1
+    },
+    "post_fix_exact_artifacts": {
+      "existing_document": "Synthetic document αβγ\n已完成修改\n",
+      "calculation": "69.85\n"
+    },
+    "fixture_unchanged_between_attempts": true
+  },
+  "validation": {
+    "release_build": "passed",
+    "rust": {
+      "passed": 916,
+      "failed": 0,
+      "ignored": 33
+    },
+    "python": {
+      "passed": 142,
+      "failed": 0
+    },
+    "swift_fixture_and_observer": "Strict Swift 6 with warnings as errors",
+    "changed_rust_format": "passed; workspace-wide check has pre-existing differences outside these changes"
+  },
+  "cleanup": "All three owned receivers and their observers were independently absent by exact executable paths. Unique fixture bundles were unregistered and empty owned socket directories removed. Prepared runs and raw evidence were preserved privately; no user windows/files were selected.",
+  "limitations": "Both post-fix disk outcomes passed, but both full tasks failed the stationary interference check because foreground and pointer changed. Their causes are unattributed; no samples were filtered or failed runs promoted. Visible Space maps stayed stable and owned receiver activation counts were zero. Transport execution includes agent/start waiting, not agent-only inference latency. Sampling cannot exclude sub-sample transients. Synthetic native background document coverage is not an unintegrated real-app, Calculator UI, native file-dialog, inactive-first Save, cross-app, physical-overlap or lock/unlock pass. Historical 2026-10-03 failures remain separate. All eight tasks remain in each run denominator; #33 and #36 remain incomplete."
+}
