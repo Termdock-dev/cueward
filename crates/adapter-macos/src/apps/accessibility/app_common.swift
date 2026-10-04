@@ -58,9 +58,9 @@ func appNode(_ element: AXUIElement) -> [String: Any] {
     if !unavailable.isEmpty {
         node["unavailable_attributes"] = unavailable.sorted()
     }
-    // A missing description does not invalidate independently read capabilities.
+    // Missing optional labels/identifiers do not invalidate independently read capabilities.
     // Keep its unavailable marker in the fingerprint so changed reads go stale.
-    if unavailable.contains(where: { $0 != kAXDescriptionAttribute }) {
+    if unavailable.contains(where: { $0 != kAXDescriptionAttribute && $0 != kAXIdentifierAttribute }) {
         node["settable_value"] = false
         node["actions"] = [String]()
     }

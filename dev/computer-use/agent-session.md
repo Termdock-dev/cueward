@@ -2,6 +2,8 @@
 
 This is an execution slice of #36, not a new production adapter. The agent receives task goals, explicitly owned receiver/window IDs, destinations and generic tool documentation. It selects current observations and actions itself. The transport records actual CLI commands/results and desktop samples; it contains no recorded task steps, selectors, coordinates or fixture-specific action choices. The operator independently reads receiver records/artifacts after execution.
 
+For a runnable owned `existing_document` or `calculation` setup and the separate 2026-10-04 results, see [fresh native document tasks](native-agent-tasks.md). Their post-fix artifacts passed, but full isolation failed; historical outcomes below remain unchanged.
+
 ## Start an owned task
 
 Prepare the run with [task-acceptance.py](task-acceptance.md), compile and launch a fresh permitted fixture, and retain its PID/native window identity before starting. An inactive-Space task moves only that owned window during setup. No user app/window is selected. Keep fixture state/oracles private to the operator, not the fresh agent. A receiver must remain alive for the observer's whole interval.

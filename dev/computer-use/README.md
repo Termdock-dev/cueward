@@ -6,6 +6,8 @@ The [read-only desktop observer](desktop-observer.md) supplies timestamped task 
 
 The [interactive agent transport](agent-session.md) records commands chosen by a fresh Agent rather than scripted task steps. Its first three synthetic task attempts failed; all eight tasks remain in the denominator.
 
+The [native task runner](native-agent-tasks.md) adds fresh document-edit and calculation execution. It exposed optional `AXIdentifier` capability loss, now fixed and covered by regression tests. Both post-fix files match their independent checks, but interference failures prevent full task passes.
+
 The [physical-input overlap diagnostic](physical-overlap.md) records the actual #31 human round and separate idle/first-mouse contrasts. #31 remains incomplete; idle effects do not replace physical overlap.
 
 The [WebView context investigation](webview-context.md) separates native first-mouse refusal, DOM button state and delayed observation. Patched receiver controls are not product compatibility.

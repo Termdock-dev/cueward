@@ -122,7 +122,13 @@ func nodeAttribute(_ element: AXUIElement, _ key: String) -> CFTypeRef? {
 
 func AXUIElementCopyAttributeValue(_ element: AXUIElement, _ key: CFString,
                                   _ output: UnsafeMutablePointer<CFTypeRef?>) -> AXError {
-    if isField(element), key as String == kAXDescriptionAttribute, scenario == "unavailable-description" {
+    if isField(element), key as String == kAXDescriptionAttribute,
+       ["unavailable-description", "unavailable-description-identifier"].contains(scenario) {
+        return .failure
+    }
+    if isField(element), key as String == kAXIdentifierAttribute,
+       ["unavailable-identifier", "unavailable-description-identifier"].contains(scenario)
+        || (scenario == "post-lock-identifier" && lockOpens > 0) {
         return .failure
     }
     output.pointee = CFEqual(element, AXUIElementCreateApplication(hostPID))

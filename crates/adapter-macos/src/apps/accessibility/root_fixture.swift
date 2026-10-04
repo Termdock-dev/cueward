@@ -55,15 +55,20 @@ func AXUIElementCopyAttributeValue(_ element: AXUIElement, _ key: CFString,
             guard CFEqual(element, fixtureChild) else { return .attributeUnsupported }
             if scenario == "failed-subrole" { return .failure }
             if scenario == "malformed-subrole" { result.pointee = NSNumber(value: 1); return .success }
-            if scenario == "secure-subrole" { result.pointee = "AXSecureTextField" as CFString; return .success }
+            if scenario.hasPrefix("secure-subrole") { result.pointee = "AXSecureTextField" as CFString; return .success }
             return .attributeUnsupported
         case kAXTitleAttribute: result.pointee = "Fixture" as CFString
         case kAXDescriptionAttribute:
-            if scenario == "unavailable-description" { return .failure }
+            if ["unavailable-description", "unavailable-description-identifier"].contains(scenario) { return .failure }
+            return .attributeUnsupported
+        case kAXIdentifierAttribute:
+            guard CFEqual(element, fixtureChild) else { return .attributeUnsupported }
+            if ["unavailable-identifier", "unavailable-description-identifier", "secure-subrole-unavailable-identifier"].contains(scenario) { return .failure }
+            if scenario == "failed-identifier" { return .cannotComplete }
             return .attributeUnsupported
         case kAXValueAttribute:
             guard CFEqual(element, fixtureChild) else { return .noValue }
-            if ["missing-role", "malformed-role", "failed-subrole", "malformed-subrole", "secure-subrole"].contains(scenario) {
+            if ["missing-role", "malformed-role", "failed-subrole", "malformed-subrole"].contains(scenario) || scenario.hasPrefix("secure-subrole") {
                 fail("fixture value was read before security classification")
             }
             if scenario == "unavailable-value" { return .failure }
