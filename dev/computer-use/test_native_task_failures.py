@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from native_agent_task import independent_evidence, task_setup, unregister_fixture
+from native_agent_task import independent_evidence, task_setup
 from task_acceptance.setup import EDITED, ORIGINAL, prepare, write_json
 
 spec = importlib.util.spec_from_file_location("native_runner", Path(__file__).with_name("native-agent-task.py"))
@@ -66,7 +66,9 @@ class NativeTaskFailureTests(unittest.TestCase):
             def serve_socket(self, socket, duration):
                 artifact.write_text(EDITED)
                 write_json(self.path, self.metadata | {"receiver_pids": [200], "receipts": receipts,
-                           "execution": execution, "records": [{"result": "private raw result"}]})
+                           "execution": execution, "records": [{"result": "private raw result"}],
+                           "observer": self.metadata | {"source": "receiver_observer", "pid": 200},
+                           "coverage": {"document_opened_by_agent": True}})
                 if fail_at == "transport":
                     raise RuntimeError("transport failed after dispatch")
 
@@ -94,6 +96,7 @@ class NativeTaskFailureTests(unittest.TestCase):
                 self.assertEqual(task["execution"], raw["execution"])
                 self.assertNotIn("records", task)
                 self.assertNotIn("observer", task)
+                self.assertNotIn("coverage", task)
                 self.assertEqual(task["failure_category"], "partial_observation")
                 report = json.loads((root / "native-agent-report.json").read_text())
                 result = next(t for t in report["tasks"] if t["task_id"] == "existing_document")
@@ -112,6 +115,38 @@ class NativeTaskFailureTests(unittest.TestCase):
             self.assertEqual(cleanup["unique_bundle_unregistration_exit"], 1)
             self.assertIn("bundle_cleanup_error", cleanup)
             self.assertTrue(cleanup["owned_process_stopped"])
+
+    def test_unbound_or_unstarted_checkpoint_never_fabricates_attempt_evidence(self):
+        for bad in ({"run_id": "another run"}, {"task_id": "calculation"},
+                    {"receiver_pids": [201]}, {"attempted": False}):
+            with self.subTest(bad=bad), tempfile.TemporaryDirectory() as parent:
+                root = prepare(parent)
+                manifest, _, _, output = task_setup(root, "existing_document")
+                session = {"run_id": manifest["run_id"], "task_id": "existing_document",
+                           "receiver_pids": [200], "attempted": True} | bad
+                write_json(output / "session.json", session)
+                runner.record_failure(root, output, manifest, "existing_document", Mock(pid=200), RuntimeError("failure"))
+                self.assertFalse((root / "native-agent-evidence.json").exists())
+                self.assertTrue((output / "failure-evidence-error.json").exists())
+                self.assertEqual(json.loads((output / "session.json").read_text()), session)
+
+    def test_cleanup_exceptions_still_record_and_attempt_other_owned_cleanup(self):
+        for failed_operation in ("stop_receiver", "unregister_fixture"):
+            with self.subTest(operation=failed_operation), tempfile.TemporaryDirectory() as parent:
+                output = Path(parent)
+                process = Mock(pid=200)
+                process.poll.return_value = 0
+                binary = output / "ExistingDocument.app/Contents/MacOS/ExistingDocument"
+                stop_error = OSError("owned process cleanup failed") if failed_operation == "stop_receiver" else None
+                bundle_error = subprocess.TimeoutExpired("owned bundle cleanup", 20) if failed_operation == "unregister_fixture" else None
+                with patch.object(runner, "stop_receiver", side_effect=stop_error), \
+                        patch.object(runner, "unregister_fixture", side_effect=bundle_error, return_value=0) as unregister:
+                    with self.assertRaisesRegex(RuntimeError, "cleanup"):
+                        runner.cleanup_receiver(process, binary, output, "existing_document")
+                    unregister.assert_called_once()
+                cleanup = json.loads((output / "cleanup.json").read_text())
+                self.assertIn("process_cleanup_error" if stop_error else "bundle_cleanup_error", cleanup)
+                self.assertTrue(cleanup["owned_process_stopped"])
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 """Owned native task setup and independent evidence; never selects agent actions."""
+import hashlib
 import os
 from pathlib import Path
 import plistlib
@@ -26,6 +27,11 @@ def task_setup(run, task_id):
     for parent in (run / "work", artifact.parent, run / "operator"):
         if parent.is_symlink() or parent.exists() and not parent.is_dir():
             raise ValueError("native task parent must be an unlinked directory")
+    if task_id == "existing_document":
+        relative = str(artifact.relative_to(run))
+        actual = hashlib.sha256(read_scoped(run, relative)).hexdigest()
+        if actual != manifest.get("baseline", {}).get(relative):
+            raise ValueError("existing document differs from prepared baseline")
     # Reserve once: reruns require a fresh prepared run, not a repaired old result.
     output = run / "operator" / task_id
     output.mkdir(parents=True, exist_ok=False)
@@ -105,21 +111,40 @@ def unregister_fixture(binary):
     return result.returncode
 
 
-def independent_evidence(session, state, manifest, task_id, pid, artifact):
-    """Bind independently read receiver state without replacing CLI/trace results."""
-    if state.get("pid") != pid or session.get("receiver_pids") != [pid]:
-        raise ValueError("receiver and actual session identity differ")
+def session_evidence(session, manifest, task_id, pid):
+    """Bind actual session metadata without inventing receiver observations."""
+    if session.get("receiver_pids") != [pid]:
+        raise ValueError("actual session identity differs from owned handle")
     if session.get("run_id") != manifest["run_id"] or session.get("task_id") != task_id:
         raise ValueError("session does not belong to this prepared task")
-    result = {k: v for k, v in session.items() if k != "records"}
+    return {k: v for k, v in session.items() if k not in ("records", "observer", "coverage")}
+
+
+def independent_evidence(session, state, manifest, task_id, pid, artifact):
+    """Require observed owned-file read/save/write, then retain actual CLI/trace results."""
+    result = session_evidence(session, manifest, task_id, pid)
+    if state.get("pid") != pid:
+        raise ValueError("receiver and actual session identity differ")
+    opened = state.get("file") == str(artifact) and type(state.get("read_requests")) is int and state["read_requests"] > 0
+    saved = all(type(state.get(k)) is int and state[k] > 0 for k in ("save_requests", "data_requests"))
+    if not opened or not saved or state.get("error") != "" or state.get("document_edited") is not False:
+        raise ValueError("owned document open/save/write observation is incomplete or failed")
     result["observer"] = {"source": "receiver_observer", "run_id": manifest["run_id"],
                           "task_id": task_id, "pid": pid,
                           **{k: state.get(k) for k in ("file", "contents", "read_requests", "save_requests",
-                                                       "data_requests", "error", "panel_window_id")}}
-    result["coverage"] = {"document_opened_by_agent": state.get("file") == str(artifact)
-                          and type(state.get("read_requests")) is int and state["read_requests"] > 0,
-                          "calculation_uses_document_app": task_id == "calculation",
+                                                       "data_requests", "error", "document_edited", "panel_window_id")}}
+    result["coverage"] = {"document_opened_by_agent": opened,
+                          "calculation_uses_document_app": task_id == "calculation" and opened,
                           "first_save_panel": False, "native_file_dialog": False}
+    return result
+
+
+def incomplete_session_evidence(path, manifest, task_id, pid):
+    """Preserve a started attempt without publishing a passing partial receiver."""
+    result = session_evidence(load_json(path), manifest, task_id, pid)
+    if result.get("attempted") is not True:
+        raise ValueError("session has no acknowledged attempt metadata")
+    result["failure_category"] = "partial_observation"
     return result
 
 

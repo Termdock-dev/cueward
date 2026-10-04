@@ -9,16 +9,54 @@ from agent_session import AgentSession
 from desktop_observer import DesktopObserver, compile_observer
 from native_agent_task import (TASKS, compile_fixture, independent_evidence, launch_receiver,
                                merge_evidence, receiver_state, stop_receiver, task_setup)
-from native_agent_task import unregister_fixture
+from native_agent_task import incomplete_session_evidence, unregister_fixture
 from task_acceptance.evaluate import evaluate, load_json
 from task_acceptance.setup import write_json
+
+
+def write_report(run, evidence):
+    report = Path(run) / "native-agent-report.json"
+    write_json(report, evaluate(Path(run), load_json(evidence)))
+    return report
+
+
+def record_failure(run, output, manifest, task_id, process, error):
+    write_json(output / "runner-error.json", {"error": str(error), "task_id": task_id})
+    if process is None or not (output / "session.json").exists():
+        return
+    try:
+        evidence = incomplete_session_evidence(output / "session.json", manifest, task_id, process.pid)
+        write_report(run, merge_evidence(run, evidence))
+    except (OSError, ValueError, TypeError, KeyError) as evidence_error:
+        # Invalid/unfinished metadata cannot authorize fabricated attempt evidence.
+        write_json(output / "failure-evidence-error.json", {"error": str(evidence_error)})
+
+
+def cleanup_receiver(process, binary, output, task_id):
+    cleanup = {"task_id": task_id}
+    try:
+        stop_receiver(process)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        cleanup["process_cleanup_error"] = str(error)
+    cleanup["owned_process_stopped"] = process is None or process.poll() is not None
+    cleanup["owned_pid"] = process.pid if process else None
+    if binary:
+        try:
+            code = unregister_fixture(binary)
+            cleanup["unique_bundle_unregistration_exit"] = code
+            if code != 0:
+                cleanup["bundle_cleanup_error"] = f"unique bundle unregistration exited {code}"
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            cleanup["bundle_cleanup_error"] = str(error)
+    write_json(output / "cleanup.json", cleanup)
+    if not cleanup["owned_process_stopped"] or any(k.endswith("cleanup_error") for k in cleanup):
+        raise RuntimeError("owned native task cleanup failed; see cleanup.json")
 
 
 def run_task(cli, run, task_id, socket):
     manifest, goal, artifact, output = task_setup(run, task_id)
     process = None
     binary = None
-    cleanup = {"task_id": task_id, "owned_process_stopped": True}
     try:
         binary = compile_fixture(output)
         observer_binary = compile_observer(output)
@@ -38,22 +76,12 @@ def run_task(cli, run, task_id, socket):
         write_json(output / "receiver-final.json", final)
         evidence = independent_evidence(load_json(output / "session.json"), final, manifest, task_id, process.pid, artifact)
         path = merge_evidence(run, evidence)
-        report = evaluate(Path(run), load_json(path))
-        write_json(Path(run) / "native-agent-report.json", report)
-        print(json.dumps({"task_id": task_id, "report": str(Path(run) / "native-agent-report.json")}), flush=True)
+        print(json.dumps({"task_id": task_id, "report": str(write_report(run, path))}), flush=True)
     except BaseException as error:
-        write_json(output / "runner-error.json", {"error": str(error), "task_id": task_id})
+        record_failure(run, output, manifest, task_id, process, error)
         raise
     finally:
-        stop_receiver(process)
-        cleanup["owned_process_stopped"] = process is None or process.poll() is not None
-        cleanup["owned_pid"] = process.pid if process else None
-        if binary:
-            try:
-                cleanup["unique_bundle_unregistration_exit"] = unregister_fixture(binary)
-            except (OSError, ValueError, subprocess.TimeoutExpired) as error:
-                cleanup["bundle_cleanup_error"] = str(error)
-        write_json(output / "cleanup.json", cleanup)
+        cleanup_receiver(process, binary, output, task_id)
 
 
 def main():

@@ -281,12 +281,13 @@
       "ignored": 33
     },
     "python": {
-      "passed": 142,
+      "passed": 148,
       "failed": 0
     },
     "swift_fixture_and_observer": "Strict Swift 6 with warnings as errors",
     "changed_rust_format": "passed; workspace-wide check has pre-existing differences outside these changes"
   },
+  "post_recording_harness_guards": "After these desktop recordings, four offline regressions exposed and corrected preedited baseline acceptance, incomplete IO evidence, lost attempted-session aggregation and ignored bundle cleanup failure. Both retained post-fix receiver records pass the stricter guards; offline evaluation produces the unchanged failed-task report without desktop actions. Generic evaluator provenance limits remain unchanged.",
   "cleanup": "All three owned receivers and their observers were independently absent by exact executable paths. Unique fixture bundles were unregistered and empty owned socket directories removed. Prepared runs and raw evidence were preserved privately; no user windows/files were selected.",
   "limitations": "Both post-fix disk outcomes passed, but both full tasks failed the stationary interference check because foreground and pointer changed. Their causes are unattributed; no samples were filtered or failed runs promoted. Visible Space maps stayed stable and owned receiver activation counts were zero. Transport execution includes agent/start waiting, not agent-only inference latency. Sampling cannot exclude sub-sample transients. Synthetic native background document coverage is not an unintegrated real-app, Calculator UI, native file-dialog, inactive-first Save, cross-app, physical-overlap or lock/unlock pass. Historical 2026-10-03 failures remain separate. All eight tasks remain in each run denominator; #33 and #36 remain incomplete."
 }
