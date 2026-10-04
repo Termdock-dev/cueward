@@ -43,16 +43,17 @@ class NativeTaskFailureTests(unittest.TestCase):
                     independent_evidence(session, state | mutation, {"run_id": "run"}, task, 200,
                                          Path("/run/owned.txt"))
 
-    def run_with_owned_boundaries(self, root, fail_at=None, unregister_exit=0):
+    def run_with_owned_boundaries(self, root, fail_at=None, unregister_exit=0, late_activation=None):
         """Replace only native launch/observer and Agent transport boundaries."""
         process = Mock(pid=200)
         process.poll.return_value = 0
         output = root / "operator/existing_document"
         artifact = root / "work/existing_document/existing.txt"
         initial = {"pid": 200, "window_id": 20, "active": False, "activations": 0,
-                   "file": "", "contents": "", "read_requests": 0}
+                   "file": "", "contents": "", "read_requests": 0, "observation_sequence": 1}
         final = initial | {"file": str(artifact), "contents": EDITED, "read_requests": 1,
-                           "save_requests": 1, "data_requests": 1, "error": "", "document_edited": False}
+                           "save_requests": 1, "data_requests": 1, "error": "", "document_edited": False,
+                           "observation_sequence": 2, "fresh_after_sequence": 1}
         receipts = [{"command": "synthetic dispatched command", "status": "confirmed", "elapsed_ms": 10}]
         samples = [{"ms": ms, "frontmost_pid": 100, "pointer": [12, 34],
                     "visible_spaces": {"display-1": "space-1"}, "target_active": {"200": False}}
@@ -72,12 +73,24 @@ class NativeTaskFailureTests(unittest.TestCase):
                 if fail_at == "transport":
                     raise RuntimeError("transport failed after dispatch")
 
-        state_reads = [initial, RuntimeError("final receiver observation failed") if fail_at == "final" else final]
+        context_closed = []
+        def read_native_state(path, process, **options):
+            if options.get("require_inactive", True):
+                return initial
+            if fail_at == "final":
+                raise RuntimeError("final receiver observation failed")
+            if late_activation and context_closed and options.get("fresh"):
+                return final | late_activation
+            return final
+
+        observer = Mock()
+        observer.__enter__ = Mock(return_value=observer)
+        observer.__exit__ = Mock(side_effect=lambda *_: context_closed.append(True))
         binary = output / "ExistingDocument.app/Contents/MacOS/ExistingDocument"
         with patch.object(runner, "compile_fixture", return_value=binary), \
                 patch.object(runner, "compile_observer"), patch.object(runner, "launch_receiver", return_value=process), \
-                patch.object(runner, "receiver_state", side_effect=state_reads), \
-                patch.object(runner, "DesktopObserver"), patch.object(runner, "AgentSession", SimulatedAgentTransport), \
+                patch.object(runner, "receiver_state", side_effect=read_native_state), \
+                patch.object(runner, "DesktopObserver", return_value=observer), patch.object(runner, "AgentSession", SimulatedAgentTransport), \
                 patch.object(runner, "stop_receiver"), patch.object(runner, "unregister_fixture", return_value=unregister_exit):
             runner.run_task(Path("/owned/cueward"), root, "existing_document", root / "owned.sock")
 
