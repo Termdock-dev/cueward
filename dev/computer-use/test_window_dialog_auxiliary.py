@@ -217,8 +217,26 @@ class DialogAuxiliaryTests(unittest.TestCase):
             self.assertEqual(self.auxiliary_trace(record), "failed")
             self.assertEqual(self.result(record)["status"], "failed")
 
+    def test_service_foreground_is_failed_before_missing_coverage_or_boolean_channels(self):
+        changes = [
+            lambda e: None,
+            lambda e: e["observer"].update(receiver_pids=[100]),
+            lambda e: e.pop("observer"),
+            lambda e: e["samples"][0]["target_active"].pop("200"),
+            lambda e: e["samples"][1]["target_active"].pop("200"),
+            lambda e: e["samples"][1].pop("target_active"),
+            lambda e: e["samples"][0].update(ms=20),
+        ]
+        for index, change in enumerate(changes):
+            record = self.record()
+            record["execution"]["samples"][1]["frontmost_pid"] = 200
+            change(record["execution"])
+            with self.subTest(index=index):
+                self.assertEqual(self.auxiliary_trace(record), "failed")
+                self.assertEqual(self.result(record)["status"], "failed")
+
     def test_complete_auxiliary_coverage_does_not_filter_other_interference(self):
-        for change in ({"frontmost_pid": 200}, {"pointer": [1, 0]}, {"visible_spaces": {"one": "B"}},
+        for change in ({"pointer": [1, 0]}, {"visible_spaces": {"one": "B"}},
                        {"target_active": {"100": True, "200": False}}):
             record = self.record()
             record["execution"]["samples"][1].update(change)
