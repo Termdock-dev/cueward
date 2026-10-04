@@ -9,7 +9,7 @@ import socket
 import sys
 import time
 
-from observed_cli import ObservedCLI
+from observed_cli import ObservedCLI, external_for_agent
 from task_acceptance.setup import write_json
 
 
@@ -91,10 +91,10 @@ class AgentSession:
         self.records.append(record)
         try:
             record["result"] = self.commands.call(*arguments)
-            return {"result": record["result"]}
+            return {"result": external_for_agent(record["result"])}
         except RuntimeError as error:
             record["error"] = str(error)
-            return {"error": str(error), "do_not_replay": True}
+            return {"error": external_for_agent(str(error)), "do_not_replay": True}
         finally:
             if self.recording_started:
                 write_json(self.output, {**self.metadata, "status": "observing", "receiver_pids": [self.pid],
@@ -150,7 +150,12 @@ class AgentSession:
                 while b"\n" in pending and self.request_count < 64:
                     line, pending = pending.split(b"\n", 1)
                     self.request_count += 1
-                    response = self.request(json.loads(line))
+                    try:
+                        value = json.loads(line)
+                    except (ValueError, UnicodeError) as error:
+                        response = {"error": str(error), "not_dispatched": True}
+                    else:
+                        response = self.request(value)
                     print(json.dumps(response, ensure_ascii=False), file=sink, flush=True)
                     if response.get("finished"):
                         self.termination_reason = "finished"

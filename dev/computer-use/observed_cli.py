@@ -1,9 +1,29 @@
 """Record actual CLI receipts alongside a separately running desktop observer."""
 
 import json
+import re
 import shlex
 import subprocess
 import time
+
+
+def parse_cli_output(text):
+    """Parse operator data only after validating an external-content envelope."""
+    if text.startswith("<external"):
+        opening, separator, rest = text.partition("\n")
+        payload, closing_separator, closing = rest.rpartition("\n")
+        if (not separator or not closing_separator
+                or re.fullmatch(r'<external source="[^"<>\r\n]+">', opening) is None
+                or closing != "</external>" or "</external>" in payload):
+            raise ValueError("malformed external CLI output")
+        text = payload.replace("&lt;/external&gt;", "</external>")
+    return json.loads(text)
+
+
+def external_for_agent(value):
+    """Keep all CLI-derived data inside the product's external-content boundary."""
+    payload = json.dumps(value, ensure_ascii=False).replace("</external>", "&lt;/external&gt;")
+    return '<external source="cueward/agent-session">\n' + payload + '\n</external>'
 
 
 class ObservedCLI:
@@ -24,11 +44,7 @@ class ObservedCLI:
             if output.returncode:
                 receipt["status"] = "tool_error"
                 raise RuntimeError(output.stderr.strip() or "CLI exited without a result")
-            text = output.stdout.strip()
-            if text.startswith("<external "):
-                text = text.split("\n", 1)[1].rsplit("\n</external>", 1)[0]
-                text = text.replace("&lt;/external&gt;", "</external>")
-            value = json.loads(text)
+            value = parse_cli_output(output.stdout.strip())
             receipt["status"] = value.get("status", "observed") if isinstance(value, dict) else "observed"
             return value
         except (OSError, ValueError, subprocess.TimeoutExpired) as error:
