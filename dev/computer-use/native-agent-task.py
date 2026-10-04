@@ -71,8 +71,10 @@ def run_task(cli, run, task_id, socket):
         with DesktopObserver(observer_binary, [process.pid], output / "session.trace.jsonl", duration_ms=900_000) as observer:
             session = AgentSession(cli, observer, process.pid, initial["window_id"], output / "session.json", metadata)
             session.serve_socket(socket, duration=800)
-        # Retain activation failures in the actual trace/evaluator, rather than losing the attempt.
-        final = receiver_state(output / "receiver.json", process, require_inactive=False)
+        # Start a new sequence baseline after the observer closes, then await a newer snapshot.
+        # Retain late/transient activation fields for an explicit failed evaluator check.
+        final = receiver_state(output / "receiver.json", process, require_inactive=False,
+                               fresh=True, expected_window_id=initial["window_id"])
         write_json(output / "receiver-final.json", final)
         evidence = independent_evidence(load_json(output / "session.json"), final, manifest, task_id, process.pid, artifact)
         path = merge_evidence(run, evidence)

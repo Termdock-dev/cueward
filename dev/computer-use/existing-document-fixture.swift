@@ -80,6 +80,7 @@ final class ExistingDocument: NSDocument, NSTextViewDelegate {
     let stateURL: URL
     let lifetime: Double
     var activations = 0
+    var observationSequence = 0
 
     init(stateURL: URL, ownedFile: URL, lifetime: Double) {
         self.stateURL = stateURL
@@ -88,7 +89,9 @@ final class ExistingDocument: NSDocument, NSTextViewDelegate {
     }
 
     func saveState() {
+        observationSequence += 1
         let state: [String: Any] = ["pid": getpid(), "active": app.isActive, "activations": activations,
+            "observation_sequence": observationSequence,
             "window_id": document.windowControllers.first?.window?.windowNumber ?? 0,
             "file": document.fileURL?.path ?? "", "initial_contents": document.initialText,
             "contents": document.editor?.string ?? "", "read_requests": document.reads,

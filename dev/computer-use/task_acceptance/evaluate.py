@@ -115,8 +115,26 @@ def effect_checks(root, task_id, evidence):
         status, reason = check_window_dialog(root, evidence, observer)
         return [check("fresh_window_observations", status, reason)]
     if task_id in ("existing_document", "calculation"):
-        return [check("receiver", "passed", "independent receiver identity supplied; result checked from disk")]
+        return [check("receiver", "passed", "independent receiver identity supplied; result checked from disk"),
+                *final_receiver_checks(observer)]
     return pointer_checks(task_id, evidence, observer)
+
+
+def final_receiver_checks(observer):
+    """Reject supplemental late activation; do not upgrade older evidence with invented state."""
+    fields = ("active", "activations", "observation_sequence", "fresh_after_sequence")
+    if not any(k in observer for k in fields):
+        return []  # Older supplied identity/artifact evidence has no final-snapshot contract.
+    active, count = observer.get("active"), observer.get("activations")
+    if active is True or type(count) is int and count > 0:
+        return [check("final_receiver_inactive", "failed", "receiver active or lifetime activation recorded in final observation")]
+    if type(active) is not bool or type(count) is not int or count < 0:
+        return [check("final_receiver_inactive", "unverified", "missing or malformed final receiver activation state")]
+    sequence, baseline, window = (observer.get(k) for k in ("observation_sequence", "fresh_after_sequence", "window_id"))
+    if (type(sequence) is not int or type(baseline) is not int or not 0 < baseline < sequence
+            or type(window) is not int or window <= 0):
+        return [check("final_receiver_inactive", "unverified", "missing or invalid fresh final receiver observation")]
+    return [check("final_receiver_inactive", "passed", "fresh owned receiver inactive with zero lifetime activations")]
 
 
 def pointer_checks(task_id, evidence, observer):

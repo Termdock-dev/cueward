@@ -74,19 +74,32 @@ def launch_receiver(binary, state, artifact, lifetime=900):
                                                   "CUEWARD_LIFETIME": str(lifetime)})
 
 
-def receiver_state(path, process, timeout=5, require_inactive=True):
-    """Read an acknowledged owned identity, never treating a PID-only file as ownership."""
+def receiver_state(path, process, timeout=5, require_inactive=True, *, fresh=False, expected_window_id=None):
+    """Bind owned identity; a fresh read waits beyond a newly read sequence baseline."""
+    if fresh and (type(expected_window_id) is not int or expected_window_id <= 0):
+        raise ValueError("fresh reads require the owned window identity")
     deadline = time.monotonic() + timeout
+    baseline = None
     while process.poll() is None and time.monotonic() < deadline:
         if Path(path).exists():
             state = load_json(path)
-            if state.get("pid") != process.pid or type(state.get("window_id")) is not int or state["window_id"] <= 0:
+            if (state.get("pid") != process.pid or type(state.get("window_id")) is not int or state["window_id"] <= 0
+                    or expected_window_id is not None and state["window_id"] != expected_window_id):
                 raise RuntimeError("receiver state identity differs from owned handle")
             if require_inactive and (state.get("active") is not False or state.get("activations") != 0):
                 raise RuntimeError("owned receiver is active; no task actions are permitted")
-            return state
+            if not fresh:
+                return state
+            sequence = state.get("observation_sequence")
+            if type(sequence) is not int or sequence <= 0 or baseline is not None and sequence < baseline:
+                raise RuntimeError("receiver observation sequence is invalid or regressed")
+            if baseline is None:
+                baseline = sequence
+            elif sequence > baseline:
+                return state | {"fresh_after_sequence": baseline}
         time.sleep(0.03)
-    raise RuntimeError("owned receiver did not acknowledge readiness")
+    raise RuntimeError("owned receiver did not acknowledge a fresh observation" if fresh
+                       else "owned receiver did not acknowledge readiness")
 
 
 def stop_receiver(process):
@@ -132,7 +145,8 @@ def independent_evidence(session, state, manifest, task_id, pid, artifact):
     result["observer"] = {"source": "receiver_observer", "run_id": manifest["run_id"],
                           "task_id": task_id, "pid": pid,
                           **{k: state.get(k) for k in ("file", "contents", "read_requests", "save_requests",
-                                                       "data_requests", "error", "document_edited", "panel_window_id")}}
+                                                       "data_requests", "error", "document_edited", "panel_window_id",
+                                                       "active", "activations", "window_id", "observation_sequence", "fresh_after_sequence")}}
     result["coverage"] = {"document_opened_by_agent": opened,
                           "calculation_uses_document_app": task_id == "calculation" and opened,
                           "first_save_panel": False, "native_file_dialog": False}
