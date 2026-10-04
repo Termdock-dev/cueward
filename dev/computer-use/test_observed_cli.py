@@ -21,6 +21,22 @@ class ObservedCLITests(unittest.TestCase):
         self.assertEqual(commands.receipts[0]["end_marker"], "after")
         self.assertGreaterEqual(commands.receipts[0]["elapsed_ms"], 0)
 
+    def test_malformed_external_envelopes_are_unknown_without_replay(self):
+        outputs = ['<external source="test">',
+                   '<external source="test">\n{"status":"confirmed"}',
+                   '<external source="test">\n{"status":"confirmed"}\n</external> trailing',
+                   '<external source="test"> junk\n{"status":"confirmed"}\n</external>',
+                   '<external source="test">\n{"value":"</external>"}\n</external>']
+        for stdout in outputs:
+            with self.subTest(stdout=stdout):
+                commands = ObservedCLI("/owned/cueward", Mock(mark=Mock(side_effect=["before", "after"])))
+                with patch("observed_cli.subprocess.run", return_value=SimpleNamespace(returncode=0, stdout=stdout, stderr="")) as dispatch:
+                    with self.assertRaisesRegex(RuntimeError, "outcome unknown"):
+                        commands.call("app", "inspect")
+                self.assertEqual(dispatch.call_count, 1)
+                self.assertEqual(commands.receipts[0]["status"], "unknown_outcome")
+                self.assertEqual(commands.receipts[0]["end_marker"], "after")
+
     def test_uncertain_outcome_never_replayed_or_erased_by_marker_failure(self):
         for error in (subprocess.TimeoutExpired("cueward", 45), OSError("launch error"), ValueError("bad JSON")):
             with self.subTest(error=error):

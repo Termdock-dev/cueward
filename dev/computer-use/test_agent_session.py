@@ -103,11 +103,14 @@ class AgentSessionTests(unittest.TestCase):
             client = Path(__file__).with_name("agent-command.py")
             result = subprocess.run([sys.executable, str(client), "--socket", str(path), "app", "inspect", "--pid", "100"],
                                     capture_output=True, text=True, check=True, timeout=5)
-            self.assertEqual(json.loads(result.stdout)["result"]["nodes"][0]["ref"], "w2")
             subprocess.run([sys.executable, str(client), "--socket", str(path), "--finish"], capture_output=True, check=True, timeout=5)
             worker.join(3)
             self.assertFalse(worker.is_alive())
             self.assertFalse(path.exists())
+            rendered = json.loads(result.stdout)["result"]
+            self.assertIsInstance(rendered, str)
+            body = rendered.split("\n", 1)[1].rsplit("\n</external>", 1)[0]
+            self.assertEqual(json.loads(body)["nodes"][0]["ref"], "w2")
             report = json.loads((folder / "evidence.json").read_text())
             self.assertTrue(report["execution"]["covered"])
             session.commands.call.assert_called_once_with("app", "inspect", "--pid", "100")
