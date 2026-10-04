@@ -1,6 +1,6 @@
 # Fresh native document task execution
 
-This continues [#36](https://github.com/Termdock-dev/cueward/issues/36) with runnable owned `existing_document` and `calculation` tasks. The [aggregate](results/2026-10-04-native-agent.json) records successful post-fix disk results, but **zero full task passes** because foreground and pointer observations changed. #36 remains incomplete; #33 is not repaired by this change.
+This continues [#36](https://github.com/Termdock-dev/cueward/issues/36) with runnable owned `existing_document`, `calculation` and `window_dialog` tasks. The [document/calculation aggregate](results/2026-10-04-native-agent.json) records successful post-fix disk results, but **zero full task passes** because foreground and pointer observations changed. The [window/dialog aggregate](results/2026-10-05-window-dialog-agent.json) retains a failed initial attempt and a locked-session prerequisite check. #36 remains incomplete; #33 is not repaired by this change.
 
 ## Product defect found during execution
 
@@ -45,6 +45,28 @@ python3 -B dev/computer-use/task-acceptance.py evaluate --run "$run" \
 
 The checker exits 1 while any task is failed or unverified. Task records cannot overwrite an earlier attempt; all eight tasks stay in the denominator.
 
+## Two-window native save-dialog task
+
+Prepare a new run and socket directory, then use `--task window_dialog`. Its setup opens two existing disposable documents through normal `NSDocument.read`; the Agent performs editing and the native Save As interaction, not initial opening. The goal supplies the requested text and exact target path. Give a fresh Agent only that goal, owned PID/two native window IDs, generic app documentation and the broker contract. No fixture, observer state, expected-result manifest or previous attempt belongs in its handoff.
+
+The fixture uses an ordinary `NSTextView` and `NSDocument.saveAs`. It has no identifier on the editor, first-mouse, focus, activation or input-acceptance override. The panel's filename and Save enabled state remain native. It disables New Folder, refuses document relocation and restricts read/write destinations to the two prepared regular files, with only target writes authorized. These fixture restrictions limit authorized side effects; they are not a filesystem sandbox or a fix for first-save acceptance. A native panel may still expose unrelated read-only navigation metadata. This synthetic existing-document task does not reproduce #33's inactive first-save setup.
+
+The independent helper associates document UUID identifiers with `_AXUIElementGetWindow` native IDs. A remote save sheet does not expose the configured panel UUID: it can report `save-panel` and belong to the shared save-panel service, or contain service-owned descendants under a host-owned sheet. The observer instead requires the exact panel native ID and `AXWindow` equality with the owned target document, retaining the current descendant ref and actual receiver PIDs. It never selects a sheet by title or fixed `wN` index.
+
+The broker permits only bounded app inspection/press/value assignment and the owned windows' snapshot/inspection. It rejects menus, global/pointer actions, unknown/duplicate/attached flags and output paths. Action targets must have been returned by a current broker observation. Document roots stay restricted to the host PID; independently bound service targets are permitted only under that exact owned panel. Every observed panel receiver is checked, including groups without action targets. A foreign receiver with missing/wrong native panel identity stops binding instead of disappearing from coverage. Context changes invalidate the target registry. A CLI return followed by an evidence failure is an uncertain dispatched outcome, never `not_dispatched` or permission to replay.
+
+Actual Agent inspections/actions supply the `initial`, `dialog`, `resumed` phases in the desktop observer's timebase. Setup observations cannot substitute for them. Final evidence independently checks normal target save/write, no rejected writes, cleared dirty state, untouched bystander IO/content, exact disk bytes and a fresh inactive receiver snapshot.
+
+The shared save-panel service is an auxiliary receiver, not a newly owned process. Cleanup never terminates it. The [evaluator contract](task-acceptance.md#shared-save-panel-receivers) requires auxiliary activation coverage across the entire execution interval. The current desktop observer starts with the host alone; late discovery of a service cannot supply missing earlier samples. Such service coverage stays `unverified`, even if panel traversal and disk save eventually succeed. Standalone service-owned panels are not implemented by this runner.
+
+### Recorded window/dialog work: 2026-10-05
+
+The initial fresh Agent dispatched five CLI commands. It edited and read back the requested Unicode text, then opened Save As. The runner's original panel-UUID assumption failed during post-action observation; transport closed and the Agent stopped without replay. Disk target bytes remained unchanged, the bystander/source hashes were preserved, and only the initial phase was recorded. The report remains **0 passed, 1 failed, 7 unverified**, with artifact/interference failures and missing complete receiver evidence. Foreground and pointer changes remain unattributed and unfiltered. Owned receiver activation remained zero. Cleanup stopped the retained host and unregistered its unique bundle.
+
+Separate operator diagnostics established the native sheet association and remote receiver behavior, leading to the fail-closed binding implementation above. They did not run the task to completion and do not count as fresh-agent passes. A newly prepared second run stopped at preflight because the desktop was locked while AX/Screen Recording permission remained available. No fixture or fresh Agent launched; its separate report is **0 passed, 0 failed, 1 blocked, 7 unverified**. The original failed attempt is not upgraded by the correction or prerequisite record.
+
+An offline regression also reproduced a dev-broker output escape through `window snapshot --output=...`. Test-only commit `6938815` failed two subcases; fix `9109ac5` rejects both attached and separate output options before dispatch. The affected scope/transport suite then passed 17 tests. Production Cueward input and Rust sources are unchanged in this work.
+
 ## Recorded attempts: 2026-10-04
 
 Each row used a separate fresh Agent and receiver. Post-fix attempts used the unchanged fixture and the corrected broker trust boundary. Command counts include dispatched CLI errors, while request counts also include rejected broker requests and finish.
@@ -63,4 +85,4 @@ PR #71 review follow-up reproduced false passing when final activation occurred 
 
 All three receivers stayed inactive with zero owned activation events; visible Space maps stayed stable across three observed displays. Maximum sampling gaps were 42.4, 43.8 and 64.2 ms. Foreground and pointer changes were retained without attribution or filtering. Transport intervals include Agent/start waiting, not just inference time. Sampling cannot exclude shorter transients, and disk success does not override isolation failure. All owned receiver/observer executable paths were absent after cleanup; no user windows or files were selected.
 
-Cross-app artifact consumption, changing native dialogs/multiple windows, accepted canvas drag/interruption, unintegrated real apps and controlled physical-input/lock coverage remain outstanding. These two synthetic native tasks do not satisfy the whole issue.
+Cross-app artifact consumption, completed window/dialog acceptance, accepted canvas drag/interruption, unintegrated real apps and controlled physical-input/lock coverage remain outstanding. These synthetic native tasks do not satisfy the whole issue.

@@ -1,0 +1,204 @@
+{
+  "kind": "reviewed_synthetic_aggregate",
+  "date": "2026-10-05",
+  "timezone": "Asia/Taipei",
+  "macos": "27.0.1",
+  "build": "26A434",
+  "architecture": "arm64",
+  "online_displays": 3,
+  "product_commit": "4ffec16fe3d2bb0245b4f53b578f1901c5df379d",
+  "installed_cli": "0.5.0",
+  "scope": "Dev-only two-window native save-dialog harness. No Rust/product input change or new app adapter.",
+  "agent_context": "One fresh Agent received only the goal, owned PID/two native window IDs, destination, generic app docs and scoped socket contract. No fixture, receiver state, oracle, tests, old targets or prior attempts were supplied. Operator separately checked records and disk.",
+  "fixture": {
+    "type": "Synthetic AppKit NSDocument with ordinary NSTextView and native Save As",
+    "two_documents_preopened_by_setup": true,
+    "agent_performs_initial_open": false,
+    "explicit_editor_ax_identifier": false,
+    "input_focus_first_mouse_override": false,
+    "can_create_directories": false,
+    "document_move_refused": true,
+    "exact_owned_write_guard": true,
+    "first_save_panel_coverage": false
+  },
+  "initial_attempt": {
+    "harness_commit": "55c081471cfa408ee40a9a303dc51ccd2b262c3e",
+    "summary": {
+      "passed": 0,
+      "failed": 1,
+      "blocked": 0,
+      "unverified": 7
+    },
+    "denominator": 8,
+    "support_matrix": {
+      "native_ax": {
+        "passed": 0,
+        "failed": 1,
+        "blocked": 0,
+        "unverified": 4
+      },
+      "webview_pointer": {
+        "passed": 0,
+        "failed": 0,
+        "blocked": 0,
+        "unverified": 3
+      }
+    },
+    "task_id": "window_dialog",
+    "status": "failed",
+    "checks": [
+      {
+        "name": "preserved:seeds/original.txt",
+        "status": "passed",
+        "reason": "baseline hash comparison"
+      },
+      {
+        "name": "preserved:work/window_dialog/bystander.txt",
+        "status": "passed",
+        "reason": "baseline hash comparison"
+      },
+      {
+        "name": "artifact",
+        "status": "failed",
+        "reason": "exact UTF-8 byte comparison"
+      },
+      {
+        "name": "workspace_scope",
+        "status": "passed",
+        "reason": "only the prepared files may be present"
+      },
+      {
+        "name": "receiver",
+        "status": "unverified",
+        "reason": "missing independent receiver observation"
+      },
+      {
+        "name": "interference_trace",
+        "status": "failed",
+        "reason": "foreground, pointer or visible Space changed"
+      }
+    ],
+    "broker_request_count": 5,
+    "actual_cli_command_count": 5,
+    "termination_reason": "transport_error",
+    "transport_execution_wall_ms": 170417.5,
+    "tool_wall_ms": 4621.8,
+    "sample_count": 8523,
+    "maximum_sample_gap_ms": 67.8,
+    "distinct_foregrounds": 3,
+    "distinct_pointer_positions": 3327,
+    "distinct_visible_space_maps": 1,
+    "receiver_activation_events": 0,
+    "observer_errors": 0,
+    "recorded_phases": [
+      "initial"
+    ],
+    "last_receiver_snapshot": {
+      "read_requests": 1,
+      "save_requests": 1,
+      "data_requests": 0,
+      "active": false,
+      "activations": 0,
+      "document_edited": true
+    },
+    "last_receiver_is_fresh_final_acceptance_evidence": false,
+    "agent_text_readback_matched_goal": true,
+    "disk_target_unchanged": true,
+    "failure": "Initial observer assumed configured panel UUID and host-owned sheet; post-Save-As native binding failed, closing transport. Agent stopped without replay. Artifact and sampled interference checks failed; no complete independent receiver evidence was fabricated.",
+    "owned_process_stopped": true,
+    "unique_bundle_unregistration_exit": 0,
+    "owned_socket_directory_removed": true
+  },
+  "operator_diagnostics": {
+    "counts_as_fresh_agent_acceptance": false,
+    "observed_remote_sheet_identifier": "save-panel",
+    "configured_panel_uuid_available_in_ax": false,
+    "actual_sheet_receiver": "Shared service may own sheet root or descendants beneath a host-owned sheet",
+    "successful_native_binding": "Exact _AXUIElementGetWindow panel ID plus AXWindow CFEqual with target owner",
+    "full_task_completed": false,
+    "shared_service_terminated": false,
+    "cleanup": "Each diagnostic stopped only its newly retained host handle and unregistered its unique bundle."
+  },
+  "corrected_runner_prerequisite_check": {
+    "summary": {
+      "passed": 0,
+      "failed": 0,
+      "blocked": 1,
+      "unverified": 7
+    },
+    "denominator": 8,
+    "support_matrix": {
+      "native_ax": {
+        "passed": 0,
+        "failed": 0,
+        "blocked": 1,
+        "unverified": 4
+      },
+      "webview_pointer": {
+        "passed": 0,
+        "failed": 0,
+        "blocked": 0,
+        "unverified": 3
+      }
+    },
+    "task_id": "window_dialog",
+    "attempted": false,
+    "status": "blocked",
+    "prerequisite": "session_locked",
+    "ax_trusted": true,
+    "screen_capture_access": true,
+    "fixture_launched": false,
+    "fresh_agent_delegated": false,
+    "owned_socket_directory_removed": true,
+    "followup": "User chose delivery now, later desktop acceptance; no further UI attempt."
+  },
+  "guards": {
+    "snapshot_output_escape": {
+      "test_only_commit": "6938815",
+      "fix_commit": "9109ac5",
+      "red_subcase_failures": 2,
+      "green_related_tests": 17,
+      "real_file_write_required_for_regression": false
+    },
+    "service_foreground": {
+      "test_only_commit": "4d64fbe",
+      "fix_commit": "a2caeac",
+      "red_subcase_failures": 7,
+      "minimum_effect": "Bound service foreground is failed even when earlier coverage is missing"
+    },
+    "native_binding": "Exact native ID/owner equality and actual receiver PID set required before exposing panel tokens; root reorder or dialog change clears prior target registry.",
+    "ownership": "Document roots and task fresh-receiver PIDs remain host-only. Shared service authorized only in native-bound panel subtree; never terminated by cleanup.",
+    "coverage": "Host-only observer cannot invent service samples before late service discovery; full auxiliary service interval remains unverified.",
+    "host_only_supplied_proof": {
+      "test_only_commit": "5207b00",
+      "fix_commit": "180f722",
+      "red_subcase_failures": 18,
+      "effect": "Validate every supplied native proof; absent legacy proof remains compatible."
+    },
+    "passive_panel_receiver": {
+      "test_only_commit": "a4c06af",
+      "fix_commit": "f89a9bd",
+      "red_subcase_failures": 3,
+      "effect": "Check panel node receivers even without action targets."
+    },
+    "unbound_native_service": {
+      "test_only_commit": "7566c94",
+      "fix_commit": "b9623f1",
+      "red_subcase_failures": 17,
+      "swift_tests": 7,
+      "effect": "Reject invalid/dead/foreign-window/unlinked panel receivers rather than drop them from coverage."
+    }
+  },
+  "validation": {
+    "python": {
+      "passed": 232,
+      "failed": 0,
+      "command": "python3 -B -W error -m unittest discover -s dev/computer-use -p 'test_*.py'"
+    },
+    "swift_fixture_and_observers": "Strict Swift 6 with warnings as errors, compile only",
+    "production_rust": "Unchanged from validated 0.5.0 source (release build and serial suite: 916 passed, 33 ignored); later origin/main adds only LICENSE.",
+    "native_ax_helper": "Swift 6 strict concurrency with warnings as errors after helper decomposition; compile only",
+    "retained_reports": "Offline re-evaluation preserves initial failed and prelaunch blocked summaries; both checker invocations exit 1 as expected."
+  },
+  "limitations": "Zero new full task passes. Initial failed recording is unchanged; native binding diagnostics are not task acceptance, and a locked preflight is not a fresh-Agent attempt. Foreground/pointer changes remain unattributed and unfiltered. Timing includes Agent/start waiting. Sampling cannot exclude shorter transients. Corrected runner still requires an unlocked fresh run and complete shared-service trace coverage. This is existing-document synthetic Save As, not inactive first-save #33, standalone service panel, unintegrated real-app, cross-app, canvas, physical overlap or lock/unlock acceptance. #36 stays open; raw desktop data remains private."
+}

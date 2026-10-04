@@ -2,7 +2,7 @@
 
 This is an execution slice of #36, not a new production adapter. The agent receives task goals, explicitly owned receiver/window IDs, destinations and generic tool documentation. It selects current observations and actions itself. The transport records actual CLI commands/results and desktop samples; it contains no recorded task steps, selectors, coordinates or fixture-specific action choices. The operator independently reads receiver records/artifacts after execution.
 
-For a runnable owned `existing_document` or `calculation` setup and the separate 2026-10-04 results, see [fresh native document tasks](native-agent-tasks.md). Their post-fix artifacts passed, but full isolation failed; historical outcomes below remain unchanged.
+For runnable owned `existing_document`, `calculation` or two-window `window_dialog` setup, see [fresh native document tasks](native-agent-tasks.md). Document/calculation post-fix artifacts passed, but full isolation failed. The initial dialog attempt failed and its replacement was blocked before launch; historical outcomes below remain unchanged.
 
 ## Start an owned task
 
