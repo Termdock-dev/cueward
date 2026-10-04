@@ -38,18 +38,18 @@ cd cueward
 cargo install --path crates/cli
 ```
 
-Requires Rust 1.85+ (edition 2024).
+Requires Rust 1.88+ (edition 2024). The CLI is macOS-only; the Windows adapter remains a reserved, unpublished stub.
 Running the Safari JavaScript behavior tests also requires Node.js on `PATH`.
 
-## What's New in 0.3.0
+## What's New in 0.5.0
 
-Cueward `0.3.0` adds several major capabilities and reliability improvements:
+Cueward `0.5.0` includes the changes since the published `0.3.2` release:
 
-- Shortcuts CLI: create, run, rename, move, apply/export spec, Share Sheet setup, and action editing
-- `cueward doctor`: audit Full Disk Access, Automation, and optional Safari live probes before using integrations
-- Reminders reads moved to EventKit-first with AppleScript fallback, removing the previous multi-second read bottleneck on supported setups
-- Calendar reads moved to EventKit-first with AppleScript fallback
-- Notes attachment support expanded, including drawing attachments and richer structured attachment enrichment
+- Scoped file browsing, reads, search, metadata, previews, Finder context and explicit iCloud download requests
+- Guarded file management, including copy/duplicate, rename/move, bounded tree/package copy, batch rename, trash with verified backups and non-overwriting backup restoration
+- App, window and Space discovery, AX inspection/actions, snapshot diffs and bounded background-operation workflows
+- Modular Safari/CLI implementations and maintained agent skill references
+- Rust 1.88 minimum; locked-session operation and generic background canvas/drag acceptance remain unverified. See the [release notes](docs/releases/0.5.0.md) for support boundaries.
 
 ### macOS Permissions
 
@@ -721,7 +721,7 @@ cueward capture --source all --since 24h | gemini "Group these by topic and high
 
 The maintained skill lives in [skills/cueward-agent](skills/cueward-agent/SKILL.md). Repo discovery links in `.agents/skills/` and `.claude/skills/` point to that same source for local Codex and Claude Code sessions. It routes among local data, Safari DOM/diagnostics, app/window/Space operations, Shortcuts, and bounded file reads when the installed CLI supports them.
 
-For use in other projects, see [installation and synchronization](docs/agent-skill.md), including verified backups before updating an existing copy. Updating the skill does not update `cueward`: check `command -v cueward` and subcommand `--help` before using newly documented commands. The file-read slice is pending in [PR #44](https://github.com/Termdock-dev/cueward/pull/44); it is not advertised as available in main or a published release.
+For use in other projects, see [installation and synchronization](docs/agent-skill.md), including verified backups before updating an existing copy. Updating the skill does not update `cueward`: check `command -v cueward` and subcommand `--help` before using newly documented commands. The scoped file commands merged starting with [PR #44](https://github.com/Termdock-dev/cueward/pull/44) are included in 0.5.0; older installed versions may not expose them.
 
 ## Architecture
 
