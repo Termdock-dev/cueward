@@ -91,7 +91,7 @@ def auxiliary_dialog(dialog, identity, records, pids):
             or set(receivers) - set(pids) != {record["pid"] for record in records}):
         raise ValueError("native panel receiver identities are unknown, duplicate or unbound")
     if dialog["mode"] == "window":
-        raise MissingEvidence("standalone auxiliary save-panel owner binding remains unverified")
+        raise MissingEvidence("standalone native save-panel owner binding remains unverified")
     if proof["owner_window_cf_equal"] is False:
         raise ValueError("native AX sheet window does not equal its owned document owner")
     if proof["owner_window_cf_equal"] is not True:
@@ -108,15 +108,7 @@ def save_dialog(dialog, target, windows, pids, auxiliary):
             or (owner["pid"], owner["window_id"]) != (target["pid"], target["window_id"])):
         raise ValueError("save dialog does not belong to the intended document window")
     identity = root_identity(dialog["root"], pids + [record["pid"] for record in auxiliary])
-    proof = dialog.get("native_binding")
-    supplied_receivers = proof.get("receiver_pids") if isinstance(proof, dict) else None
-    if isinstance(proof, dict) and "receiver_pids" in proof and (
-            not isinstance(supplied_receivers, list) or not supplied_receivers
-            or not all(positive(pid) for pid in supplied_receivers)
-            or len(set(supplied_receivers)) != len(supplied_receivers) or identity[0] not in supplied_receivers):
-        raise ValueError("native panel receiver identities are invalid or duplicate")
-    foreign_proof = isinstance(supplied_receivers, list) and any(pid not in pids for pid in supplied_receivers)
-    if auxiliary or identity[0] not in pids or foreign_proof:
+    if auxiliary or identity[0] not in pids or "native_binding" in dialog:
         auxiliary_dialog(dialog, identity, auxiliary, pids)
     document_roots = {root_identity(w["root"], pids)[:2] for w in windows.values()}
     if identity[:2] in document_roots:
