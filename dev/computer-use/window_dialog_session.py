@@ -120,13 +120,16 @@ class DialogSession(AgentSession):
         if before["dialog"] is not None:
             roots.append(before["dialog"]["root"]["ref"])
         for node in result.get("nodes", []):
+            allowed = {self.pid}
+            if before["dialog"] is not None and under(node.get("ref"), before["dialog"]["root"]["ref"]):
+                allowed.update(r["pid"] for r in before.get("auxiliary_receivers", []))
+                # Passive groups still expose receiver/coverage requirements.
+                if type(node.get("receiver_pid")) is not int or node["receiver_pid"] not in allowed:
+                    raise RuntimeError("CLI observed an unbound panel receiver; evidence is incomplete")
             token = node.get("target")
             if not token or not any(under(node.get("ref"), r) for r in roots):
                 continue
             decoded = decode_target(token)
-            allowed = {self.pid}
-            if before["dialog"] is not None and under(node.get("ref"), before["dialog"]["root"]["ref"]):
-                allowed.update(r["pid"] for r in before.get("auxiliary_receivers", []))
             if (node.get("receiver_pid") not in allowed or decoded.get("ref") != node.get("ref")
                     or decoded.get("app", {}).get("pid") != self.pid or decoded.get("kind") != "app_ax"):
                 raise RuntimeError("observed AX token does not bind an owned receiver/root")
