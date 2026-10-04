@@ -6,7 +6,7 @@ import Darwin
     let windowID: UInt32
     let ax: RetainedLockAX
     var capture: RetainedLockCapture?
-    var captureError: String?
+    var captureError: LockCaptureFailure?
     var sawLock = false
     var testedActions = Set<String>()
     let allowInput: Bool
@@ -26,10 +26,11 @@ import Darwin
 
     func prepare() async {
         do { capture = try await RetainedLockCapture.start(pid: pid, windowID: windowID) }
-        catch { captureError = String(describing: error) }
+        catch { captureError = error as? LockCaptureFailure ?? LockCaptureFailure(description: "capture setup failed") }
         emit(["kind": "ready", "schema": 1, "pid": pid, "window_id": windowID,
               "retained_ax": true, "retained_stream": capture != nil,
-              "capture_error": captureError ?? "", "diagnostic_input": allowInput,
+              "capture_error": captureError?.description ?? "",
+              "capture_status": captureError?.sample().status ?? "ready", "diagnostic_input": allowInput,
               "uptime": ProcessInfo.processInfo.systemUptime])
     }
 
@@ -40,8 +41,7 @@ import Darwin
     }
 
     func unavailableCapture() -> [String: Any] {
-        ["status": "error", "sequence": NSNull(), "frameCount": 0,
-         "uptime": ProcessInfo.processInfo.systemUptime, "error": captureError ?? "capture setup unavailable"]
+        (captureError ?? LockCaptureFailure(description: "capture setup unavailable")).sample().record
     }
 
     func sample() async {

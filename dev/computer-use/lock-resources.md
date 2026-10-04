@@ -12,6 +12,8 @@ The retained `SCStream` keeps its initial exact PID/window filter; each new scre
 
 Each sample brackets observations with the receiver's independent before/after counter and timestamps, using the same Swift `systemUptime` clock. The after record must advance beyond the before sequence and the probe's completion time. A route needs at least two distinct increasing, receiver-correlated values in a consistently locked or unlocked phase before it is `fresh`. API success, callback count, a single value or a repeated frozen frame cannot pass. Stale data needs an advancing receiver oracle; blank, missing, stopped, timeout and error outcomes remain separate. A lock transition inside a sample leaves it unverified. Raw timestamps and probe bounds are preserved privately.
 
+Capture failures are `permission_denied` only for the ScreenCaptureKit error domain and Apple's documented [`userDeclined`](https://developer.apple.com/documentation/screencapturekit/scstreamerror/userdeclined) code. The classification survives startup, enumeration, screenshot and stream callbacks; matching numbers in another domain or permission words are not inferred. Only a fixed phase and numeric code are logged, never the SDK's localized description. A normal explicit stream stop clears an earlier runtime error as a confirmed shutdown; a stop operation's own error remains a cleanup failure.
+
 ## Unlocked baseline
 
 Requires an unlocked desktop, Accessibility and Screen Recording permission, Swift 6 and a macOS 15-or-newer SDK/runtime for this capture configuration. Only macOS 27.0.1, arm64 was actually tested. The command checks existing permissions; it does not request or change them.
@@ -56,7 +58,7 @@ The first attempt aborted before readiness with a WindowServer initialization as
 
 These are operator diagnostics, not fresh-agent acceptance, physical-input isolation or a locked-session result. No full foreground/pointer/Space isolation trace is claimed, and no lock/unlock experiment was performed. Formal product lock guards and all crates are unchanged. #34 stays open for the actual three-phase matrix and remaining input/stream-renewal coverage.
 
-Validation includes strict Swift 6 warnings-as-errors compilation, twelve pure BGRA pattern cases and offline tests of freshness, malformed/missing phases, permission codes, partial transport, failure checkpoints, independently timed action effects, mode-specific completion and cleanup. Run the offline suite without launching a desktop app:
+Validation includes strict Swift 6 warnings-as-errors compilation, twelve pure BGRA pattern cases, actual capture-error producer-to-report checks and offline tests of freshness, malformed/missing phases, permission codes, partial transport, failure checkpoints, independently timed action effects, mode-specific completion and cleanup. Error tests construct synthetic SDK errors without capturing, changing system permissions or running a desktop app. Run the offline suite without launching a desktop app:
 
 ```sh
 python3 -B -m unittest discover -s dev/computer-use -p 'test_*.py' -v

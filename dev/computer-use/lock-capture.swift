@@ -17,14 +17,28 @@ struct LockCaptureSample: Sendable {
     }
 }
 
-private struct LockCaptureFailure: Error, Sendable, CustomStringConvertible, LocalizedError {
+struct LockCaptureFailure: Error, Sendable, CustomStringConvertible, LocalizedError {
     let description: String
+    let permissionDenied: Bool
     var errorDescription: String? { description }
+
+    init(description: String, permissionDenied: Bool = false) {
+        self.description = description
+        self.permissionDenied = permissionDenied
+    }
+
+    func sample(defaultStatus: String = "error", count: Int = 0) -> LockCaptureSample {
+        captureSample(permissionDenied ? "permission_denied" : defaultStatus,
+                      count: count, error: description)
+    }
 }
 
-private func captureError(_ phase: String, _ error: any Error) -> String {
+func captureError(_ phase: String, _ error: any Error) -> LockCaptureFailure {
+    let sdkError = error as NSError
     // SDK localized descriptions can contain external data. Record only a fixed phase/code.
-    "\(phase) failed (code \((error as NSError).code))"
+    return LockCaptureFailure(description: "\(phase) failed (code \(sdkError.code))",
+        permissionDenied: sdkError.domain == SCStreamErrorDomain
+            && sdkError.code == SCStreamError.userDeclined.rawValue)
 }
 
 private func captureSample(_ status: String, sequence: Int? = nil,
@@ -108,7 +122,7 @@ private func freshOwnedFilter(pid: Int32, windowID: UInt32)
         SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: false) { content, error in
             guard gate.isPending else { return }
             if let error {
-                gate.finish(.failure(LockCaptureFailure(description: captureError("enumeration", error))))
+                gate.finish(.failure(captureError("enumeration", error)))
             } else if let filter = ownedFilter(content, pid: pid, windowID: windowID) {
                 gate.finish(.success(OwnedCaptureFilter(filter)))
             } else {
@@ -143,7 +157,7 @@ private func streamFrameStatus(_ buffer: CMSampleBuffer) -> SCFrameStatus? {
 }
 
 /// Framework callbacks stay off MainActor; only decoded scalars enter locked state.
-private final class RetainedCaptureOutput: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
+final class RetainedCaptureOutput: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     private let lock = NSLock()
     private var current = captureSample("no_frame")
     private var stopped = false
@@ -154,15 +168,16 @@ private final class RetainedCaptureOutput: NSObject, SCStreamOutput, SCStreamDel
         return current
     }
 
-    func markStopped(error: String? = nil) {
+    func markStopped(failure: LockCaptureFailure? = nil) {
         lock.lock()
         defer { lock.unlock() }
         stopped = true
-        current = captureSample("stopped", count: current.frameCount, error: error)
+        current = failure?.sample(defaultStatus: "stopped", count: current.frameCount)
+            ?? captureSample("stopped", count: current.frameCount)
     }
 
     func stream(_ stream: SCStream, didStopWithError error: any Error) {
-        markStopped(error: captureError("stream", error))
+        markStopped(failure: captureError("stream", error))
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer,
@@ -220,7 +235,7 @@ private final class RetainedCaptureOutput: NSObject, SCStreamOutput, SCStreamDel
         output = RetainedCaptureOutput()
         stream = SCStream(filter: filter, configuration: try captureConfiguration(filter), delegate: output)
         do { try stream.addStreamOutput(output, type: .screen, sampleHandlerQueue: callbackQueue) }
-        catch { throw LockCaptureFailure(description: captureError("stream output", error)) }
+        catch { throw captureError("stream output", error) }
     }
 
     static func start(pid: Int32, windowID: UInt32) async throws -> RetainedLockCapture {
@@ -247,7 +262,7 @@ private final class RetainedCaptureOutput: NSObject, SCStreamOutput, SCStreamDel
             let gate = CaptureDeadline(continuation, timeout: { captureSample("timeout", error: "screenshot timed out") })
             SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: false) { content, error in
                 guard gate.isPending else { return }
-                if let error { gate.finish(captureSample("error", error: captureError("enumeration", error))); return }
+                if let error { gate.finish(captureError("enumeration", error).sample()); return }
                 guard let filter = ownedFilter(content, pid: targetPID, windowID: targetWindow) else {
                     gate.finish(captureSample("no_frame", error: "owned PID/window binding unavailable")); return
                 }
@@ -269,7 +284,7 @@ private final class RetainedCaptureOutput: NSObject, SCStreamOutput, SCStreamDel
                 description: "stream startup timed out")) })
             stream.startCapture { error in
                 let result: Result<Void, LockCaptureFailure> = error.map {
-                    .failure(LockCaptureFailure(description: captureError("stream startup", $0)))
+                    .failure(captureError("stream startup", $0))
                 } ?? .success(())
                 if !gate.finish(result), error == nil {
                     Task { @MainActor in await self.forceStop() }
@@ -284,11 +299,10 @@ private final class RetainedCaptureOutput: NSObject, SCStreamOutput, SCStreamDel
             let gate = CaptureDeadline(continuation, timeout: { .failure(LockCaptureFailure(
                 description: "stream stop timed out; underlying stop unconfirmed")) })
             stream.stopCapture { error in
-                gate.finish(error.map { .failure(LockCaptureFailure(
-                    description: captureError("stream stop", $0))) } ?? .success(()))
+                gate.finish(error.map { .failure(captureError("stream stop", $0)) } ?? .success(()))
             }
         }
-        if case .failure(let error) = result { output.markStopped(error: error.description) }
+        if case .failure(let error) = result { output.markStopped(failure: error) }
     }
 }
 
@@ -299,7 +313,7 @@ private func startFreshScreenshot(filter: SCContentFilter, gate: CaptureDeadline
         guard gate.isPending else { return }
         SCScreenshotManager.captureSampleBuffer(contentFilter: filter, configuration: config) { buffer, error in
             guard gate.isPending else { return }
-            if let error { gate.finish(captureSample("error", error: captureError("screenshot", error))); return }
+            if let error { gate.finish(captureError("screenshot", error).sample()); return }
             guard let buffer else { gate.finish(captureSample("no_frame")); return }
             gate.finish(decodeCaptureBuffer(buffer, count: 1))
         }
