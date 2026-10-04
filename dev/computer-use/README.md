@@ -2,6 +2,14 @@
 
 For the separate fresh-agent task preparation and result checker, see the [task acceptance framework](task-acceptance.md). Benchmark/probe outcomes are not fresh-agent task acceptance results.
 
+The [read-only desktop observer](desktop-observer.md) supplies timestamped task intervals, per-online-display visible Spaces, foreground/pointer samples and receiver activation events. It remains separate from task execution and independent artifact checks.
+
+The [interactive agent transport](agent-session.md) records commands chosen by a fresh Agent rather than scripted task steps. Its first three synthetic task attempts failed; all eight tasks remain in the denominator.
+
+The [physical-input overlap diagnostic](physical-overlap.md) records the actual #31 human round and separate idle/first-mouse contrasts. #31 remains incomplete; idle effects do not replace physical overlap.
+
+The [WebView context investigation](webview-context.md) separates native first-mouse refusal, DOM button state and delayed observation. Patched receiver controls are not product compatibility.
+
 Run on an unlocked macOS desktop with Accessibility and Screen Recording permissions:
 
 ```sh
@@ -49,3 +57,10 @@ All five interpreted helper key pairs and all five CLI key pairs reached the rec
 These samples show a large interpreter startup/transport residual and much smaller final JSON serialization cost. They justify investigating helper startup, but do not establish a usable input optimization. The missing precompiled effect remains unexplained: event delivery/lifetime and command pacing are hypotheses, not confirmed causes. Production continues to use its existing helper route. No cache, persistent helper, service or new dependency is introduced, and no speedup is claimed for the delivered CLI.
 
 The initial matching wait uncovered unconditional reads of irrelevant AXDescription attributes. The production wait now reads only selector/condition attributes; deterministic tests preserve required-attribute failures, and the native text receiver and existing wait desktop tests pass. This correction enables the matching-wait baseline without weakening role or secure-value checks.
+# First-save context comparison
+
+See [first-save-context.md](first-save-context.md) for the observer-backed diagnostic and its current-build limitations.
+
+# Background pointer repair
+
+The draft repair work and rejected sender hypotheses are recorded in [background-pointer-repair.md](background-pointer-repair.md). Diagnostic tooling and passing evaluator tests do not establish a functional fix.

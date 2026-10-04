@@ -2,7 +2,7 @@
 
 Prepared for issue [#36](https://github.com/Termdock-dev/cueward/issues/36), 2026-10-01. This document defines repeatable tasks and independent completion checks. It is not a report that the agent has completed the tasks.
 
-The [offline preparation and evaluation framework](task-acceptance.md) generates fresh synthetic workspaces and reports every task, including blocked and unrun cases. It needs independently supplied receiver and execution evidence; it does not drive the agent or collect desktop observations. No actual fresh-agent runs are recorded yet.
+The [offline preparation and evaluation framework](task-acceptance.md) generates fresh synthetic workspaces and reports every task, including blocked and unrun cases. It needs independently supplied receiver and execution evidence; it does not drive the agent or collect desktop observations. The [interactive agent transport](agent-session.md) now records three actual failed attempts; five other tasks remain unverified. See the [physical-overlap diagnostic](physical-overlap.md) for the separate operator-assisted #31 result.
 
 ## Shared setup and evidence
 
@@ -27,6 +27,8 @@ Record command count, task wall time, tool execution time and observer sample in
 Reset by terminating only the owned receiver instances and preparing a new unique directory. Preserve needed evidence and reports before removing an old owned task directory or its generated snapshots. The framework does not launch or terminate processes. Recompile/relaunch fixtures for the next run. Never reuse a prior input or AX target across resets. A task that needs a real installed app must use a new explicitly identified instance and preserve its existing user-owned documents and settings.
 
 ## Support matrix at preparation
+
+The following table preserves the 2026-10-01 preparation status, not the later result matrix. Current results are linked above.
 
 | Interface / path | Current evidence | Acceptance status |
 | --- | --- | --- |

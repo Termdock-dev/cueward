@@ -1,0 +1,211 @@
+{
+  "schema": 1,
+  "kind": "scripted_webview_context_diagnostic_not_fresh_agent_acceptance",
+  "variant": "control",
+  "context": "inactive",
+  "ordinary_support_candidate": false,
+  "cases": [
+    {
+      "variant": "control",
+      "context": "inactive",
+      "status": "recorded",
+      "ordinary_support_candidate": false,
+      "command_receipts_count": 8,
+      "desktop": {
+        "status": "passed",
+        "reason": "sampled execution coverage within 100 ms; shorter transients remain outside resolution",
+        "maximum_gap_ms": 40.97295831888914,
+        "foreground_changed": false,
+        "pointer_changed": false,
+        "visible_spaces_changed": false,
+        "receiver_active": false
+      },
+      "actions": [
+        {
+          "name": "first_single_click",
+          "dispatch_status": "sent_unverified",
+          "posted_events": 2,
+          "app_event_counts": {
+            "1": 1,
+            "6": 0,
+            "2": 1
+          },
+          "app_pressed_button_masks": [
+            0
+          ],
+          "first_mouse_native_results": [
+            false
+          ],
+          "first_mouse_returned_results": [
+            true
+          ],
+          "view_callback_delta": {
+            "down": 1,
+            "drag": 0,
+            "up": 1
+          },
+          "settling": {
+            "status": "terminal_dom_observed",
+            "wait_ms": 867.9387079901062,
+            "budget_ms": 3000
+          },
+          "effect": {
+            "status": "passed",
+            "click_increment": 1,
+            "object_delta": {
+              "x": 0,
+              "y": 0
+            },
+            "release_increment": 0,
+            "dom_event_count": 3,
+            "dragging": false,
+            "dom_buttons_by_type": {
+              "mousedown": [
+                0
+              ],
+              "mousemove": [],
+              "mouseup": [
+                0
+              ],
+              "click": [
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "subsequent_single_click",
+          "dispatch_status": "sent_unverified",
+          "posted_events": 2,
+          "app_event_counts": {
+            "1": 1,
+            "6": 0,
+            "2": 1
+          },
+          "app_pressed_button_masks": [
+            0
+          ],
+          "first_mouse_native_results": [
+            false
+          ],
+          "first_mouse_returned_results": [
+            true
+          ],
+          "view_callback_delta": {
+            "down": 1,
+            "drag": 0,
+            "up": 1
+          },
+          "settling": {
+            "status": "terminal_dom_observed",
+            "wait_ms": 905.7902499916963,
+            "budget_ms": 3000
+          },
+          "effect": {
+            "status": "passed",
+            "click_increment": 1,
+            "object_delta": {
+              "x": 0,
+              "y": 0
+            },
+            "release_increment": 0,
+            "dom_event_count": 3,
+            "dragging": false,
+            "dom_buttons_by_type": {
+              "mousedown": [
+                0
+              ],
+              "mousemove": [],
+              "mouseup": [
+                0
+              ],
+              "click": [
+                0
+              ]
+            }
+          }
+        }
+      ],
+      "cleanup": {
+        "owned_processes_stopped": true,
+        "errors": []
+      }
+    },
+    {
+      "variant": "control",
+      "context": "inactive",
+      "status": "recorded",
+      "ordinary_support_candidate": false,
+      "command_receipts_count": 6,
+      "desktop": {
+        "status": "passed",
+        "reason": "sampled execution coverage within 100 ms; shorter transients remain outside resolution",
+        "maximum_gap_ms": 24.164916685549542,
+        "foreground_changed": false,
+        "pointer_changed": false,
+        "visible_spaces_changed": false,
+        "receiver_active": false
+      },
+      "actions": [
+        {
+          "name": "canvas_drag",
+          "dispatch_status": "sent_unverified",
+          "posted_events": 27,
+          "app_event_counts": {
+            "1": 1,
+            "6": 25,
+            "2": 1
+          },
+          "app_pressed_button_masks": [
+            0
+          ],
+          "first_mouse_native_results": [
+            false
+          ],
+          "first_mouse_returned_results": [
+            true
+          ],
+          "view_callback_delta": {
+            "down": 1,
+            "drag": 25,
+            "up": 1
+          },
+          "settling": {
+            "status": "terminal_dom_observed",
+            "wait_ms": 526.3090829830617,
+            "budget_ms": 3000
+          },
+          "effect": {
+            "status": "failed",
+            "click_increment": 0,
+            "object_delta": {
+              "x": 0,
+              "y": 0
+            },
+            "release_increment": 1,
+            "dom_event_count": 28,
+            "dragging": false,
+            "dom_buttons_by_type": {
+              "mousedown": [
+                0
+              ],
+              "mousemove": [
+                0
+              ],
+              "mouseup": [
+                0
+              ],
+              "click": [
+                0
+              ]
+            }
+          }
+        }
+      ],
+      "cleanup": {
+        "owned_processes_stopped": true,
+        "errors": []
+      }
+    }
+  ]
+}

@@ -36,6 +36,25 @@ def interference(samples, pids, inactive_space, space):
     return "passed", "sampled execution coverage within 100 ms; shorter transients remain outside resolution"
 
 
+def observer_checks(execution, pids):
+    """Inspect optional native-observer evidence without authenticating its provenance."""
+    observer = execution.get("observer")
+    if observer is None:
+        return None
+    if not isinstance(observer, dict) or observer.get("schema") != 1 or observer.get("receiver_pids") != pids:
+        return "unverified", "native observer receiver scope is incomplete or mismatched"
+    events = execution.get("events")
+    if not isinstance(events, list) or not all(isinstance(e, dict) and number(e.get("ms")) for e in events):
+        return "unverified", "native observer event evidence is incomplete"
+    if any(e.get("type") in ("observation_error", "control_error") for e in events):
+        return "unverified", "native observer failed within the execution interval"
+    if any(e.get("type") == "activation" and e.get("pid") in pids for e in events):
+        return "failed", "receiver activation observed between samples"
+    if any(s.get("session_locked") is not False for s in execution.get("samples", [])):
+        return "unverified", "desktop locked or session state unavailable during execution"
+    return None
+
+
 def check_trace(evidence, inactive_space=False):
     """Return status/reason and metrics from an independently collected trace."""
     execution = evidence.get("execution", {})
@@ -59,6 +78,9 @@ def check_trace(evidence, inactive_space=False):
         return "unverified", "endpoint-only or missing observation", metrics
     if not all(valid_sample(s, pids) for s in samples):
         return "unverified", "incomplete foreground/pointer/Space/activation samples", metrics
+    observed = observer_checks(execution, pids)
+    if observed:
+        return *observed, metrics
     status, reason = interference(samples, pids, inactive_space, evidence.get("target_space"))
     if status == "failed":
         return status, reason, metrics

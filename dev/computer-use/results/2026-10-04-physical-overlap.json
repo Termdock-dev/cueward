@@ -1,0 +1,208 @@
+{
+  "schema": 1,
+  "physical_trial_date_taipei": "2026-10-03",
+  "diagnosis_date_taipei": "2026-10-04",
+  "platform": {
+    "macos": "27.0.1",
+    "build": "26A434",
+    "architecture": "arm64",
+    "display_count": 3
+  },
+  "kind": "diagnostic_not_fresh_agent_acceptance",
+  "physical_round": {
+    "execution_ms": 30536.273208330385,
+    "sample_count": 1577,
+    "assessment": {
+      "status": "failed",
+      "checks": {
+        "desktop": {
+          "status": "passed",
+          "reason": "human foreground and background isolation at sampled resolution",
+          "maximum_gap_ms": 59.979416662827134,
+          "pointer_positions": 395
+        },
+        "background": {
+          "status": "failed",
+          "reason": "receiver content AND event/effect checks",
+          "checks": {
+            "text_and_shortcut": true,
+            "key_release": true,
+            "modifier_isolation": true,
+            "event_annotations": true,
+            "click": true,
+            "drag_and_release": false,
+            "scroll": false
+          }
+        },
+        "human": {
+          "status": "unverified",
+          "reason": "owned human text and unannotated event observations; annotations are not hardware authentication",
+          "checks": {
+            "text_matches_challenge": true,
+            "no_background_annotations": true,
+            "shift_typing_and_mouse_movement": true,
+            "event_log_complete": true
+          },
+          "finish_acknowledged": false,
+          "key_downs": 35,
+          "mouse_moves": 364,
+          "shift_key_downs": 17
+        },
+        "pointer_correlation": {
+          "status": "unverified",
+          "reason": "sampled pointer changes correlated to owned-window/global-mouse observations; not causal authentication or a sub-sample warp guarantee",
+          "changes": 396,
+          "unattributed_changes": 271
+        },
+        "command_overlap": {
+          "status": "unverified",
+          "reason": "physical event streams overlap each CLI command interval; does not assert simultaneous individual event delivery",
+          "actions": {
+            "text": {
+              "key_downs": 3,
+              "mouse_moves": 0
+            },
+            "shortcut": {
+              "key_downs": 1,
+              "mouse_moves": 6
+            },
+            "replacement": {
+              "key_downs": 2,
+              "mouse_moves": 0
+            },
+            "click": {
+              "key_downs": 1,
+              "mouse_moves": 0
+            },
+            "drag": {
+              "key_downs": 1,
+              "mouse_moves": 12
+            },
+            "scroll": {
+              "key_downs": 1,
+              "mouse_moves": 2
+            }
+          }
+        },
+        "controlled_interruption": {
+          "status": "failed",
+          "reason": "identity change must stop dispatch, deliver original receiver up AND release an accepted gesture",
+          "dispatch_stopped": false,
+          "original_receiver_up": true,
+          "receiver_gesture_released": false,
+          "receiver_gesture_not_started": false,
+          "interruption_triggered": false
+        },
+        "foreground_refusal": {
+          "status": "passed",
+          "reason": "pre-dispatch foreground refusal only; not a mid-flight activation case",
+          "refused": true,
+          "no_background_annotations": true
+        },
+        "midflight_foreground": {
+          "status": "unverified",
+          "reason": "target becoming foreground during dispatch was not exercised"
+        }
+      }
+    },
+    "background_key_downs": 45,
+    "background_key_ups": 45,
+    "human_finish_acknowledgement": "not_collected_by_initial_fixture"
+  },
+  "first_mouse_contrast": {
+    "ordinary": {
+      "posted_events": 52,
+      "app_events": {
+        "1": 1,
+        "6": 50,
+        "2": 1
+      },
+      "view_callbacks": {
+        "down": 0,
+        "up": 0,
+        "drag": 0
+      },
+      "object_delta": {
+        "x": 0,
+        "y": 0
+      },
+      "release_increment": 0
+    },
+    "patched_control_only": {
+      "posted_events": 52,
+      "app_events": {
+        "1": 1,
+        "6": 50,
+        "2": 1
+      },
+      "view_callbacks": {
+        "down": 1,
+        "drag": 50,
+        "up": 1
+      },
+      "object_delta": {
+        "x": 80,
+        "y": 40
+      },
+      "release_increment": 1
+    },
+    "receiver_change": "Canvas acceptsFirstMouse returns true in a local diagnostic source copy only; not shipped and not counted as ordinary native acceptance"
+  },
+  "corrected_idle_diagnostic": {
+    "assessment": {
+      "kind": "idle_diagnostic_only_not_physical_acceptance",
+      "background": {
+        "status": "failed",
+        "reason": "receiver content AND event/effect checks",
+        "checks": {
+          "text_and_shortcut": true,
+          "key_release": true,
+          "modifier_isolation": true,
+          "event_annotations": true,
+          "click": true,
+          "drag_and_release": false,
+          "scroll": true
+        }
+      },
+      "controlled_interruption": {
+        "status": "unverified",
+        "reason": "identity change must stop dispatch, deliver original receiver up AND release an accepted gesture",
+        "dispatch_stopped": true,
+        "original_receiver_up": true,
+        "receiver_gesture_released": false,
+        "receiver_gesture_not_started": true,
+        "interruption_triggered": true
+      },
+      "desktop": {
+        "status": "passed",
+        "reason": "sampled execution coverage within 100 ms; shorter transients remain outside resolution",
+        "metrics": {
+          "command_count": 1,
+          "task_wall_ms": 19535.682041663677,
+          "tool_wall_ms": 0,
+          "observer_max_interval_ms": 25.175666669383645
+        },
+        "pointer_policy": "stationary"
+      }
+    },
+    "scroll_before": 0,
+    "scroll_after": 160,
+    "scroll_document_height": 1400,
+    "scroll_viewport_height": 150,
+    "interruption_events_sent": 7
+  },
+  "limitations": [
+    "Initial physical trial used a non-scrollable text receiver; later idle scroll success does not retroactively pass that round.",
+    "Original physical mouse observations were scoped to the owned window; 271 sampled pointer changes remain unattributed.",
+    "New global mouse-only observations and manual finish/release acknowledgement have not been exercised in another human round.",
+    "Controlled window identity change in an idle trial is not a target becoming foreground during input.",
+    "No WebView physical-overlap trial, real-app compatibility, all-app isolation or sub-sample no-warp guarantee.",
+    "Only aggregate and synthetic receiver data are public; raw identities, text, coordinates, paths, screenshots and receipts remain local."
+  ],
+  "source_sha256": {
+    "overlap-fixture.swift": "1ba57bbe13f70ae11da8318e4e5cff1691e49f91a79302de69b23947c2f34751",
+    "physical_overlap.py": "329a5bcf55c7958705f911f23cc39354d4910e3d41b506f5936fd853f80c5c5b",
+    "desktop-observer-main.swift": "3af3d2c6474ce45e7e0b138ac9aa1d5cd2848750b7cffb64f094f5aecda0799f"
+  },
+  "source_hash_scope": "Current diagnostic/evaluator sources, not historical physical-trial source capture."
+}

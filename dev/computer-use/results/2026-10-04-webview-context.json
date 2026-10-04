@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "date_taipei": "2026-10-04",
+  "kind": "scripted_webview_context_diagnostic_not_fresh_agent_acceptance",
+  "platform": {
+    "macos": "27.0.1",
+    "build": "26A434",
+    "architecture": "arm64",
+    "webkit_bundle_version": "22625.1.29.11.28",
+    "online_display_count": 3
+  },
+  "settling_correction": {
+    "initial_fixed_wait_ms": 500,
+    "initial_subsequent_click_observation": {
+      "status": "failed",
+      "click_increment": 0,
+      "object_delta": {
+        "x": 0,
+        "y": 0
+      },
+      "release_increment": 0,
+      "dom_event_count": 0,
+      "dragging": false,
+      "dom_buttons_by_type": {
+        "mousedown": [],
+        "mousemove": [],
+        "mouseup": [],
+        "click": []
+      }
+    },
+    "initial_drag_observation": {
+      "status": "failed",
+      "click_increment": 0,
+      "object_delta": {
+        "x": 0,
+        "y": 0
+      },
+      "release_increment": 0,
+      "dom_event_count": 8,
+      "dragging": true,
+      "dom_buttons_by_type": {
+        "mousedown": [
+          0
+        ],
+        "mousemove": [
+          0
+        ],
+        "mouseup": [],
+        "click": []
+      }
+    },
+    "later_same_receiver_counts": {
+      "clicks": 2,
+      "drag_releases": 1,
+      "dragging": false
+    },
+    "conclusion": "Initial per-action missing-click/up observations were stale; they do not prove event loss. Later bounded terminal observations still show zero drag displacement and buttons=0."
+  },
+  "native_ax_contrast": {
+    "context": "inactive",
+    "observed_nodes": 7,
+    "tree_truncated": false,
+    "uniquely_observed_page_buttons": 0,
+    "ax_press_dispatches": 0,
+    "conclusion": "Only window/chrome nodes observed in this instance; no generic AX page-button action was dispatched. Not a universal WebView AX finding."
+  },
+  "limitations": [
+    "Control changes receiver first-mouse behavior and never counts as ordinary compatibility or a production fix.",
+    "No product route, global button-state mutation, app activation, double-click or automatic replay.",
+    "DOM terminal waiting is bounded to three seconds, not a permanent delivery/loss guarantee.",
+    "One observation-variant drag recorded unattributed pointer movement; its isolation check is failed.",
+    "No physical WebView overlap, accepted interrupted ordinary gesture or real-app coverage.",
+    "Upstream source/platform research remains local and is not asserted to match the installed system binary.",
+    "Raw identities, targets, coordinates, screenshots, native traces and external research remain local."
+  ],
+  "case_count": 8,
+  "matrix_files": [
+    "2026-10-04-webview-context-ordinary-inactive.json",
+    "2026-10-04-webview-context-ordinary-visible.json",
+    "2026-10-04-webview-context-observed-inactive.json",
+    "2026-10-04-webview-context-control-inactive.json"
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "kind": "diagnostic",
+  "date": "2026-10-03",
+  "macos": "27.0.1",
+  "build": "26A434",
+  "architecture": "arm64",
+  "online_displays": 3,
+  "results": [
+    {
+      "context": "inactive",
+      "status": "save_control_disabled_or_unavailable",
+      "edit_confirmed": true,
+      "panel_save_dispatch_count": 0,
+      "control_enabled_before_move": [
+        false
+      ],
+      "control_enabled_at_save": [
+        false
+      ],
+      "file_created": false,
+      "file_content_matches": false,
+      "both_window_memberships_confirmed_in_target_space": null,
+      "command_count": 12,
+      "sample_count": 398,
+      "maximum_sample_gap_ms": 59.6,
+      "distinct_foregrounds": 1,
+      "distinct_visible_space_maps": 1,
+      "distinct_pointer_positions": 1,
+      "receiver_activations": 0,
+      "observation_status": "passed"
+    },
+    {
+      "context": "visible",
+      "status": "artifact_verified",
+      "edit_confirmed": true,
+      "panel_save_dispatch_count": 1,
+      "control_enabled_before_move": [
+        true
+      ],
+      "control_enabled_at_save": [
+        true
+      ],
+      "file_created": true,
+      "file_content_matches": true,
+      "both_window_memberships_confirmed_in_target_space": null,
+      "command_count": 12,
+      "sample_count": 531,
+      "maximum_sample_gap_ms": 119.2,
+      "distinct_foregrounds": 1,
+      "distinct_visible_space_maps": 1,
+      "distinct_pointer_positions": 105,
+      "receiver_activations": 0,
+      "observation_status": "failed"
+    },
+    {
+      "context": "warm",
+      "status": "artifact_verified",
+      "edit_confirmed": true,
+      "panel_save_dispatch_count": 1,
+      "control_enabled_before_move": [
+        true
+      ],
+      "control_enabled_at_save": [
+        true
+      ],
+      "file_created": true,
+      "file_content_matches": true,
+      "both_window_memberships_confirmed_in_target_space": true,
+      "command_count": 18,
+      "sample_count": 1017,
+      "maximum_sample_gap_ms": 128.8,
+      "distinct_foregrounds": 1,
+      "distinct_visible_space_maps": 1,
+      "distinct_pointer_positions": 73,
+      "receiver_activations": 0,
+      "observation_status": "failed"
+    }
+  ],
+  "limitations": "Synthetic NSDocument only. One trial per context. Pointer movement is unattributed and visible/warm runs do not pass stationary isolation. Warm contrast is not the inactive-first task or a product workaround. Cross-app reading not performed."
+}

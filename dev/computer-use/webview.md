@@ -1,6 +1,6 @@
 # Ordinary WKWebView background input probe
 
-Prepared for issue [#32](https://github.com/Termdock-dev/cueward/issues/32), 2026-10-01.
+Prepared for issue [#32](https://github.com/Termdock-dev/cueward/issues/32), 2026-10-01. The later [native/DOM context investigation](webview-context.md) records unlocked 2026-10-04 ordinary and diagnostic-control results; the original locked-run conclusion below is historical.
 
 ```sh
 python3 dev/computer-use/webview-probe.py --cli /absolute/path/to/cueward --inactive-space --output webview.json
