@@ -11,7 +11,7 @@ from agent_session import ScopeError
 from task_acceptance.evaluate import evaluate, load_json
 from task_acceptance.setup import EDITED, ORIGINAL, prepare, write_json
 from test_agent_session import token
-from window_dialog_observer import owned_inventory, scoped_dialog
+from window_dialog_observer import owned_inventory, scoped_dialog, validate_native_result
 from window_dialog_session import DialogSession, command_options
 from window_dialog_task import dialog_evidence
 from native_agent_task import task_setup
@@ -137,6 +137,40 @@ class DialogNativeTests(unittest.TestCase):
             stale = result["nodes"][-1]["target"]
             self.assertTrue(session.request(["app", "press", "--target", stale])["not_dispatched"])
             session.commands.call.assert_called_once()
+
+    def test_auxiliary_scope_requires_native_id_attachment_and_actual_receiver_proof(self):
+        artifact = Path("/owned/target.txt"); b = binding(artifact, "dialog")
+        owner = {"pid": 100, "window_id": 20}
+        b["dialog"]["native_binding"] = {"source": "native_ax_window_binding", "window_id": 30,
+            "owner_window": owner, "owner_window_cf_equal": True, "receiver_pids": [100, 200]}
+        b["auxiliary_receivers"] = [{"pid": 200, "window_id": 30, "owner_window": owner,
+                                     "source": "native_ax_window_binding"}]
+        request = {"pid": 100, "target_file": str(artifact), "dialog": b["dialog"]}
+        validate_native_result(b, request)
+        for change in ({"window_id": 31}, {"owner_window_cf_equal": False}, {"receiver_pids": [100]},
+                       {"receiver_pids": [True, 200]}, {"source": "agent_token"}):
+            bad = deepcopy(b); bad["dialog"]["native_binding"].update(change)
+            with self.subTest(change=change), self.assertRaises(RuntimeError):
+                validate_native_result(bad, request)
+        bad = deepcopy(b); bad["windows"][0]["root"]["receiver_pid"] = 200
+        with self.assertRaisesRegex(RuntimeError, "foreign native document"):
+            validate_native_result(bad, request)
+
+    def test_service_tokens_bind_only_the_independently_observed_owned_panel(self):
+        with tempfile.TemporaryDirectory() as folder:
+            artifact = Path(folder) / "target.txt"; b = binding(artifact, "dialog")
+            b["dialog"]["root"]["receiver_pid"] = 200
+            b["auxiliary_receivers"] = [{"pid": 200, "window_id": 30,
+                "owner_window": {"pid": 100, "window_id": 20}, "source": "native_ax_window_binding"}]
+            session = self.make_session(Path(folder), artifact, [b, b, b])
+            token_value = token({"kind": "app_ax", "app": {"pid": 100}, "ref": "w0.0.1"})
+            result = {"app": {"pid": 100}, "nodes": [{"ref": "w0.0.1", "receiver_pid": 200, "target": token_value}]}
+            session.register(["app", "inspect", "--pid", "100", "--root", "w0.0"], result, b, b)
+            self.assertIn(token_value, session.tokens)
+            foreign = {"app": {"pid": 100}, "nodes": [{"ref": "w1.1", "receiver_pid": 200, "target":
+                token({"kind": "app_ax", "app": {"pid": 100}, "ref": "w1.1"})}]}
+            with self.assertRaisesRegex(RuntimeError, "owned receiver"):
+                session.register(["app", "inspect", "--pid", "100", "--root", "w1"], foreign, b, b)
 
     def test_binding_change_during_inspection_discards_phase_and_targets(self):
         with tempfile.TemporaryDirectory() as folder:

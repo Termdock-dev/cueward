@@ -44,12 +44,16 @@ class DialogSession(AgentSession):
         self.tokens = {}
         self.signature = None
         self.phases = []
+        self.auxiliary_receivers = []
         self.phase_path = self.output.with_name("window-observations.json")
 
     def bound_request(self, arguments):
         # Restrict syntax before native reads, so invalid requests are never dispatched.
         command_options(arguments)
         binding = self.bindings.read()
+        for receiver in binding.get("auxiliary_receivers", []):
+            if receiver not in self.auxiliary_receivers:
+                self.auxiliary_receivers.append(receiver)
         self.window_ids = [w["window_id"] for w in binding["windows"]]
         if binding["dialog"] is not None:
             self.window_ids.append(binding["dialog"]["window_id"])
@@ -120,7 +124,10 @@ class DialogSession(AgentSession):
             if not token or not any(under(node.get("ref"), r) for r in roots):
                 continue
             decoded = decode_target(token)
-            if (node.get("receiver_pid") != self.pid or decoded.get("ref") != node.get("ref")
+            allowed = {self.pid}
+            if before["dialog"] is not None and under(node.get("ref"), before["dialog"]["root"]["ref"]):
+                allowed.update(r["pid"] for r in before.get("auxiliary_receivers", []))
+            if (node.get("receiver_pid") not in allowed or decoded.get("ref") != node.get("ref")
                     or decoded.get("app", {}).get("pid") != self.pid or decoded.get("kind") != "app_ax"):
                 raise RuntimeError("observed AX token does not bind an owned receiver/root")
             self.tokens[token] = node

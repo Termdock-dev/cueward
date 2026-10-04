@@ -1,6 +1,7 @@
 """Independent native/AX window binding; never chooses or delivers task actions."""
 import json
 from pathlib import Path
+import re
 import subprocess
 
 from native_agent_task import receiver_state
@@ -63,6 +64,49 @@ def compile_binding_observer(output):
     return binary
 
 
+def validate_native_result(observed, request):
+    """Fail closed before tokens: native panel receivers are not app-PID guesses."""
+    pid = request["pid"]
+    roots = []
+    for window in observed["windows"]:
+        root = window.get("root", {})
+        if (root.get("receiver_pid") != pid or root.get("role") != "AXWindow"
+                or not re.fullmatch(r"w[0-9]+", root.get("ref", "")) or root["ref"] in roots):
+            raise RuntimeError("invalid or foreign native document root")
+        roots.append(root["ref"])
+    dialog, auxiliary = observed.get("dialog"), observed.get("auxiliary_receivers", [])
+    if request["dialog"] is None:
+        if dialog is not None or auxiliary:
+            raise RuntimeError("unexpected panel or auxiliary receiver")
+        return
+    if not isinstance(dialog, dict):
+        raise RuntimeError("expected native save panel observation missing")
+    expected = request["dialog"]
+    owner = {"pid": pid, "window_id": expected["owner_window"]["window_id"]}
+    if (dialog.get("kind") != "save" or dialog.get("window_id") != expected["window_id"]
+            or dialog.get("mode") != expected["mode"] or dialog.get("owner_window") != owner):
+        raise RuntimeError("native save panel purpose/identity/owner changed")
+    proof = dialog.get("native_binding", {})
+    if dialog["mode"] == "sheet":
+        receivers = proof.get("receiver_pids", [])
+        root = dialog.get("root", {})
+        target = next(w for w in observed["windows"] if w["file"] == request["target_file"])
+        if (proof.get("source") != "native_ax_window_binding" or proof.get("window_id") != dialog["window_id"]
+                or proof.get("owner_window") != owner or proof.get("owner_window_cf_equal") is not True
+                or not isinstance(receivers, list) or not receivers
+                or not all(type(p) is int and p > 0 for p in receivers) or len(set(receivers)) != len(receivers)
+                or root.get("receiver_pid") not in receivers or root.get("role") != "AXSheet"
+                or dialog.get("parent_root") != target["root"]
+                or not root.get("ref", "").startswith(target["root"]["ref"] + ".")):
+            raise RuntimeError("native sheet attachment or actual receiver binding is invalid")
+        wanted = [{"pid": p, "window_id": dialog["window_id"], "owner_window": owner,
+                   "source": "native_ax_window_binding"} for p in receivers if p != pid]
+        if auxiliary != wanted:
+            raise RuntimeError("auxiliary receiver scope differs from independently bound panel")
+    elif auxiliary:
+        raise RuntimeError("standalone service panel binding is not implemented")
+
+
 class WindowBindings:
     """Keep raw requests/results, and reject a changed identity around each read."""
     def __init__(self, binary, process, artifact, state_path, output, initial):
@@ -106,4 +150,5 @@ class WindowBindings:
         actual = [{k: w.get(k) for k in self.windows[0]} for w in observed["windows"]]
         if actual != self.windows:
             raise RuntimeError("native AX window inventory differs from retained receiver")
+        validate_native_result(observed, request)
         return observed

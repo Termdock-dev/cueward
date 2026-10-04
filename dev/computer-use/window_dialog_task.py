@@ -11,7 +11,7 @@ from window_dialog_observer import WindowBindings, compile_binding_observer, own
 from window_dialog_session import DialogSession
 
 
-def dialog_evidence(session, final, manifest, pid, artifact, windows, phases):
+def dialog_evidence(session, final, manifest, pid, artifact, windows, phases, auxiliary=()):
     result = session_evidence(session, manifest, "window_dialog", pid)
     if owned_inventory(final, pid, artifact) != windows:
         raise ValueError("final document native identities differ from setup")
@@ -39,6 +39,8 @@ def dialog_evidence(session, final, manifest, pid, artifact, windows, phases):
                                                        "fresh_after_sequence")}}
     result["coverage"] = {"documents_preopened_by_setup": True, "native_file_dialog": any(
         p["phase"] == "dialog" for p in phases), "first_save_panel": False}
+    if auxiliary:
+        result["observer"]["auxiliary_receivers"] = list(auxiliary)
     if not io:
         result["failure_category"] = "partial_observation"
     return result
@@ -72,7 +74,7 @@ def run_dialog_task(cli, run, socket, *, write_report, record_failure, cleanup_r
                                fresh=True, expected_window_id=initial["window_id"])
         write_json(output / "receiver-final.json", final)
         evidence = dialog_evidence(load_json(output / "session.json"), final, manifest, process.pid,
-                                   artifact, windows, session.phases)
+                                   artifact, windows, session.phases, session.auxiliary_receivers)
         path = merge_evidence(run, evidence)
         print(json.dumps({"task_id": "window_dialog", "report": str(write_report(run, path))}), flush=True)
     except BaseException as error:

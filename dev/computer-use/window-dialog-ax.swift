@@ -57,9 +57,10 @@ struct DialogAXReader {
         }
     }
 
-    func identity(_ element: AXUIElement, ref: String) throws -> [String: Any] {
+    func identity(_ element: AXUIElement, ref: String, requireFixture: Bool = true) throws -> [String: Any] {
         var receiver: pid_t = 0
-        guard AXUIElementGetPid(element, &receiver) == .success, receiver == pid,
+        guard AXUIElementGetPid(element, &receiver) == .success, receiver > 0,
+              (!requireFixture || receiver == pid), kill(receiver, 0) == 0,
               let role = try dialogAttribute(element, kAXRoleAttribute) as? String else {
             throw DialogAXError("AX receiver or role differs from owned fixture")
         }
@@ -77,14 +78,20 @@ struct DialogAXReader {
         return (try dialogAttribute(element, kAXIdentifierAttribute, optional: true) as? String) == identifier
     }
 
-    func sheet(_ owner: AXUIElement, parent: String, id: CGWindowID, identifier: String) throws -> [String: Any] {
+    func sheet(_ owner: AXUIElement, parent: String, id: CGWindowID, identifier: String) throws -> ([String: Any], [pid_t]) {
         var queue: [(AXUIElement, String, Int)] = [(owner, parent, 0)]
         var found: [[String: Any]] = []
         var candidates: [[String: Any]] = []
+        var receivers: [(String, pid_t, CGWindowID?)] = []
         var index = 0
         while index < queue.count && index < 500 {
             let (element, ref, depth) = queue[index]
             index += 1
+            var observedReceiver: pid_t = 0
+            guard AXUIElementGetPid(element, &observedReceiver) == .success else {
+                throw DialogAXError("descendant receiver identity unavailable")
+            }
+            receivers.append((ref, observedReceiver, nativeID(element)))
             if (try dialogAttribute(element, kAXRoleAttribute) as? String) == "AXSheet" {
                 var receiver: pid_t = 0
                 _ = AXUIElementGetPid(element, &receiver)
@@ -92,8 +99,11 @@ struct DialogAXReader {
                     "window_id": nativeID(element) as Any? ?? NSNull(),
                     "identifier": (try dialogAttribute(element, kAXIdentifierAttribute, optional: true) as? String) as Any? ?? NSNull()])
             }
-            if try matches(element, id: id, identifier: identifier) {
-                let root = try identity(element, ref: ref)
+            // Remote NSSavePanel uses a service-owned AXSheet and exposes "save-panel",
+            // not its host NSWindow's configured UUID. Direct native ID + AXWindow
+            // CFEqual(owner) is the association; never fall back to label or position.
+            if nativeID(element) == id {
+                let root = try identity(element, ref: ref, requireFixture: false)
                 if root["role"] as? String == "AXSheet" {
                     guard let attached = try dialogAttribute(element, kAXWindowAttribute),
                           CFGetTypeID(attached) == AXUIElementGetTypeID(), CFEqual(attached, owner) else {
@@ -116,7 +126,14 @@ struct DialogAXReader {
             }
             throw DialogAXError("save sheet native identity/descendant binding unavailable or ambiguous")
         }
-        return found[0]
+        let root = found[0]
+        let reference = root["ref"] as! String
+        let pids = Set(receivers.filter { ($0.0 == reference || $0.0.hasPrefix(reference + "."))
+            && $0.2 == id && $0.1 > 0 && kill($0.1, 0) == 0 }.map { $0.1 })
+        guard pids.contains(root["receiver_pid"] as! pid_t) else {
+            throw DialogAXError("sheet receiver has no direct native window association")
+        }
+        return (root, pids.sorted())
     }
 
     func observe(_ request: [String: Any]) throws -> [String: Any] {
@@ -152,9 +169,14 @@ struct DialogAXReader {
                   let targetID = windows.first(where: { $0["file"] as? String == request["target_file"] as? String })?["window_id"] as? UInt32,
                   owner["window_id"] as? UInt32 == targetID else { throw DialogAXError("save purpose/owner not bound to target") }
             var observed = dialog
+            let canonicalOwner: [String: Any] = ["pid": pid, "window_id": targetID]
+            observed["owner_window"] = canonicalOwner
             if dialog["mode"] as? String == "sheet" {
-                observed["root"] = try sheet(targetElement, parent: targetRoot["ref"] as! String, id: id, identifier: identifier)
+                let (root, receivers) = try sheet(targetElement, parent: targetRoot["ref"] as! String, id: id, identifier: identifier)
+                observed["root"] = root
                 observed["parent_root"] = targetRoot
+                observed["native_binding"] = ["source": "native_ax_window_binding", "window_id": id,
+                    "owner_window": canonicalOwner, "owner_window_cf_equal": true, "receiver_pids": receivers]
             } else if dialog["mode"] as? String == "window" {
                 var found: [[String: Any]] = []
                 for (index, element) in roots.enumerated() {
@@ -171,7 +193,15 @@ struct DialogAXReader {
         guard roots.count == finalRoots.count, zip(roots, finalRoots).allSatisfy({ CFEqual($0.0, $0.1) }) else {
             throw DialogAXError("AX roots changed during native binding observation")
         }
-        return ["pid": pid, "windows": windows, "dialog": dialogValue,
+        var auxiliary: [[String: Any]] = []
+        if let dialog = dialogValue as? [String: Any], let binding = dialog["native_binding"] as? [String: Any],
+           let receivers = binding["receiver_pids"] as? [Int32] {
+            for receiver in receivers where receiver != pid {
+                auxiliary.append(["pid": receiver, "window_id": dialog["window_id"]!,
+                    "owner_window": dialog["owner_window"]!, "source": "native_ax_window_binding"])
+            }
+        }
+        return ["pid": pid, "windows": windows, "dialog": dialogValue, "auxiliary_receivers": auxiliary,
                 "lookup_api": "_AXUIElementGetWindow", "uptime": ProcessInfo.processInfo.systemUptime]
     }
 }
