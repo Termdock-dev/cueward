@@ -9,7 +9,7 @@ import stat
 
 from .setup import CONTENT, EDITED, TASKS
 from .trace import check_trace, number
-from .window_dialog import check_window_dialog
+from .window_dialog import check_auxiliary_receiver_trace, check_window_dialog
 
 MAX_BYTES = 1024 * 1024
 MAX_JSON_BYTES = 64 * 1024 * 1024
@@ -114,6 +114,9 @@ def effect_checks(root, task_id, evidence):
     if task_id == "window_dialog":
         status, reason = check_window_dialog(root, evidence, observer)
         checks = [check("fresh_window_observations", status, reason), *final_receiver_checks(observer)]
+        if "auxiliary_receivers" in observer:
+            status, reason = check_auxiliary_receiver_trace(root, evidence, observer)
+            checks.append(check("auxiliary_receiver_trace", status, reason))
         if "native_io_complete" in observer:
             checks.append(check("native_document_io", "passed" if observer["native_io_complete"] is True else "failed",
                                 "independently observed normal target save/write and untouched bystander"))
@@ -208,7 +211,13 @@ def evaluate_task(root, manifest, task_id, evidence, kind):
     try:
         checks = guarded_checks("artifact", file_checks, root, manifest, task_id)
         checks.extend(guarded_checks("receiver", effect_checks, root, task_id, evidence))
-        status, reason, metrics = check_trace(evidence, task_id == "new_document")
+        trace_evidence = evidence
+        if task_id == "window_dialog" and any(c["name"] == "auxiliary_receiver_trace"
+                and c["status"] == "passed" for c in checks) and evidence["observer"].get("auxiliary_receivers"):
+            # This temporary observation scope never changes owned receiver PIDs
+            # or drops any foreground/pointer/Space/activation records.
+            trace_evidence = evidence | {"receiver_pids": evidence["execution"]["observer"]["receiver_pids"]}
+        status, reason, metrics = check_trace(trace_evidence, task_id == "new_document")
         checks.append(check("interference_trace", status, reason))
         result["metrics"] = metrics
         if kind != "agent":
