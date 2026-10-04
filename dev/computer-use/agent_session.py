@@ -42,7 +42,8 @@ def validate_command(arguments, pid, window_id):
         if target.get("kind") != "app_ax" or not isinstance(app, dict) or app.get("pid") != pid:
             raise ScopeError("app target outside owned scope")
     elif family == "window" and action in ("snapshot", "inspect"):
-        if option(arguments, "--id") != str(window_id) or "--output" in arguments:
+        output = any(a == "--output" or a.startswith("--output=") for a in arguments[2:])
+        if option(arguments, "--id") != str(window_id) or output:
             raise ScopeError("window/output outside owned scope")
     elif family == "window" and action in ("click", "drag"):
         target = decode_target(option(arguments, "--target"))
