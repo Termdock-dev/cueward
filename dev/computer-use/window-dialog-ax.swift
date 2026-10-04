@@ -78,6 +78,36 @@ struct DialogAXReader {
         return (try dialogAttribute(element, kAXIdentifierAttribute, optional: true) as? String) == identifier
     }
 
+    func sheetNode(_ element: AXUIElement, ref: String, owner: AXUIElement, id: CGWindowID)
+        throws -> (DialogReceiverObservation, [String: Any]?, [String: Any]?) {
+        var receiver: pid_t = 0
+        guard AXUIElementGetPid(element, &receiver) == .success else {
+            throw DialogAXError("descendant receiver identity unavailable")
+        }
+        let observation = DialogReceiverObservation(ref: ref, pid: receiver, nativeWindowID: nativeID(element))
+        var candidate: [String: Any]?
+        if (try dialogAttribute(element, kAXRoleAttribute) as? String) == "AXSheet" {
+            var candidateReceiver: pid_t = 0
+            _ = AXUIElementGetPid(element, &candidateReceiver)
+            candidate = ["ref": ref, "receiver_pid": candidateReceiver,
+                "window_id": nativeID(element) as Any? ?? NSNull(),
+                "identifier": (try dialogAttribute(element, kAXIdentifierAttribute, optional: true) as? String) as Any? ?? NSNull()]
+        }
+        // Remote sheets expose "save-panel", not the configured UUID. Bind the
+        // direct native ID and AXWindow owner equality, never a label or index.
+        if nativeID(element) == id {
+            let root = try identity(element, ref: ref, requireFixture: false)
+            if root["role"] as? String == "AXSheet" {
+                guard let attached = try dialogAttribute(element, kAXWindowAttribute),
+                      CFGetTypeID(attached) == AXUIElementGetTypeID(), CFEqual(attached, owner) else {
+                    throw DialogAXError("save sheet is not independently attached to owner")
+                }
+                return (observation, candidate, root)
+            }
+        }
+        return (observation, candidate, nil)
+    }
+
     func sheet(_ owner: AXUIElement, parent: String, id: CGWindowID, identifier: String) throws -> ([String: Any], [pid_t]) {
         var queue: [(AXUIElement, String, Int)] = [(owner, parent, 0)]
         var found: [[String: Any]] = []
@@ -87,32 +117,10 @@ struct DialogAXReader {
         while index < queue.count && index < 500 {
             let (element, ref, depth) = queue[index]
             index += 1
-            var observedReceiver: pid_t = 0
-            guard AXUIElementGetPid(element, &observedReceiver) == .success else {
-                throw DialogAXError("descendant receiver identity unavailable")
-            }
-            receivers.append(DialogReceiverObservation(ref: ref, pid: observedReceiver,
-                                                       nativeWindowID: nativeID(element)))
-            if (try dialogAttribute(element, kAXRoleAttribute) as? String) == "AXSheet" {
-                var receiver: pid_t = 0
-                _ = AXUIElementGetPid(element, &receiver)
-                candidates.append(["ref": ref, "receiver_pid": receiver,
-                    "window_id": nativeID(element) as Any? ?? NSNull(),
-                    "identifier": (try dialogAttribute(element, kAXIdentifierAttribute, optional: true) as? String) as Any? ?? NSNull()])
-            }
-            // Remote NSSavePanel uses a service-owned AXSheet and exposes "save-panel",
-            // not its host NSWindow's configured UUID. Direct native ID + AXWindow
-            // CFEqual(owner) is the association; never fall back to label or position.
-            if nativeID(element) == id {
-                let root = try identity(element, ref: ref, requireFixture: false)
-                if root["role"] as? String == "AXSheet" {
-                    guard let attached = try dialogAttribute(element, kAXWindowAttribute),
-                          CFGetTypeID(attached) == AXUIElementGetTypeID(), CFEqual(attached, owner) else {
-                        throw DialogAXError("save sheet is not independently attached to owner")
-                    }
-                    found.append(root)
-                }
-            }
+            let (receiver, candidate, matched) = try sheetNode(element, ref: ref, owner: owner, id: id)
+            receivers.append(receiver)
+            if let candidate { candidates.append(candidate) }
+            if let matched { found.append(matched) }
             if depth < 12 {
                 for (childIndex, child) in try dialogElements(element, kAXChildrenAttribute, optional: true).enumerated() {
                     queue.append((child, "\(ref).\(childIndex)", depth + 1))
@@ -137,11 +145,11 @@ struct DialogAXReader {
         return (root, pids.sorted())
     }
 
-    func observe(_ request: [String: Any]) throws -> [String: Any] {
+    func ownedWindows(_ request: [String: Any], roots: [AXUIElement])
+        throws -> ([[String: Any]], AXUIElement, [String: Any]) {
         guard let inventory = request["windows"] as? [[String: Any]], inventory.count == 2 else {
             throw DialogAXError("two owned native windows required")
         }
-        let roots = try dialogRoots(application)
         var windows: [[String: Any]] = []
         var targetElement: AXUIElement?
         var targetRoot: [String: Any]?
@@ -162,33 +170,45 @@ struct DialogAXReader {
             if file == request["target_file"] as? String { targetElement = element; targetRoot = root }
         }
         guard let targetElement, let targetRoot else { throw DialogAXError("owned target document missing") }
+        return (windows, targetElement, targetRoot)
+    }
+
+    func savePanel(_ dialog: [String: Any], request: [String: Any], windows: [[String: Any]],
+                   targetElement: AXUIElement, targetRoot: [String: Any], roots: [AXUIElement]) throws -> [String: Any] {
+        guard dialog["kind"] as? String == "save", let id = dialog["window_id"] as? UInt32, id > 0,
+              let identifier = dialog["ax_identifier"] as? String, !identifier.isEmpty,
+              let owner = dialog["owner_window"] as? [String: Any], owner["pid"] as? Int32 == pid,
+              let targetID = windows.first(where: { $0["file"] as? String == request["target_file"] as? String })?["window_id"] as? UInt32,
+              owner["window_id"] as? UInt32 == targetID else { throw DialogAXError("save purpose/owner not bound to target") }
+        var observed = dialog
+        let canonicalOwner: [String: Any] = ["pid": pid, "window_id": targetID]
+        observed["owner_window"] = canonicalOwner
+        if dialog["mode"] as? String == "sheet" {
+            let (root, receivers) = try sheet(targetElement, parent: targetRoot["ref"] as! String, id: id, identifier: identifier)
+            observed["root"] = root
+            observed["parent_root"] = targetRoot
+            observed["native_binding"] = ["source": "native_ax_window_binding", "window_id": id,
+                "owner_window": canonicalOwner, "owner_window_cf_equal": true, "receiver_pids": receivers]
+        } else if dialog["mode"] as? String == "window" {
+            var found: [[String: Any]] = []
+            for (index, element) in roots.enumerated() {
+                if try matches(element, id: id, identifier: identifier) { found.append(try identity(element, ref: "w\(index)")) }
+            }
+            guard found.count == 1, ["AXWindow", "AXDialog"].contains(found[0]["role"] as? String ?? "") else {
+                throw DialogAXError("standalone save panel native root unavailable or ambiguous")
+            }
+            observed["root"] = found[0]
+        } else { throw DialogAXError("unknown native save dialog mode") }
+        return observed
+    }
+
+    func observe(_ request: [String: Any]) throws -> [String: Any] {
+        let roots = try dialogRoots(application)
+        let (windows, targetElement, targetRoot) = try ownedWindows(request, roots: roots)
         var dialogValue: Any = NSNull()
         if let dialog = request["dialog"] as? [String: Any] {
-            guard dialog["kind"] as? String == "save", let id = dialog["window_id"] as? UInt32, id > 0,
-                  let identifier = dialog["ax_identifier"] as? String, !identifier.isEmpty,
-                  let owner = dialog["owner_window"] as? [String: Any], owner["pid"] as? Int32 == pid,
-                  let targetID = windows.first(where: { $0["file"] as? String == request["target_file"] as? String })?["window_id"] as? UInt32,
-                  owner["window_id"] as? UInt32 == targetID else { throw DialogAXError("save purpose/owner not bound to target") }
-            var observed = dialog
-            let canonicalOwner: [String: Any] = ["pid": pid, "window_id": targetID]
-            observed["owner_window"] = canonicalOwner
-            if dialog["mode"] as? String == "sheet" {
-                let (root, receivers) = try sheet(targetElement, parent: targetRoot["ref"] as! String, id: id, identifier: identifier)
-                observed["root"] = root
-                observed["parent_root"] = targetRoot
-                observed["native_binding"] = ["source": "native_ax_window_binding", "window_id": id,
-                    "owner_window": canonicalOwner, "owner_window_cf_equal": true, "receiver_pids": receivers]
-            } else if dialog["mode"] as? String == "window" {
-                var found: [[String: Any]] = []
-                for (index, element) in roots.enumerated() {
-                    if try matches(element, id: id, identifier: identifier) { found.append(try identity(element, ref: "w\(index)")) }
-                }
-                guard found.count == 1, ["AXWindow", "AXDialog"].contains(found[0]["role"] as? String ?? "") else {
-                    throw DialogAXError("standalone save panel native root unavailable or ambiguous")
-                }
-                observed["root"] = found[0]
-            } else { throw DialogAXError("unknown native save dialog mode") }
-            dialogValue = observed
+            dialogValue = try savePanel(dialog, request: request, windows: windows,
+                                       targetElement: targetElement, targetRoot: targetRoot, roots: roots)
         }
         let finalRoots = try dialogRoots(application)
         guard roots.count == finalRoots.count, zip(roots, finalRoots).allSatisfy({ CFEqual($0.0, $0.1) }) else {
