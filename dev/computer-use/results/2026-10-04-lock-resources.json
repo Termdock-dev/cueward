@@ -1,0 +1,474 @@
+{
+  "kind": "operator_diagnostic",
+  "date": "2026-10-04",
+  "macos": "27.0.1",
+  "build": "26A434",
+  "architecture": "arm64",
+  "product_code_changed": false,
+  "actual_lock_cycle_performed": false,
+  "raw_pixels_saved": false,
+  "runs": [
+    {
+      "case": "initial-startup-failure",
+      "mode": "baseline",
+      "report": {
+        "schema_version": 1,
+        "mode": "baseline",
+        "phases": {
+          "before_lock": {
+            "status": "unverified",
+            "sample_count": 0,
+            "receiver_status": "unverified",
+            "recording_status": "unverified",
+            "routes": {
+              "retained_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "retained_stream": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_screenshot": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              }
+            }
+          },
+          "locked": {
+            "status": "unverified",
+            "sample_count": 0,
+            "receiver_status": "unverified",
+            "recording_status": "unverified",
+            "routes": {
+              "retained_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "retained_stream": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_screenshot": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              }
+            }
+          },
+          "after_unlock": {
+            "status": "unverified",
+            "sample_count": 0,
+            "receiver_status": "unverified",
+            "recording_status": "unverified",
+            "routes": {
+              "retained_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "retained_stream": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_screenshot": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              }
+            }
+          }
+        },
+        "baseline_status": "unverified",
+        "lock_status": "unverified",
+        "phase_order_status": "unverified",
+        "recording_status": "unverified",
+        "error_count": 1,
+        "cleanup_status": "failed",
+        "cleanup_error_count": 1,
+        "product_operation_support": "unverified",
+        "actions": {
+          "attempts": 0,
+          "verified_effects": 0,
+          "scope": "optional single retained/new AXPress trials; no CG keyboard/pointer targets"
+        }
+      }
+    },
+    {
+      "case": "unlocked-baseline",
+      "mode": "baseline",
+      "report": {
+        "schema_version": 1,
+        "mode": "baseline",
+        "phases": {
+          "before_lock": {
+            "status": "fresh",
+            "sample_count": 14,
+            "receiver_status": "fresh",
+            "recording_status": "complete",
+            "routes": {
+              "retained_ax": {
+                "status": "fresh",
+                "sample_count": 14,
+                "observed_count": 14,
+                "matching_count": 14,
+                "distinct_sequence_count": 14,
+                "outcome_counts": {
+                  "matching": 14
+                }
+              },
+              "new_ax": {
+                "status": "fresh",
+                "sample_count": 14,
+                "observed_count": 14,
+                "matching_count": 14,
+                "distinct_sequence_count": 14,
+                "outcome_counts": {
+                  "matching": 14
+                }
+              },
+              "retained_stream": {
+                "status": "fresh",
+                "sample_count": 14,
+                "observed_count": 14,
+                "matching_count": 14,
+                "distinct_sequence_count": 14,
+                "outcome_counts": {
+                  "matching": 14
+                }
+              },
+              "new_screenshot": {
+                "status": "fresh",
+                "sample_count": 14,
+                "observed_count": 14,
+                "matching_count": 14,
+                "distinct_sequence_count": 14,
+                "outcome_counts": {
+                  "matching": 14
+                }
+              }
+            }
+          },
+          "locked": {
+            "status": "unverified",
+            "sample_count": 0,
+            "receiver_status": "unverified",
+            "recording_status": "unverified",
+            "routes": {
+              "retained_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "retained_stream": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_screenshot": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              }
+            }
+          },
+          "after_unlock": {
+            "status": "unverified",
+            "sample_count": 0,
+            "receiver_status": "unverified",
+            "recording_status": "unverified",
+            "routes": {
+              "retained_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "retained_stream": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_screenshot": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              }
+            }
+          }
+        },
+        "baseline_status": "passed",
+        "lock_status": "unverified",
+        "phase_order_status": "unverified",
+        "recording_status": "complete",
+        "error_count": 0,
+        "cleanup_status": "passed",
+        "cleanup_error_count": 0,
+        "product_operation_support": "unverified",
+        "actions": {
+          "attempts": 2,
+          "verified_effects": 2,
+          "scope": "optional single retained/new AXPress trials; no CG keyboard/pointer targets"
+        }
+      }
+    },
+    {
+      "case": "unlocked-final-checkpoints",
+      "mode": "baseline",
+      "report": {
+        "schema_version": 1,
+        "mode": "baseline",
+        "phases": {
+          "before_lock": {
+            "status": "fresh",
+            "sample_count": 14,
+            "receiver_status": "fresh",
+            "recording_status": "complete",
+            "routes": {
+              "retained_ax": {
+                "status": "fresh",
+                "sample_count": 14,
+                "observed_count": 14,
+                "matching_count": 14,
+                "distinct_sequence_count": 14,
+                "outcome_counts": {
+                  "matching": 14
+                }
+              },
+              "new_ax": {
+                "status": "fresh",
+                "sample_count": 14,
+                "observed_count": 14,
+                "matching_count": 14,
+                "distinct_sequence_count": 14,
+                "outcome_counts": {
+                  "matching": 14
+                }
+              },
+              "retained_stream": {
+                "status": "fresh",
+                "sample_count": 14,
+                "observed_count": 14,
+                "matching_count": 14,
+                "distinct_sequence_count": 14,
+                "outcome_counts": {
+                  "matching": 14
+                }
+              },
+              "new_screenshot": {
+                "status": "fresh",
+                "sample_count": 14,
+                "observed_count": 14,
+                "matching_count": 14,
+                "distinct_sequence_count": 14,
+                "outcome_counts": {
+                  "matching": 14
+                }
+              }
+            }
+          },
+          "locked": {
+            "status": "unverified",
+            "sample_count": 0,
+            "receiver_status": "unverified",
+            "recording_status": "unverified",
+            "routes": {
+              "retained_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "retained_stream": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_screenshot": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              }
+            }
+          },
+          "after_unlock": {
+            "status": "unverified",
+            "sample_count": 0,
+            "receiver_status": "unverified",
+            "recording_status": "unverified",
+            "routes": {
+              "retained_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_ax": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "retained_stream": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              },
+              "new_screenshot": {
+                "status": "unverified",
+                "sample_count": 0,
+                "observed_count": 0,
+                "matching_count": 0,
+                "distinct_sequence_count": 0,
+                "outcome_counts": {}
+              }
+            }
+          }
+        },
+        "baseline_status": "passed",
+        "lock_status": "unverified",
+        "phase_order_status": "unverified",
+        "recording_status": "complete",
+        "error_count": 0,
+        "cleanup_status": "passed",
+        "cleanup_error_count": 0,
+        "product_operation_support": "unverified",
+        "actions": {
+          "requests": 2,
+          "attempts": 2,
+          "unconfirmed_requests": 0,
+          "guard_rejected": 0,
+          "verified_effects": 2,
+          "scope": "optional AXPress with fresh-window validation; no CG keyboard/pointer targets"
+        }
+      }
+    }
+  ],
+  "validation": {
+    "swift": "Swift 6 warnings-as-errors; actual fixture/helper compilation",
+    "pure_pattern_cases": 12,
+    "offline_python_tests": 185
+  },
+  "limitations": [
+    "Only owned synthetic single-window observations and AXPress effects are covered.",
+    "No locked or after-unlock observation was made; absent phases remain unverified.",
+    "New AX client handles do not prove a separate underlying server-side connection.",
+    "Retained/new input targets use fresh window prevalidation; a guard rejection is not target failure.",
+    "No CG keyboard/pointer target, newly created locked stream, real-app or full physical-isolation coverage.",
+    "SDK callback timeout ends waiting, not the underlying API operation; retained process cleanup remains required.",
+    "The initial aborted attempt and nonzero helper exit remain recorded, not replaced by passing baselines."
+  ]
+}
