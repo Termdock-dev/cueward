@@ -12,7 +12,7 @@ struct LockCaptureSample: Sendable {
 
     var record: [String: Any] {
         ["status": status, "sequence": sequence.map { $0 as Any } ?? NSNull(),
-         "frame_count": frameCount, "uptime": uptime,
+         "frameCount": frameCount, "uptime": uptime,
          "error": error.map { $0 as Any } ?? NSNull()]
     }
 }

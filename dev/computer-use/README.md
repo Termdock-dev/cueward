@@ -8,6 +8,8 @@ The [interactive agent transport](agent-session.md) records commands chosen by a
 
 The [native task runner](native-agent-tasks.md) adds fresh document-edit and calculation execution. It exposed optional `AXIdentifier` capability loss, now fixed and covered by regression tests. Both post-fix files match their independent checks, but interference failures prevent full task passes.
 
+The [retained-resource lock probe](lock-resources.md) prepares #34 with an owned changing-state receiver, retained AX/stream resources and fresh-handle/screenshot contrasts. Its unlocked baseline is verified; no lock/unlock result or product lock support is claimed.
+
 The [physical-input overlap diagnostic](physical-overlap.md) records the actual #31 human round and separate idle/first-mouse contrasts. #31 remains incomplete; idle effects do not replace physical overlap.
 
 The [WebView context investigation](webview-context.md) separates native first-mouse refusal, DOM button state and delayed observation. Patched receiver controls are not product compatibility.
