@@ -95,6 +95,10 @@ fn app_roots_reject_failed_reads_ambiguous_identity_and_locked_sessions() {
         ("failed-read", "app AX read failed"),
         ("failed-value", "app AX node read failed"),
         ("failed-role", "app AX node read failed for AXRole"),
+        (
+            "failed-identifier",
+            "app AX node read failed for AXIdentifier",
+        ),
         ("changed", "app context changed"),
         ("locked", "desktop is locked"),
     ] {
@@ -129,6 +133,27 @@ fn optional_description_failure_preserves_verified_text_targets() {
 }
 
 #[test]
+fn optional_identifier_failure_preserves_verified_text_targets() {
+    for (scenario, missing) in [
+        ("unavailable-identifier", vec!["AXIdentifier"]),
+        (
+            "unavailable-description-identifier",
+            vec!["AXDescription", "AXIdentifier"],
+        ),
+    ] {
+        let raw = inspect_fixture(scenario, Some("w0")).unwrap();
+        let mut snapshot: AppAccessibilitySnapshot = serde_json::from_value(raw).unwrap();
+        issue_targets(&mut snapshot, now().unwrap()).unwrap();
+        let child = &snapshot.nodes[1];
+        assert_eq!(child.unavailable_attributes, missing);
+        assert!(child.node.identifier.is_none());
+        assert_eq!(child.node.value.as_deref(), Some("Fixture text"));
+        assert!(child.node.settable_value, "{scenario}");
+        assert!(child.node.target.is_some(), "{scenario}");
+    }
+}
+
+#[test]
 fn app_nodes_reject_unknown_security_classification_before_reading_values() {
     for (scenario, message) in [
         ("missing-role", "AX node has no readable role"),
@@ -143,12 +168,14 @@ fn app_nodes_reject_unknown_security_classification_before_reading_values() {
 
 #[test]
 fn app_nodes_never_read_secure_values_or_issue_secure_targets() {
-    let raw = inspect_fixture("secure-subrole", Some("w0")).unwrap();
-    let mut snapshot: AppAccessibilitySnapshot = serde_json::from_value(raw).unwrap();
-    issue_targets(&mut snapshot, now().unwrap()).unwrap();
-    let child = &snapshot.nodes[1];
-    assert!(child.node.value.is_none());
-    assert!(!child.node.settable_value);
-    assert!(child.node.actions.is_empty());
-    assert!(child.node.target.is_none());
+    for scenario in ["secure-subrole", "secure-subrole-unavailable-identifier"] {
+        let raw = inspect_fixture(scenario, Some("w0")).unwrap();
+        let mut snapshot: AppAccessibilitySnapshot = serde_json::from_value(raw).unwrap();
+        issue_targets(&mut snapshot, now().unwrap()).unwrap();
+        let child = &snapshot.nodes[1];
+        assert!(child.node.value.is_none());
+        assert!(!child.node.settable_value);
+        assert!(child.node.actions.is_empty());
+        assert!(child.node.target.is_none());
+    }
 }

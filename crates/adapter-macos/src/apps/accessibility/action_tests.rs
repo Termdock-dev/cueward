@@ -6,6 +6,36 @@ use support::Fixture;
 const FIELD: &str = "w0.0.0";
 
 #[test]
+fn app_dispatch_accepts_optional_identifier_failure_and_rechecks_availability() {
+    let fixture = Fixture::build();
+    for scenario in [
+        "unavailable-identifier",
+        "unavailable-description-identifier",
+    ] {
+        let target = fixture.observe(scenario, FIELD);
+        assert_eq!(
+            fixture.accept(scenario, &target, "press").status,
+            ActionStatus::SentUnverified
+        );
+        assert_eq!(
+            fixture.accept(scenario, &target, "set_value").status,
+            ActionStatus::Confirmed
+        );
+        for action in ["press", "set_value"] {
+            fixture.reject("valid", &target, action, "app element changed");
+            let valid = fixture.observe("valid", FIELD);
+            fixture.reject(scenario, &valid, action, "app element changed");
+            fixture.reject(
+                "post-lock-identifier",
+                &valid,
+                action,
+                "app element changed before dispatch",
+            );
+        }
+    }
+}
+
+#[test]
 fn app_dispatch_accepts_optional_description_failure_and_rechecks_availability() {
     let fixture = Fixture::build();
     let target = fixture.observe("unavailable-description", FIELD);
