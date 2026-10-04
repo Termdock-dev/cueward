@@ -1,0 +1,308 @@
+{
+  "schema": 1,
+  "date_taipei": "2026-10-04",
+  "kind": "scripted_ordinary_webview_ax_diagnostic_not_fresh_agent_acceptance",
+  "platform": {
+    "macos": "27.0.1",
+    "build": "26A434",
+    "architecture": "arm64",
+    "webkit_bundle_version": "22625.1.29.11.28",
+    "online_display_count": 3
+  },
+  "product_routing_changed": false,
+  "receiver_behavior_modified": false,
+  "accessibility_setter_count": 0,
+  "readonly_contrasts": [
+    {
+      "context": "inactive",
+      "status": "recorded",
+      "input_dispatch_count": 0,
+      "observations": [
+        {
+          "planned_pause_ms": 0,
+          "tree": {
+            "node_count": 7,
+            "truncated": false,
+            "named_page_button_count": 0
+          }
+        },
+        {
+          "planned_pause_ms": 250,
+          "tree": {
+            "node_count": 12,
+            "truncated": false,
+            "named_page_button_count": 1
+          }
+        },
+        {
+          "planned_pause_ms": 1000,
+          "tree": {
+            "node_count": 12,
+            "truncated": false,
+            "named_page_button_count": 1
+          }
+        },
+        {
+          "planned_pause_ms": 2000,
+          "tree": {
+            "node_count": 12,
+            "truncated": false,
+            "named_page_button_count": 1
+          }
+        }
+      ],
+      "desktop": {
+        "stationary_check": "failed",
+        "pointer_attribution": "unattributed",
+        "sample_count": 356,
+        "execution_ms": 6754.577,
+        "max_sample_gap_ms": 41.577,
+        "pointer_changed_steps": 211,
+        "foreground_stable": true,
+        "visible_spaces_stable": true,
+        "owned_receiver_inactive": true,
+        "owned_activation_event_count": 0
+      },
+      "owned_processes_stopped": true
+    },
+    {
+      "context": "visible",
+      "status": "recorded",
+      "input_dispatch_count": 0,
+      "observations": [
+        {
+          "planned_pause_ms": 0,
+          "tree": {
+            "node_count": 7,
+            "truncated": false,
+            "named_page_button_count": 0
+          }
+        },
+        {
+          "planned_pause_ms": 250,
+          "tree": {
+            "node_count": 12,
+            "truncated": false,
+            "named_page_button_count": 1
+          }
+        },
+        {
+          "planned_pause_ms": 1000,
+          "tree": {
+            "node_count": 12,
+            "truncated": false,
+            "named_page_button_count": 1
+          }
+        },
+        {
+          "planned_pause_ms": 2000,
+          "tree": {
+            "node_count": 12,
+            "truncated": false,
+            "named_page_button_count": 1
+          }
+        }
+      ],
+      "desktop": {
+        "stationary_check": "failed",
+        "pointer_attribution": "unattributed",
+        "sample_count": 362,
+        "execution_ms": 6889.259,
+        "max_sample_gap_ms": 40.834,
+        "pointer_changed_steps": 196,
+        "foreground_stable": true,
+        "visible_spaces_stable": true,
+        "owned_receiver_inactive": true,
+        "owned_activation_event_count": 0
+      },
+      "owned_processes_stopped": true
+    }
+  ],
+  "axpress_contrasts": [
+    {
+      "context": "inactive",
+      "status": "recorded",
+      "cold_inspection": {
+        "node_count": 7,
+        "truncated": false,
+        "named_page_button_count": 0
+      },
+      "wait": {
+        "status": "matched",
+        "polls": 1,
+        "elapsed_ms": 47,
+        "match_count": 1,
+        "complete": true
+      },
+      "actions": [
+        {
+          "name": "first_ax_press",
+          "inspection": {
+            "node_count": 12,
+            "truncated": false,
+            "named_page_button_count": 1
+          },
+          "receipt_status": "sent_unverified",
+          "effect": {
+            "status": "passed",
+            "click_increment": 1,
+            "dom_click_count": 1,
+            "dom_event_count": 3,
+            "trusted_click": true,
+            "native_mouse_event_increment": 0,
+            "identity_unchanged": true,
+            "event_prefix_intact": true
+          },
+          "settling": {
+            "status": "new_click_observed",
+            "wait_ms": 810.408,
+            "budget_ms": 3000
+          },
+          "dom_button_masks": [
+            0
+          ],
+          "native_window_key": false,
+          "native_window_main": false
+        },
+        {
+          "name": "subsequent_ax_press",
+          "inspection": {
+            "node_count": 12,
+            "truncated": false,
+            "named_page_button_count": 1
+          },
+          "receipt_status": "sent_unverified",
+          "effect": {
+            "status": "passed",
+            "click_increment": 1,
+            "dom_click_count": 1,
+            "dom_event_count": 3,
+            "trusted_click": true,
+            "native_mouse_event_increment": 0,
+            "identity_unchanged": true,
+            "event_prefix_intact": true
+          },
+          "settling": {
+            "status": "new_click_observed",
+            "wait_ms": 108.988,
+            "budget_ms": 3000
+          },
+          "dom_button_masks": [
+            0
+          ],
+          "native_window_key": false,
+          "native_window_main": false
+        }
+      ],
+      "desktop": {
+        "stationary_check": "failed",
+        "pointer_attribution": "unattributed",
+        "sample_count": 362,
+        "execution_ms": 6733.467,
+        "max_sample_gap_ms": 42.158,
+        "pointer_changed_steps": 160,
+        "foreground_stable": true,
+        "visible_spaces_stable": true,
+        "owned_receiver_inactive": true,
+        "owned_activation_event_count": 0
+      },
+      "owned_processes_stopped": true
+    },
+    {
+      "context": "visible",
+      "status": "recorded",
+      "cold_inspection": {
+        "node_count": 7,
+        "truncated": false,
+        "named_page_button_count": 0
+      },
+      "wait": {
+        "status": "matched",
+        "polls": 1,
+        "elapsed_ms": 45,
+        "match_count": 1,
+        "complete": true
+      },
+      "actions": [
+        {
+          "name": "first_ax_press",
+          "inspection": {
+            "node_count": 12,
+            "truncated": false,
+            "named_page_button_count": 1
+          },
+          "receipt_status": "sent_unverified",
+          "effect": {
+            "status": "passed",
+            "click_increment": 1,
+            "dom_click_count": 1,
+            "dom_event_count": 3,
+            "trusted_click": true,
+            "native_mouse_event_increment": 0,
+            "identity_unchanged": true,
+            "event_prefix_intact": true
+          },
+          "settling": {
+            "status": "new_click_observed",
+            "wait_ms": 0.107,
+            "budget_ms": 3000
+          },
+          "dom_button_masks": [
+            0
+          ],
+          "native_window_key": false,
+          "native_window_main": false
+        },
+        {
+          "name": "subsequent_ax_press",
+          "inspection": {
+            "node_count": 12,
+            "truncated": false,
+            "named_page_button_count": 1
+          },
+          "receipt_status": "sent_unverified",
+          "effect": {
+            "status": "passed",
+            "click_increment": 1,
+            "dom_click_count": 1,
+            "dom_event_count": 3,
+            "trusted_click": true,
+            "native_mouse_event_increment": 0,
+            "identity_unchanged": true,
+            "event_prefix_intact": true
+          },
+          "settling": {
+            "status": "new_click_observed",
+            "wait_ms": 0.114,
+            "budget_ms": 3000
+          },
+          "dom_button_masks": [
+            0
+          ],
+          "native_window_key": false,
+          "native_window_main": false
+        }
+      ],
+      "desktop": {
+        "stationary_check": "failed",
+        "pointer_attribution": "unattributed",
+        "sample_count": 306,
+        "execution_ms": 5601.597,
+        "max_sample_gap_ms": 43.024,
+        "pointer_changed_steps": 53,
+        "foreground_stable": true,
+        "visible_spaces_stable": true,
+        "owned_receiver_inactive": true,
+        "owned_activation_event_count": 0
+      },
+      "owned_processes_stopped": true
+    }
+  ],
+  "limits": [
+    "All four stationary desktop checks failed because observed pointer movement remains unattributed.",
+    "Exactly-once AX button effects do not establish raw-pointer first-mouse acceptance or canvas held-button state.",
+    "Foreground/visible-Space sampling and activation notifications are not a continuous all-app isolation guarantee.",
+    "No new fresh-agent run, physical-overlap pass, accepted interrupted drag or real-app coverage is claimed.",
+    "Planned pauses are not measured AX initialization latency; the action waits matched on the first poll after other observation work."
+  ]
+}

@@ -1,6 +1,6 @@
 # Background pointer repair work in progress
 
-No generic sender-side correction has been established for #32. The draft repair PR preserves the failing ordinary-receiver baseline, distinguishing actual effects from dispatch receipts. Production routing, target binding and interruption guards remain unchanged. #31, #32, #33 and #36 are not closed by these diagnostic tools.
+No generic raw-pointer sender correction has been established for #32. The diagnostic work merged in PR #68 preserves the failing ordinary-receiver baseline, distinguishing actual effects from dispatch receipts. Production routing, target binding and interruption guards remain unchanged. #31, #32, #33 and #36 are not closed by these diagnostic tools.
 
 ## Reproduce the acceptance gap
 
@@ -30,10 +30,12 @@ A sender-only field inspection suggested a stale timestamp hypothesis. The indep
 
 A read-only AX contrast found application `AXFocusedWindow`/`AXMainWindow` and window `AXFocused` not settable. Window `AXMain` was already true and settable while native `isKeyWindow` remained false. No setter was called. There is no proven writable AX focus route for this instance; AX main state is not interchangeable with native key state. This is not a claim about all applications.
 
+A later [ordinary AX button contrast](webview-ax.md) found that the page button appeared on a later read without any setter. Existing AXPress then produced exactly one effect per planned press on visible and inactive Spaces. Those runs retained unattributed pointer movement and did not pass full isolation; canvas dragging remains unresolved. The earlier one-read AX contrast is not evidence of permanent page-control absence.
+
 ## Required before a functional fix is ready
 
 1. Establish a sender route that produces exactly one click and the expected drag displacement on an unmodified receiver, without activation, a visible-Space switch, Command spoofing, physical button-state changes or receiver hooks. Isolate native first-mouse policy from DOM held-button state rather than assuming one change fixes both.
 2. Keep a failing behavior regression in a test-only commit, then the demonstrated product correction in a separate commit. Verify the same receiver effect after the correction, including interruption and accepted release, plus existing native pointer and keyboard regressions. A patched diagnostic control cannot satisfy this gate.
 3. Repeat physical overlap on the corrected native route, then verify applicable WebView cases. Retain the full task denominator and independently check effects; no lost or unrun case becomes a pass. First-save panel creation and retained lock/unlock resources remain separate follow-up work.
 
-No activation/global-input fallback or receiver-specific adapter is proposed by this PR. The repair remains draft until the first gate has evidence.
+No activation/global-input fallback or receiver-specific adapter is proposed. A future raw-pointer functional repair must meet these gates before it is represented as ready.
