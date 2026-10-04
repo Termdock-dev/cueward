@@ -1,0 +1,307 @@
+{
+  "kind": "diagnostic",
+  "date": "2026-10-04",
+  "macos": "27.0.1",
+  "build": "26A434",
+  "architecture": "arm64",
+  "online_displays": 3,
+  "product_code_changed": false,
+  "initialization_controls": [
+    {
+      "case": "bare-inactive",
+      "bundled": false,
+      "activation_policy": "accessory",
+      "document_window_initialization": "before_run",
+      "context": "inactive",
+      "status": "save_control_disabled_or_unavailable",
+      "receiver_remained_inactive": true,
+      "document_save_request_count": 1,
+      "panel_read_count": 6,
+      "panel_controls_enabled_by_read": [
+        [
+          false
+        ],
+        [
+          false
+        ],
+        [
+          false
+        ],
+        [
+          false
+        ],
+        [
+          false
+        ],
+        [
+          false
+        ]
+      ],
+      "panel_read_span_ms": 10005.4,
+      "panel_traversal_truncated": true,
+      "document_and_panel_memberships_verified_at_save": false,
+      "panel_save_dispatch_count": 0,
+      "file_created": false,
+      "file_content_matches": false,
+      "owned_process_stopped": true,
+      "command_count": 27,
+      "sample_count": 1005,
+      "execution_ms": 18186.5,
+      "maximum_sample_gap_ms": 79.4,
+      "distinct_foregrounds": 1,
+      "distinct_visible_space_maps": 1,
+      "distinct_pointer_positions": 51,
+      "receiver_activations": 0,
+      "observation_status": "failed"
+    },
+    {
+      "case": "bundle-inactive",
+      "bundled": true,
+      "activation_policy": "accessory",
+      "document_window_initialization": "before_run",
+      "context": "inactive",
+      "status": "save_control_disabled_or_unavailable",
+      "receiver_remained_inactive": true,
+      "document_save_request_count": 1,
+      "panel_read_count": 6,
+      "panel_controls_enabled_by_read": [
+        [
+          false
+        ],
+        [
+          false
+        ],
+        [
+          false
+        ],
+        [
+          false
+        ],
+        [
+          false
+        ],
+        [
+          false
+        ]
+      ],
+      "panel_read_span_ms": 9565.7,
+      "panel_traversal_truncated": false,
+      "document_and_panel_memberships_verified_at_save": false,
+      "panel_save_dispatch_count": 0,
+      "file_created": false,
+      "file_content_matches": false,
+      "owned_process_stopped": true,
+      "command_count": 27,
+      "sample_count": 949,
+      "execution_ms": 16978.4,
+      "maximum_sample_gap_ms": 103.8,
+      "distinct_foregrounds": 1,
+      "distinct_visible_space_maps": 1,
+      "distinct_pointer_positions": 241,
+      "receiver_activations": 0,
+      "observation_status": "failed"
+    },
+    {
+      "case": "bundle-visible",
+      "bundled": true,
+      "activation_policy": "accessory",
+      "document_window_initialization": "before_run",
+      "context": "visible",
+      "status": "artifact_verified",
+      "receiver_remained_inactive": true,
+      "document_save_request_count": 1,
+      "panel_read_count": 1,
+      "panel_controls_enabled_by_read": [
+        [
+          true
+        ]
+      ],
+      "panel_read_span_ms": 0,
+      "panel_traversal_truncated": false,
+      "document_and_panel_memberships_verified_at_save": true,
+      "panel_save_dispatch_count": 1,
+      "file_created": true,
+      "file_content_matches": true,
+      "owned_process_stopped": true,
+      "command_count": 12,
+      "sample_count": 518,
+      "execution_ms": 9674.8,
+      "maximum_sample_gap_ms": 61.7,
+      "distinct_foregrounds": 1,
+      "distinct_visible_space_maps": 1,
+      "distinct_pointer_positions": 42,
+      "receiver_activations": 0,
+      "observation_status": "failed"
+    },
+    {
+      "case": "delegate-accessory-inactive",
+      "bundled": true,
+      "activation_policy": "accessory",
+      "document_window_initialization": "did_finish_launching",
+      "context": "inactive",
+      "status": "save_control_disabled_or_unavailable",
+      "receiver_remained_inactive": true,
+      "document_save_request_count": 1,
+      "panel_read_count": 3,
+      "panel_controls_enabled_by_read": [
+        [
+          false
+        ],
+        [
+          false
+        ],
+        [
+          false
+        ]
+      ],
+      "panel_read_span_ms": 9078.0,
+      "panel_traversal_truncated": false,
+      "document_and_panel_memberships_verified_at_save": false,
+      "panel_save_dispatch_count": 0,
+      "file_created": false,
+      "file_content_matches": false,
+      "owned_process_stopped": true,
+      "command_count": 18,
+      "sample_count": 1083,
+      "execution_ms": 21051.6,
+      "maximum_sample_gap_ms": 77.2,
+      "distinct_foregrounds": 1,
+      "distinct_visible_space_maps": 1,
+      "distinct_pointer_positions": 143,
+      "receiver_activations": 0,
+      "observation_status": "failed"
+    },
+    {
+      "case": "delegate-accessory-visible",
+      "bundled": true,
+      "activation_policy": "accessory",
+      "document_window_initialization": "did_finish_launching",
+      "context": "visible",
+      "status": "artifact_verified",
+      "receiver_remained_inactive": true,
+      "document_save_request_count": 1,
+      "panel_read_count": 1,
+      "panel_controls_enabled_by_read": [
+        [
+          true
+        ]
+      ],
+      "panel_read_span_ms": 0,
+      "panel_traversal_truncated": false,
+      "document_and_panel_memberships_verified_at_save": true,
+      "panel_save_dispatch_count": 1,
+      "file_created": true,
+      "file_content_matches": true,
+      "owned_process_stopped": true,
+      "command_count": 12,
+      "sample_count": 1162,
+      "execution_ms": 23237.9,
+      "maximum_sample_gap_ms": 63.5,
+      "distinct_foregrounds": 1,
+      "distinct_visible_space_maps": 1,
+      "distinct_pointer_positions": 1,
+      "receiver_activations": 0,
+      "observation_status": "passed"
+    },
+    {
+      "case": "delegate-regular-inactive",
+      "bundled": true,
+      "activation_policy": "regular",
+      "document_window_initialization": "did_finish_launching",
+      "context": "inactive",
+      "status": "diagnostic_error",
+      "receiver_remained_inactive": false,
+      "document_save_request_count": 1,
+      "panel_read_count": 0,
+      "panel_controls_enabled_by_read": [],
+      "panel_read_span_ms": 0,
+      "panel_traversal_truncated": false,
+      "document_and_panel_memberships_verified_at_save": false,
+      "panel_save_dispatch_count": 0,
+      "file_created": null,
+      "file_content_matches": null,
+      "owned_process_stopped": true,
+      "command_count": 12,
+      "sample_count": 895,
+      "execution_ms": 19551.7,
+      "maximum_sample_gap_ms": 97.0,
+      "distinct_foregrounds": 2,
+      "distinct_visible_space_maps": 1,
+      "distinct_pointer_positions": 465,
+      "receiver_activations": 1,
+      "observation_status": "failed"
+    }
+  ],
+  "unmodified_native_writer": {
+    "app": "TextEdit",
+    "version": "1.21",
+    "preflight": {
+      "running_instances": 0,
+      "saved_state_present": false,
+      "autosave_entries": 0
+    },
+    "empty_document_created_before_inactive_move": true,
+    "editor_value_confirmed_in_inactive_space": true,
+    "file_save_menu_observed_disabled": true,
+    "file_save_menu_press_count": 0,
+    "planned_command_s_count": 1,
+    "key_events_posted": 2,
+    "panel_save_dispatch_count": 0,
+    "save_panel_observed": false,
+    "artifact_format": "RTF",
+    "artifact_size_bytes": 500,
+    "independent_decoded_content_matches": true,
+    "filename_or_destination_selected_by_operator": false,
+    "app_selected_default_location": "iCloud document directory",
+    "command_s_vs_automatic_save_causality": "not_distinguished",
+    "inactive_membership_confirmed_after_file_observed": true,
+    "owned_app_stopped": true,
+    "command_count": 25,
+    "sample_count": 13339,
+    "execution_ms": 266017.1,
+    "maximum_sample_gap_ms": 238.3,
+    "distinct_foregrounds": 1,
+    "distinct_visible_space_maps": 1,
+    "distinct_pointer_positions": 327,
+    "receiver_activations": 0,
+    "observation_status": "failed"
+  },
+  "synthetic_reader": {
+    "standard_generic_app_open": true,
+    "read_original_native_artifact": true,
+    "exact_rtf_bytes_match": true,
+    "receiver_activation_count": 0,
+    "owned_app_stopped": true,
+    "command_count": 1,
+    "sample_count": 41,
+    "execution_ms": 668.2,
+    "maximum_sample_gap_ms": 21.3,
+    "distinct_foregrounds": 1,
+    "distinct_visible_space_maps": 1,
+    "distinct_pointer_positions": 15,
+    "receiver_activations": 0,
+    "observation_status": "failed"
+  },
+  "cleanup": {
+    "artifact_backed_up_byte_exact_and_independently_decoded_before_removal": true,
+    "only_new_synthetic_artifact_and_its_new_autosave_index_removed": true,
+    "raw_artifact_and_metadata_backups_retained_privately": true,
+    "preexisting_user_document_overwritten_or_closed": false
+  },
+  "excluded_preliminary_runs": [
+    "Positional fixture paths in a bundle were treated as document-open requests; an unexpected alert appeared. Those bundle runs are invalid compatibility controls.",
+    "A deep expanded-panel traversal exhausted the 500-node bound and did not reach Save; shallow fresh-root reads were used for the reported contrasts.",
+    "The first TextEdit setup rejected a stale Space-move identity after window bounds changed; no edit or Save was requested. A separate owned run used a fresh observed move target.",
+    "An independent raw-AX cross-check was not completed: the preceding document AXPress returned an uncertain error before any Save-panel observation. No Save replay or raw-AX conclusion is claimed."
+  ],
+  "limitations": [
+    "One owned run per reported initialization case. Synthetic document behavior is not general app compatibility.",
+    "The regular direct-executable control activated during the trial and was stopped; it is not an inactive-Space success or workaround.",
+    "Shallow panel reads deliberately truncate unrelated descendants. Disabled Save was explicitly observed; absence alone is not reported as disabled.",
+    "The TextEdit document was initially created before movement; this does not validate creating a new document while already inactive.",
+    "TextEdit generated an app-selected artifact without an observed Save panel. It does not fix or validate the disabled-panel case or operator-selected destination.",
+    "Writer and reader use separate observation intervals; no single continuous end-to-end trace is claimed.",
+    "Pointer movement is unattributed. Writer coverage exceeded the 100 ms bound. Full stationary isolation/fresh-agent/#33 acceptance is not passed.",
+    "No Cueward input/AX defect or AppKit root cause established. No disabled-control override, activation fallback, global input or uncertain Save replay."
+  ]
+}
