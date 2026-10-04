@@ -11,7 +11,7 @@ from task_acceptance.evaluate import load_json, read_scoped
 from task_acceptance.setup import write_json
 
 HERE = Path(__file__).resolve().parent
-TASKS = {"existing_document": "existing.txt", "calculation": "result.txt"}
+TASKS = {"existing_document": "existing.txt", "calculation": "result.txt", "window_dialog": "target.txt"}
 
 
 def task_setup(run, task_id):
@@ -27,11 +27,13 @@ def task_setup(run, task_id):
     for parent in (run / "work", artifact.parent, run / "operator"):
         if parent.is_symlink() or parent.exists() and not parent.is_dir():
             raise ValueError("native task parent must be an unlinked directory")
-    if task_id == "existing_document":
-        relative = str(artifact.relative_to(run))
-        actual = hashlib.sha256(read_scoped(run, relative)).hexdigest()
-        if actual != manifest.get("baseline", {}).get(relative):
-            raise ValueError("existing document differs from prepared baseline")
+    if task_id in ("existing_document", "window_dialog"):
+        files = [artifact] + ([artifact.with_name("bystander.txt")] if task_id == "window_dialog" else [])
+        for file in files:
+            relative = str(file.relative_to(run))
+            actual = hashlib.sha256(read_scoped(run, relative)).hexdigest()
+            if actual != manifest.get("baseline", {}).get(relative):
+                raise ValueError("existing document differs from prepared baseline")
     # Reserve once: reruns require a fresh prepared run, not a repaired old result.
     output = run / "operator" / task_id
     output.mkdir(parents=True, exist_ok=False)
@@ -43,34 +45,41 @@ def task_setup(run, task_id):
     return manifest, goals[0], artifact, output
 
 
-def compile_fixture(output):
+def compile_fixture(output, task_id="existing_document"):
     """Build a uniquely owned complete bundle with normal NSDocument file IO."""
     output = Path(output)
-    source = output / "ExistingDocument.swift"
+    dialog = task_id == "window_dialog"
+    name, module, document = ("WindowDialog", "OwnedWindowDialog", "OwnedDialogDocument") if dialog else (
+        "ExistingDocument", "OwnedDocument", "ExistingDocument")
+    source = output / (name + ".swift")
     source.write_text((HERE / "document-observer.swift").read_text() + "\n"
-                      + (HERE / "existing-document-fixture.swift").read_text())
-    bundle = output / "ExistingDocument.app"
-    binary = bundle / "Contents/MacOS/ExistingDocument"
+                      + (HERE / ("window-dialog-fixture.swift" if dialog else "existing-document-fixture.swift")).read_text())
+    bundle = output / (name + ".app")
+    binary = bundle / "Contents/MacOS" / name
     binary.parent.mkdir(parents=True)
-    subprocess.run(["swiftc", "-swift-version", "6", "-parse-as-library", "-warnings-as-errors", "-module-name", "OwnedDocument",
-                    str(source), "-o", str(binary)], capture_output=True, check=True, timeout=90)
+    compiled = subprocess.run(["swiftc", "-swift-version", "6", "-parse-as-library", "-warnings-as-errors", "-module-name", module,
+                               str(source), "-o", str(binary)], capture_output=True, timeout=90)
+    (output / "fixture-compiler.stdout.log").write_bytes(compiled.stdout)
+    (output / "fixture-compiler.stderr.log").write_bytes(compiled.stderr)
+    compiled.check_returncode()
     (bundle / "Contents/Info.plist").write_bytes(plistlib.dumps({
-        "CFBundleExecutable": binary.name, "CFBundleIdentifier": "dev.cueward.OwnedDocument." + uuid.uuid4().hex,
+        "CFBundleExecutable": binary.name, "CFBundleIdentifier": "dev.cueward." + name + "." + uuid.uuid4().hex,
         "CFBundlePackageType": "APPL", "CFBundleName": "Owned document editor",
         "NSPrincipalClass": "NSApplication", "LSUIElement": True,
         "CFBundleDocumentTypes": [{"CFBundleTypeName": "Plain text", "CFBundleTypeRole": "Editor",
                                    "LSHandlerRank": "None", "LSItemContentTypes": ["public.plain-text"],
-                                   "NSDocumentClass": "OwnedDocument.ExistingDocument"}],
+                                   "NSDocumentClass": module + "." + document}],
     }))
     return binary
 
 
-def launch_receiver(binary, state, artifact, lifetime=900):
+def launch_receiver(binary, state, artifact, lifetime=900, bystander=None):
     """Return the owned process handle; configuration does not open user files."""
     with Path(state).with_suffix(".stdout.log").open("x") as stdout, \
             Path(state).with_suffix(".stderr.log").open("x") as stderr:
         return subprocess.Popen([str(binary)], start_new_session=True, stdout=stdout, stderr=stderr,
-                                env=os.environ | {"CUEWARD_STATE": str(state), "CUEWARD_FILE": str(artifact),
+                                env=os.environ | ({"CUEWARD_BYSTANDER": str(bystander)} if bystander else {})
+                                | {"CUEWARD_STATE": str(state), "CUEWARD_FILE": str(artifact),
                                                   "CUEWARD_LIFETIME": str(lifetime)})
 
 
@@ -117,7 +126,8 @@ def unregister_fixture(binary):
     """Remove only the uniquely built owned bundle's LaunchServices registration."""
     binary = Path(binary)
     bundle = binary.parents[2]
-    if bundle.name != "ExistingDocument.app" or binary.relative_to(bundle).parts != ("Contents", "MacOS", "ExistingDocument"):
+    name = binary.name
+    if name not in ("ExistingDocument", "WindowDialog") or bundle.name != name + ".app" or binary.relative_to(bundle).parts != ("Contents", "MacOS", name):
         raise ValueError("not an owned native-task fixture bundle")
     registry = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
     result = subprocess.run([registry, "-u", str(bundle)], capture_output=True, text=True, timeout=20)

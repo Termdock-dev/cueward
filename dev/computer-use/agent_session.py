@@ -33,6 +33,7 @@ def validate_command(arguments, pid, window_id):
     if sum(len(a.encode("utf-8")) for a in arguments) > 65_536:
         raise ScopeError("command exceeds 64 KiB")
     family, action = arguments[:2]
+    windows = {window_id} if type(window_id) is int else set(window_id)
     if (family, action) == ("app", "inspect"):
         if option(arguments, "--pid") != str(pid):
             raise ScopeError("app PID outside owned scope")
@@ -42,12 +43,13 @@ def validate_command(arguments, pid, window_id):
         if target.get("kind") != "app_ax" or not isinstance(app, dict) or app.get("pid") != pid:
             raise ScopeError("app target outside owned scope")
     elif family == "window" and action in ("snapshot", "inspect"):
-        if option(arguments, "--id") != str(window_id) or "--output" in arguments:
+        output = any(a == "--output" or a.startswith("--output=") for a in arguments[2:])
+        if option(arguments, "--id") not in {str(w) for w in windows} or output:
             raise ScopeError("window/output outside owned scope")
     elif family == "window" and action in ("click", "drag"):
         target = decode_target(option(arguments, "--target"))
         window = target.get("window", {})
-        if target.get("kind") != "window_input" or not isinstance(window, dict) or window.get("owner_pid") != pid or window.get("window_id") != window_id:
+        if target.get("kind") != "window_input" or not isinstance(window, dict) or window.get("owner_pid") != pid or window.get("window_id") not in windows:
             raise ScopeError("input target outside owned scope")
         if action == "click" and option(arguments, "--count") != "1":
             raise ScopeError("task click must be single; no repair replay")
@@ -73,6 +75,7 @@ class AgentSession:
     def __init__(self, cli, observer, pid, window_id, output, metadata):
         self.commands = ObservedCLI(cli, observer)
         self.observer, self.pid, self.window_id = observer, pid, window_id
+        self.window_ids = [window_id]
         self.output, self.metadata = Path(output), metadata
         self.records = []
         self.dispatches = {"click": 0, "drag": 0}
@@ -81,7 +84,7 @@ class AgentSession:
         self.request_count = 0
 
     def invoke(self, arguments):
-        arguments = validate_command(arguments, self.pid, self.window_id)
+        arguments = validate_command(arguments, self.pid, self.window_ids)
         if arguments[0] == "window" and arguments[1] in self.dispatches:
             action = arguments[1]
             if self.dispatches[action]:

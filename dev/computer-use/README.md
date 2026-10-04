@@ -6,7 +6,7 @@ The [read-only desktop observer](desktop-observer.md) supplies timestamped task 
 
 The [interactive agent transport](agent-session.md) records commands chosen by a fresh Agent rather than scripted task steps. Its first three synthetic task attempts failed; all eight tasks remain in the denominator.
 
-The [native task runner](native-agent-tasks.md) adds fresh document-edit and calculation execution. It exposed optional `AXIdentifier` capability loss, now fixed and covered by regression tests. Both post-fix files match their independent checks, but interference failures prevent full task passes.
+The [native task runner](native-agent-tasks.md) adds fresh document-edit, calculation and two-window native save-dialog execution. It exposed optional `AXIdentifier` capability loss, now fixed and covered by regression tests. Document/calculation post-fix files match their independent checks, but interference failures prevent full task passes. The initial dialog attempt failed at observer binding; the corrected runner's replacement was blocked by a locked desktop before launch. Shared save-panel receiver coverage remains unverified.
 
 The [retained-resource lock probe](lock-resources.md) prepares #34 with an owned changing-state receiver, retained AX/stream resources and fresh-handle/screenshot contrasts. Its unlocked baseline is verified; no lock/unlock result or product lock support is claimed.
 
