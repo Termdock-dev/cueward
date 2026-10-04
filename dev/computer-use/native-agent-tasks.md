@@ -57,6 +57,8 @@ The broker permits only bounded app inspection/press/value assignment and the ow
 
 Actual Agent inspections/actions supply the `initial`, `dialog`, `resumed` phases in the desktop observer's timebase. Setup observations cannot substitute for them. Final evidence independently checks normal target save/write, no rejected writes, cleared dirty state, untouched bystander IO/content, exact disk bytes and a fresh inactive receiver snapshot.
 
+Unlike `new_document`, the `window_dialog` goal has no exact-once save-submission condition. Its native IO check requires positive integer read/save/write counts. The fixture increments `save_requests` when `save` or `saveAs` is invoked, before the panel or write completes, so the count is not a count of successful disk saves. This does not authorize blindly replaying an uncertain action; the Agent must observe before any new decision, and actual receipts remain available for review.
+
 The shared save-panel service is an auxiliary receiver, not a newly owned process. Cleanup never terminates it. The [evaluator contract](task-acceptance.md#shared-save-panel-receivers) requires auxiliary activation coverage across the entire execution interval. The current desktop observer starts with the host alone; late discovery of a service cannot supply missing earlier samples. Such service coverage stays `unverified`, even if panel traversal and disk save eventually succeed. Standalone service-owned panels are not implemented by this runner.
 
 ### Recorded window/dialog work: 2026-10-05
