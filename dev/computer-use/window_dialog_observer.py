@@ -56,6 +56,7 @@ def compile_binding_observer(output):
     output = Path(output)
     binary = output / "WindowDialogAX"
     result = subprocess.run(["swiftc", "-swift-version", "6", "-parse-as-library", "-warnings-as-errors",
+                             str(HERE / "window-dialog-receivers.swift"),
                              str(HERE / "window-dialog-ax.swift"), "-o", str(binary)],
                             capture_output=True, timeout=90)
     (output / "binding-compiler.stdout.log").write_bytes(result.stdout)

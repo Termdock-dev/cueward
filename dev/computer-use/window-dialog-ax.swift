@@ -82,7 +82,7 @@ struct DialogAXReader {
         var queue: [(AXUIElement, String, Int)] = [(owner, parent, 0)]
         var found: [[String: Any]] = []
         var candidates: [[String: Any]] = []
-        var receivers: [(String, pid_t, CGWindowID?)] = []
+        var receivers: [DialogReceiverObservation] = []
         var index = 0
         while index < queue.count && index < 500 {
             let (element, ref, depth) = queue[index]
@@ -91,7 +91,8 @@ struct DialogAXReader {
             guard AXUIElementGetPid(element, &observedReceiver) == .success else {
                 throw DialogAXError("descendant receiver identity unavailable")
             }
-            receivers.append((ref, observedReceiver, nativeID(element)))
+            receivers.append(DialogReceiverObservation(ref: ref, pid: observedReceiver,
+                                                       nativeWindowID: nativeID(element)))
             if (try dialogAttribute(element, kAXRoleAttribute) as? String) == "AXSheet" {
                 var receiver: pid_t = 0
                 _ = AXUIElementGetPid(element, &receiver)
@@ -128,8 +129,8 @@ struct DialogAXReader {
         }
         let root = found[0]
         let reference = root["ref"] as! String
-        let pids = Set(receivers.filter { ($0.0 == reference || $0.0.hasPrefix(reference + "."))
-            && $0.2 == id && $0.1 > 0 && kill($0.1, 0) == 0 }.map { $0.1 })
+        let pids = try boundDialogSheetReceivers(receivers, hostPID: pid, root: reference,
+                                                panelID: id, isAlive: { kill($0, 0) == 0 })
         guard pids.contains(root["receiver_pid"] as! pid_t) else {
             throw DialogAXError("sheet receiver has no direct native window association")
         }
