@@ -172,6 +172,26 @@ class DialogNativeTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "owned receiver"):
                 session.register(["app", "inspect", "--pid", "100", "--root", "w1"], foreign, b, b)
 
+    def test_panel_receiver_is_checked_even_when_node_has_no_action_target(self):
+        with tempfile.TemporaryDirectory() as folder:
+            artifact = Path(folder) / "target.txt"; b = binding(artifact, "dialog")
+            session = self.make_session(Path(folder), artifact, [b] * 3)
+            button = {"ref": "w0.0.1", "receiver_pid": 100,
+                      "target": token({"kind": "app_ax", "app": {"pid": 100}, "ref": "w0.0.1"})}
+            args = ["app", "inspect", "--pid", "100", "--root", "w0.0"]
+            for receiver in (200, None, 0):
+                result = {"app": {"pid": 100}, "nodes": [
+                    {"ref": "w0.0.0", "receiver_pid": receiver, "role": "AXGroup"}, button]}
+                with self.subTest(receiver=receiver), self.assertRaisesRegex(RuntimeError, "unbound panel receiver"):
+                    session.register(args, result, b, b)
+            allowed = deepcopy(b)
+            allowed["auxiliary_receivers"] = [{"pid": 200, "window_id": 30,
+                "owner_window": {"pid": 100, "window_id": 20}, "source": "native_ax_window_binding"}]
+            result = {"app": {"pid": 100}, "nodes": [
+                {"ref": "w0.0.0", "receiver_pid": 200, "role": "AXGroup"}, button]}
+            session.register(args, result, allowed, allowed)
+            self.assertIn(button["target"], session.tokens)
+
     def test_binding_change_during_inspection_discards_phase_and_targets(self):
         with tempfile.TemporaryDirectory() as folder:
             artifact = Path(folder) / "target.txt"; b = binding(artifact); changed = binding(artifact, reverse=True)
