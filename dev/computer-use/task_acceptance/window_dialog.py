@@ -216,6 +216,9 @@ def check_auxiliary_receiver_trace(root, evidence, observer):
     execution = evidence.get("execution", {})
     samples, events = execution.get("samples"), execution.get("events")
     if isinstance(samples, list) and any(isinstance(sample, dict)
+            and type(sample.get("frontmost_pid")) is int and sample["frontmost_pid"] in services for sample in samples):
+        return "failed", "shared save-panel service became foreground in execution samples"
+    if isinstance(samples, list) and any(isinstance(sample, dict)
             and isinstance(sample.get("target_active"), dict)
             and any(sample["target_active"].get(str(pid)) is True for pid in services) for sample in samples):
         return "failed", "shared save-panel service became active in execution samples"
