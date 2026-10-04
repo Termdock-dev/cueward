@@ -61,7 +61,7 @@ These samples show a large interpreter startup/transport residual and much small
 The initial matching wait uncovered unconditional reads of irrelevant AXDescription attributes. The production wait now reads only selector/condition attributes; deterministic tests preserve required-attribute failures, and the native text receiver and existing wait desktop tests pass. This correction enables the matching-wait baseline without weakening role or secure-value checks.
 # First-save context comparison
 
-See [first-save-context.md](first-save-context.md) for the observer-backed diagnostic and its current-build limitations.
+See [first-save-context.md](first-save-context.md) for the observer-backed diagnostic and its current-build limitations. [Initialization and native-app contrasts](first-save-initialization.md) distinguish the reproducible disabled panel from an unmodified TextEdit artifact result; neither is a completed #33 acceptance claim.
 
 # Background pointer repair
 
