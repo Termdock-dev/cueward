@@ -54,6 +54,10 @@ def cleanup_receiver(process, binary, output, task_id):
 
 
 def run_task(cli, run, task_id, socket):
+    if task_id == "window_dialog":
+        from window_dialog_task import run_dialog_task
+        return run_dialog_task(cli, run, socket, write_report=write_report,
+                               record_failure=record_failure, cleanup_receiver=cleanup_receiver)
     manifest, goal, artifact, output = task_setup(run, task_id)
     process = None
     binary = None

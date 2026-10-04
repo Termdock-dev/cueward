@@ -113,7 +113,11 @@ def effect_checks(root, task_id, evidence):
         return [check("reader", "passed" if good else "failed", "recipient file identity and exact content")]
     if task_id == "window_dialog":
         status, reason = check_window_dialog(root, evidence, observer)
-        return [check("fresh_window_observations", status, reason)]
+        checks = [check("fresh_window_observations", status, reason), *final_receiver_checks(observer)]
+        if "native_io_complete" in observer:
+            checks.append(check("native_document_io", "passed" if observer["native_io_complete"] is True else "failed",
+                                "independently observed normal target save/write and untouched bystander"))
+        return checks
     if task_id in ("existing_document", "calculation"):
         return [check("receiver", "passed", "independent receiver identity supplied; result checked from disk"),
                 *final_receiver_checks(observer)]

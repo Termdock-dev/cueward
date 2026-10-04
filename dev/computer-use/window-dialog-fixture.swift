@@ -116,9 +116,16 @@ final class OwnedDialogDocument: NSDocument, NSTextViewDelegate {
         super.saveAs(sender)
     }
 
+    override func move(to url: URL, completionHandler: (((any Error)?) -> Void)? = nil) {
+        // NSDocument's coordinated move bypasses writeSafely and may replace a file.
+        // This task authorizes no relocation, including document-title renaming.
+        completionHandler?(refusal("Document relocation is outside this owned save task"))
+    }
+
     override func prepareSavePanel(_ panel: NSSavePanel) -> Bool {
-        // Only identity is added for independent AX/native-window binding.
-        // No filename, enabled state, first responder or input behavior changes.
+        // Limit filesystem side effects to the exact owned document write.
+        // Save enabled state, filename, first responder and input behavior stay native.
+        panel.canCreateDirectories = false
         panelAXIdentifier = "owned-save-panel-" + UUID().uuidString
         panel.setAccessibilityIdentifier(panelAXIdentifier)
         savePanel = panel
@@ -194,6 +201,7 @@ final class OwnedDialogDocument: NSDocument, NSTextViewDelegate {
         return ["kind": "save", "mode": mode,
                 "owner_window": windowIdentity,
                 "window_id": panel.windowNumber, "ax_identifier": panelAXIdentifier,
+                "can_create_directories": panel.canCreateDirectories,
                 "owner_binding": "NSDocument.prepareSavePanel"]
     }
 }
