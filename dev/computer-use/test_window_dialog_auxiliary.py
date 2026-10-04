@@ -60,6 +60,62 @@ class DialogAuxiliaryTests(unittest.TestCase):
                                      "tasks": {"window_dialog": record}})
         return next(task for task in report["tasks"] if task["task_id"] == "window_dialog")
 
+    def host_only_proof(self, *, standalone=False):
+        record = self.record(auxiliary=False, service_root=False)
+        phase = record["observer"]["window_observations"][1]
+        phase["dialog"]["native_binding"] = {"source": "native_ax_window_binding", "window_id": 30,
+            "owner_window": {"pid": 100, "window_id": 20}, "owner_window_cf_equal": True, "receiver_pids": [100]}
+        if standalone:
+            phase["dialog"].update(mode="window", root={"receiver_pid": 100, "ref": "w2", "role": "AXWindow"})
+            phase["active_root"] = deepcopy(phase["dialog"]["root"])
+            phase["dialog"]["native_binding"].update(owner_window_cf_equal=None,
+                                                    owner_source="NSDocument.prepareSavePanel")
+        return record
+
+    def test_complete_host_only_present_sheet_proof_passes(self):
+        record = self.host_only_proof()
+        self.assertEqual(self.transition(record), "passed")
+        self.assertEqual(self.result(record)["status"], "passed")
+
+    def test_host_only_present_proof_contradictions_fail(self):
+        for change in ({"source": "guessed title"}, {"window_id": 31},
+                       {"owner_window": {"pid": 100, "window_id": 21}}, {"owner_window_cf_equal": False},
+                       {"receiver_pids": [999]}, {"receiver_pids": [100, 100]}):
+            record = self.host_only_proof()
+            record["observer"]["window_observations"][1]["dialog"]["native_binding"].update(change)
+            with self.subTest(change=change):
+                self.assertEqual(self.transition(record), "failed")
+                self.assertEqual(self.result(record)["status"], "failed")
+        for malformed in (None, "binding", []):
+            record = self.host_only_proof()
+            record["observer"]["window_observations"][1]["dialog"]["native_binding"] = malformed
+            with self.subTest(malformed=malformed):
+                self.assertEqual(self.transition(record), "failed")
+
+    def test_host_only_present_proof_missing_fields_are_unverified(self):
+        changes = [lambda d, key=key: d["native_binding"].pop(key)
+                   for key in ("source", "window_id", "owner_window", "owner_window_cf_equal", "receiver_pids")]
+        changes += [lambda d: d["native_binding"]["owner_window"].pop("window_id"),
+                    lambda d: d.pop("window_id"),
+                    lambda d: d["native_binding"].update(owner_window_cf_equal=None)]
+        for index, change in enumerate(changes):
+            record = self.host_only_proof()
+            change(record["observer"]["window_observations"][1]["dialog"])
+            with self.subTest(index=index):
+                self.assertEqual(self.transition(record), "unverified")
+                self.assertEqual(self.result(record)["status"], "unverified")
+
+    def test_host_only_standalone_legacy_absence_and_present_proof_are_distinct(self):
+        record = self.host_only_proof(standalone=True)
+        phase = record["observer"]["window_observations"][1]
+        proof = phase["dialog"].pop("native_binding")
+        self.assertEqual(self.result(record)["status"], "passed")
+        for supplied, expected in ((proof | {"source": "guessed title"}, "failed"),
+                                   ({}, "unverified"), (proof, "unverified")):
+            phase["dialog"]["native_binding"] = supplied
+            with self.subTest(supplied=supplied):
+                self.assertEqual(self.transition(record), expected)
+
     def test_native_service_root_and_descendant_bindings_both_pass(self):
         for service_root in (True, False):
             with self.subTest(service_root=service_root):
