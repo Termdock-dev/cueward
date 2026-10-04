@@ -10,6 +10,8 @@ The [physical-input overlap diagnostic](physical-overlap.md) records the actual 
 
 The [WebView context investigation](webview-context.md) separates native first-mouse refusal, DOM button state and delayed observation. Patched receiver controls are not product compatibility.
 
+The [ordinary WebView AX contrast](webview-ax.md) demonstrates exactly-once button effects through existing AXPress after delayed tree exposure. Pointer movement remains unattributed, so these runs do not pass full isolation or establish canvas support.
+
 Run on an unlocked macOS desktop with Accessibility and Screen Recording permissions:
 
 ```sh
@@ -63,4 +65,4 @@ See [first-save-context.md](first-save-context.md) for the observer-backed diagn
 
 # Background pointer repair
 
-The draft repair work and rejected sender hypotheses are recorded in [background-pointer-repair.md](background-pointer-repair.md). Diagnostic tooling and passing evaluator tests do not establish a functional fix.
+The repair investigation and rejected sender hypotheses are recorded in [background-pointer-repair.md](background-pointer-repair.md). Diagnostic tooling and passing evaluator tests do not establish a functional fix.

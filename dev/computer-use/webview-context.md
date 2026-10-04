@@ -35,6 +35,8 @@ Foreground, receiver activity and visible Spaces stayed unchanged at sampled res
 
 A separate read-only generic AX contrast saw seven window/chrome nodes and no uniquely observed page button in this inactive instance. It issued no AX press. This does not establish that all WebViews lack accessible page controls. Engine/platform research and exact source versions remain local; upstream behavior is not assumed to match this installed binary.
 
+A later [bounded AX contrast](webview-ax.md) observed the ordinary page button on subsequent reads and demonstrated exactly-once effects using the existing AXPress route. No receiver or accessibility-mode changes were required. Those runs did not pass stationary isolation because pointer movement remained unattributed; they do not fix the raw-pointer or canvas results above.
+
 The evidence supports two distinct receiver-side hurdles: native first-mouse refusal and, after a diagnostic policy change, insufficient DOM held-button state. It does **not** justify changing the real receiver, spoofing global button state, activating the target, switching Spaces, double-clicking or replaying uncertain input. A production route must work on an unmodified receiver and preserve binding, interruption and physical isolation before adoption. Accepted ordinary interrupted drag, physical WebView overlap and real-app coverage remain unverified.
 
 ## Verification

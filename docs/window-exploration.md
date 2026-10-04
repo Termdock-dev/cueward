@@ -29,6 +29,8 @@ Replace the example ID and ref with the current observation. `root_ref` identifi
 
 Refs describe paths in the live tree. A path can refer to a different element after the app changes. Check the returned node before choosing an action, and use the fresh `target` token. Inspection is not an atomic tree snapshot or a persistent element handle.
 
+A first read can precede asynchronous AX content exposure. On the tested ordinary WKWebView, the first tree contained window/chrome nodes and later reads exposed the page button without an accessibility-mode change. `truncated: false` means the requested traversal was not cut short; it does not prove that later content cannot appear. Reinspect within a finite budget, or use a [matching element wait](background-input.md) for a label known from the task/current UI, then inspect again for fresh action targets. Do not guess unnamed window buttons or automatically replay input. The [AX contrast and its isolation limits](../dev/computer-use/webview-ax.md) retain the measured scope; this does not establish canvas dragging or all-WebView support.
+
 ## Explore menus and attached dialogs
 
 ```sh
