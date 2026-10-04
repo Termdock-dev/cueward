@@ -25,6 +25,6 @@ The [aggregate result](results/2026-10-03-first-save-context.json) records one c
 | Document visible | Yes | Yes | Failed: observed pointer movement |
 | Visible, then document and panel moved inactive | Yes before and after move | Yes | Failed: observed pointer movement |
 
-Foreground PID, receiver activation and all three visible-Space mappings remained unchanged at the observed resolution in each run. Actual maximum sample gaps were below 100 ms. Pointer movement in the visible/warm runs is unattributed; no no-interference pass is claimed for them. Both warm document/panel memberships were independently confirmed in the inactive Space before panel Save.
+Foreground PID, receiver activation and all three visible-Space mappings remained unchanged at the observed resolution in each run. Maximum execution sample gaps were 59.6 ms (inactive), 119.2 ms (visible) and 128.8 ms (warm). Only the inactive run met the 100 ms coverage bound. The visible/warm runs exceeded that bound and recorded unattributed pointer movement; no no-interference pass is claimed for them. Both warm document/panel memberships were independently confirmed in the inactive Space before panel Save.
 
 This reproduces the creation-context distinction on the current build. It supports investigation of native Save-panel initialization, but does not establish an AppKit root cause or general app compatibility. #33 remains open. Inactive-first controls must not be bypassed with activation or a warm-up fallback.
