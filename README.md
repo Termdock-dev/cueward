@@ -685,6 +685,25 @@ cueward voice-memos read --id F45D4751-183C-4032-99F7-F1FE1F541BA2
 
 Outputs JSON with `id`, `title`, `duration_seconds`, `timestamp`, and `path`.
 
+Transcribe one recording on-device with the Speech framework. This needs macOS 26 or later.
+
+```bash
+# Use the system locale
+cueward voice-memos transcribe --id F45D4751-183C-4032-99F7-F1FE1F541BA2
+
+# Choose a locale
+cueward voice-memos transcribe --id F45D4751-183C-4032-99F7-F1FE1F541BA2 --locale zh_TW
+```
+
+Outputs JSON with `id`, `title`, `locale`, and `text`. `locale` is the locale that was used.
+
+- Without `--locale`, the command uses the system locale.
+- The locale must be supported, and its speech assets must already be installed. If not, the command fails and names the installed locales. Cueward does not download assets.
+- A recording with no detectable speech fails with `no speech detected` and prints no transcript. It never returns empty text.
+- A memo with no local audio file fails with `voice memo has no local audio file`.
+- The time limit is 120 seconds plus a quarter of the recording length.
+- Transcripts stored inside an m4a file are not read.
+
 ### Stickies
 
 Manage Stickies notes from the desktop:
@@ -758,6 +777,7 @@ crates/
 │   ├── shortcuts/          Shortcuts DB compiler, installer, and tests
 │   ├── stickies/           Stickies CRUD, geometry, color, state
 │   ├── voice_memos.rs      Voice Memos metadata reads
+│   ├── voice_memos/transcribe.rs On-device Voice Memos transcription
 │   └── window/             Window and Space observation, background input
 └── adapter-windows/    Reserved for future cross-platform support
 ```
