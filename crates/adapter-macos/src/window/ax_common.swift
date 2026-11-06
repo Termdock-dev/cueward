@@ -69,6 +69,10 @@ func validateCatalogWindow(allowOffscreen: Bool = false, exactBounds: Bool = fal
     }
 }
 
+// Optional native identity avoids relying on AX titles, which dialogs omit and browsers extend.
+typealias GetAXWindow = @convention(c) (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError
+var axWindowSymbol: UnsafeMutableRawPointer? { dlsym(UnsafeMutableRawPointer(bitPattern: -2), "_AXUIElementGetWindow") }
+
 func matchingWindows() -> [AXUIElement] {
     var candidates = elements(application, kAXWindowsAttribute)
     for name in [kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
@@ -76,6 +80,14 @@ func matchingWindows() -> [AXUIElement] {
             let element = raw as! AXUIElement
             if !candidates.contains(where: { CFEqual($0, element) }) { candidates.append(element) }
         }
+    }
+    if let symbol = axWindowSymbol {
+        let lookup = unsafeBitCast(symbol, to: GetAXWindow.self)
+        let native = candidates.filter { element in
+            var observedID: CGWindowID = 0
+            return lookup(element, &observedID) == .success && observedID == windowID
+        }
+        if !native.isEmpty { return native }
     }
     return candidates.filter { element in
         guard text(attribute(element, kAXTitleAttribute)) == expectedTitle,
