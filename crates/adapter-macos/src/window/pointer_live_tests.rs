@@ -66,6 +66,48 @@ fn pointer_input_routes_clicks_and_drag_to_a_background_non_key_window() {
 
 #[test]
 #[ignore = "requires a logged-in macOS desktop, Accessibility and Screen Recording permissions"]
+fn pointer_click_and_drag_reach_a_view_that_refuses_first_mouse() {
+    let receiver = Receiver::with_source(include_str!("pointer_fixture.swift"), "normal");
+    let snapshot = receiver.snapshot(1);
+    let x = 120.0 * snapshot.image.scale_x;
+    let y = 140.0 * snapshot.image.scale_y;
+    let clicked = click(&snapshot.input_target, x, y, "left", 1).expect("click");
+    assert_eq!(clicked.status, InputDelivery::SentUnverified);
+    let state = receiver.wait_for(|s| s["events"].as_array().is_some_and(|e| e.len() == 2));
+    let types: Vec<_> = state["events"]
+        .as_array()
+        .expect("events")
+        .iter()
+        .map(|e| e["type"].as_u64().expect("type"))
+        .collect();
+    assert_eq!(types, [1, 2]);
+    assert_eq!(state["active"], false);
+
+    let snapshot = receiver.snapshot(1);
+    let dragged = drag(
+        &snapshot.input_target,
+        (x, y),
+        (
+            x + 60.0 * snapshot.image.scale_x,
+            y + 40.0 * snapshot.image.scale_y,
+        ),
+        300,
+    )
+    .expect("drag");
+    let state = receiver.wait_for(|s| {
+        s["events"]
+            .as_array()
+            .is_some_and(|e| e.len() == 2 + dragged.events_sent)
+    });
+    assert_eq!(state["active"], false);
+    let events = state["events"].as_array().expect("events");
+    let last = events.last().expect("release");
+    assert_eq!(last["type"], 2);
+    assert_eq!(last["x"], 180.0);
+}
+
+#[test]
+#[ignore = "requires a logged-in macOS desktop, Accessibility and Screen Recording permissions"]
 fn pointer_drag_releases_at_last_delivered_point_when_window_changes() {
     let receiver = Receiver::with_source(include_str!("pointer_fixture.swift"), "interrupt");
     let snapshot = receiver.snapshot(0);
