@@ -243,7 +243,7 @@ pub(crate) enum Command {
         #[arg(long)]
         live_safari: bool,
     },
-    /// Read Voice Memos metadata
+    /// Read Voice Memos metadata and transcribe recordings on this Mac
     VoiceMemos {
         #[command(subcommand)]
         action: VoiceMemosAction,

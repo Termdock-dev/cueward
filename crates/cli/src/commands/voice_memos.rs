@@ -13,6 +13,21 @@ pub(crate) enum VoiceMemosAction {
         #[arg(long)]
         id: String,
     },
+    /// Transcribe one voice memo on this Mac. Needs macOS 26 or later
+    Transcribe {
+        /// Voice memo id
+        #[arg(long)]
+        id: String,
+        /// Speech locale such as zh_TW. Defaults to the system locale. Must be installed
+        #[arg(long)]
+        locale: Option<String>,
+    },
+}
+
+fn transcribe_json(id: &str, locale: Option<&str>) -> Result<String, String> {
+    let transcript = cueward_adapter_macos::voice_memos::transcribe::transcribe_voice_memo(id, locale)
+        .map_err(|error| error.to_string())?;
+    serde_json::to_string_pretty(&transcript).map_err(|error| error.to_string())
 }
 
 pub(crate) fn dispatch(action: VoiceMemosAction) {
@@ -32,6 +47,15 @@ pub(crate) fn dispatch(action: VoiceMemosAction) {
                 Ok(item) => {
                     print_external("voice-memos/read", &serde_json::to_string_pretty(&item).unwrap());
                 }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    process::exit(1);
+                }
+            }
+        }
+        VoiceMemosAction::Transcribe { id, locale } => {
+            match transcribe_json(&id, locale.as_deref()) {
+                Ok(json) => print_external("voice-memos/transcribe", &json),
                 Err(e) => {
                     eprintln!("error: {e}");
                     process::exit(1);
