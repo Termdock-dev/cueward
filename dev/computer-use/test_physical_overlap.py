@@ -136,6 +136,17 @@ class PhysicalEvidenceTests(unittest.TestCase):
         self.assertFalse(check["receiver_gesture_released"])
         self.assertEqual(interruption_check([])["status"], "unverified")
 
+    def test_interruption_accepts_a_warm_up_pair_but_not_a_held_button(self):
+        action = {"name": "interrupted_drag", "before": {"events": [], "releases": 0},
+                  "after": {"events": [event(1), event(2), event(1), event(6), event(2)], "releases": 1,
+                            "dragging": False, "interruption_triggered": True},
+                  "result": {"status": "partially_sent", "events_sent": 3, "interruption": "window changed; take a new snapshot"}}
+        self.assertEqual(interruption_check([action])["status"], "passed")
+        for kinds in ((1, 2, 1, 6), (2, 1, 2), (1, 1, 2, 2), (6,)):
+            variant = copy.deepcopy(action)
+            variant["after"]["events"] = [event(kind) for kind in kinds]
+            self.assertEqual(interruption_check([variant])["status"], "failed", kinds)
+
     def test_foreground_refusal_is_not_proven_just_by_an_error(self):
         action = {"name": "foreground_refusal", "error": "target app is in the foreground; input stopped",
                   "receipt": {"status": "tool_error", "exit_code": 1}, "before": {"active": True, "events": []},
