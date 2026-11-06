@@ -84,8 +84,42 @@
     }
   },
   "limits": [
-    "Owned fixtures only; real-app verification outstanding.",
-    "Stage Manager was enabled; windows outside the stage could not be bound.",
+    "Real Electron apps not tested.",
+    "Clicks on windows outside a Stage Manager stage unverified.",
     "20 ms sampling cannot exclude shorter transients."
-  ]
+  ],
+  "real_apps": {
+    "stage_manager": "off",
+    "calculator": {
+      "clicks": 3,
+      "display": "789"
+    },
+    "textedit": {
+      "click_then_type": "inserted at clicked position",
+      "drag_then_type": "selection replaced"
+    },
+    "finder": {
+      "click": "row selected"
+    },
+    "safari": {
+      "clicks": 3,
+      "exact": 3
+    },
+    "chrome": {
+      "clicks": 3,
+      "exact": 3,
+      "before_native_binding": "no_safe_point, 0 of 3"
+    }
+  },
+  "stage_manager": {
+    "catalog_size": [
+      94,
+      104
+    ],
+    "accessibility_size": [
+      673,
+      439
+    ],
+    "difference_after_turning_off": false
+  }
 }
