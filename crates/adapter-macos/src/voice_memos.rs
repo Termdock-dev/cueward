@@ -6,6 +6,8 @@ use serde::Serialize;
 
 use crate::MacosError;
 
+pub mod transcribe;
+
 const APPLE_EPOCH_OFFSET: f64 = 978_307_200.0;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
