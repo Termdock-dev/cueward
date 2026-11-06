@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "kind": "native_agent_tasks",
+  "date": "2026-11-06",
+  "timezone": "Asia/Taipei",
+  "platform": {
+    "macos": "27.0.1",
+    "build": "26A434",
+    "architecture": "arm64",
+    "online_displays": 3
+  },
+  "product_commit": "bb2cb2d (verification merge of PRs 76, 77 and 78 at its first head)",
+  "agent_context": "fresh Agent; goal, owned PID and window, broker command form, docs/app-exploration.md only",
+  "runs": [
+    {
+      "run": "A",
+      "summary": {
+        "passed": 0,
+        "failed": 1,
+        "blocked": 0,
+        "unverified": 7
+      },
+      "tasks": [
+        {
+          "task_id": "existing_document",
+          "status": "failed",
+          "commands": 17,
+          "requests": 18,
+          "failed_checks": [
+            "final_receiver_inactive",
+            "interference_trace"
+          ],
+          "attribution": {
+            "pointer_changes": 2692,
+            "automated_pointer": 0,
+            "physical_pointer": 7157,
+            "physical_other": 150,
+            "foregrounds": 4
+          },
+          "activation": {
+            "source": "person",
+            "physical_input_before_ms": 13,
+            "pointer_in_receiver_window": true,
+            "command_running": false
+          }
+        }
+      ]
+    },
+    {
+      "run": "B",
+      "summary": {
+        "passed": 1,
+        "failed": 0,
+        "blocked": 0,
+        "unverified": 7
+      },
+      "tasks": [
+        {
+          "task_id": "existing_document",
+          "status": "unverified",
+          "commands": 17,
+          "requests": 18,
+          "unverified_checks": [
+            "interference_trace"
+          ],
+          "observer_max_interval_ms": 199.5,
+          "receiver_activations": 0
+        },
+        {
+          "task_id": "calculation",
+          "status": "passed",
+          "commands": 13,
+          "requests": 14,
+          "observer_max_interval_ms": 63.5,
+          "receiver_activations": 0,
+          "attribution": {
+            "pointer_changes": 1458,
+            "automated_pointer": 0,
+            "physical_pointer": 3580,
+            "physical_other": 52,
+            "foregrounds": 2
+          },
+          "agent_rule_deviation": "wrote one AX inspection result outside the task workspace; artifact and app untouched"
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Runs are separate and not combined.",
+    "The runner covers the owned document fixture, not Calculator UI operation.",
+    "Sampling cannot exclude shorter transients."
+  ]
+}
