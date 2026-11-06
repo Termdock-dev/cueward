@@ -1,6 +1,6 @@
 # Fresh native document task execution
 
-This continues [#36](https://github.com/Termdock-dev/cueward/issues/36) with runnable owned `existing_document`, `calculation` and `window_dialog` tasks. The [document/calculation aggregate](results/2026-10-04-native-agent.json) records successful post-fix disk results, but **zero full task passes** because foreground and pointer observations changed. The [window/dialog aggregate](results/2026-10-05-window-dialog-agent.json) retains a failed initial attempt and a locked-session prerequisite check. #36 remains incomplete; #33 is not repaired by this change.
+This continues [#36](https://github.com/Termdock-dev/cueward/issues/36) with runnable owned `existing_document`, `calculation` and `window_dialog` tasks. The [document/calculation aggregate](results/2026-10-04-native-agent.json) records successful post-fix disk results, but **zero full task passes** because foreground and pointer observations changed. The [2026-11-06 aggregate](results/2026-11-06-native-agent.json) records the first full task pass, `calculation`, after the observer gained [input attribution](desktop-observer.md). The [window/dialog aggregate](results/2026-10-05-window-dialog-agent.json) retains a failed initial attempt and a locked-session prerequisite check. #36 remains incomplete; #33 is not repaired by this change.
 
 ## Product defect found during execution
 
@@ -68,6 +68,26 @@ The initial fresh Agent dispatched five CLI commands. It edited and read back th
 Separate operator diagnostics established the native sheet association and remote receiver behavior, leading to the fail-closed binding implementation above. They did not run the task to completion and do not count as fresh-agent passes. A newly prepared second run stopped at preflight because the desktop was locked while AX/Screen Recording permission remained available. No fixture or fresh Agent launched; its separate report is **0 passed, 0 failed, 1 blocked, 7 unverified**. The original failed attempt is not upgraded by the correction or prerequisite record.
 
 An offline regression also reproduced a dev-broker output escape through `window snapshot --output=...`. Test-only commit `6938815` failed two subcases; fix `9109ac5` rejects both attached and separate output options before dispatch. The affected scope/transport suite then passed 17 tests. Production Cueward input and Rust sources are unchanged in this work.
+
+## Recorded attempts: 2026-11-06
+
+Each row used a separate fresh Agent and receiver, with the observer's input attribution and the unchanged fixture. A person used the computer during the runs. The Agent handoff held only the goal, the owned PID and window, the broker command form and the generic app documentation.
+
+| Run / task | Broker requests | CLI commands | Independent result | Full acceptance |
+| --- | ---: | ---: | --- | --- |
+| A / existing document | 18 | 17 | Exact artifact; bystander and workspace preserved | Failed: receiver activation |
+| B / existing document | 18 | 17 | Exact artifact; zero activations; all other checks passed | Unverified: observer gap of 199.5 ms |
+| B / calculation | 14 | 13 | Exact `69.85` plus newline; zero activations; 1,458 pointer changes attributed to physical input | **Passed** |
+
+Run A totals are **0 passed, 1 failed, 7 unverified**. Run B totals are **1 passed, 0 failed, 7 unverified**. They are separate runs and are not combined.
+
+Run A's activation came from a person, not from Cueward. A physical input arrived 13 ms before the activation, the pointer was inside the receiver window, and no command was running. It stays failed: the check does not excuse receiver activation, and a person touching the receiver means the run cannot show isolation.
+
+Run B's three largest existing-document gaps fell in the first two seconds, while load averages were 14 to 16 from unrelated work. It stays unverified. Sampling cannot show coverage across a gap above 100 ms.
+
+In the calculation run the Agent wrote one AX inspection result to a file outside the task workspace, against its handoff rules, and reported it. The file did not touch the artifact or the app, so no check changed. As before, this runner covers the owned document fixture and cannot demonstrate Calculator UI operation.
+
+Both Agents reported that AX exposes no saved state: Save returns `sent_unverified`, and the window shows no change. One Agent noted that `--root menu` returned `app AX root disappeared` for an app that was still running, which reads as if the app had gone.
 
 ## Recorded attempts: 2026-10-04
 
