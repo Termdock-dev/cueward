@@ -8,7 +8,7 @@ use super::helpers::print_external;
 pub(crate) enum WindowAction {
     /// Compare a saved snapshot with a fresh observation of the same window.
     Diff {
-        /// JSON or wrapped stdout from a previous window snapshot.
+        /// Path to a file holding JSON or wrapped stdout from a previous window snapshot.
         #[arg(long)]
         previous: String,
     },

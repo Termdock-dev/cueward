@@ -48,7 +48,7 @@ cueward calendar delete --title "Team Sync" --start "2026-04-12 14:00" --calenda
 ```
 
 - Calendar and Reminders reads prefer EventKit when the terminal has read access.
-- If reads are unexpectedly slow or empty, run `cueward doctor` and check permissions.
+- If reads are unexpectedly slow or empty, run `cueward doctor` and check permissions. It tests Full Disk Access and AppleScript Automation; it does not test EventKit access.
 
 ## OCR / Screenshots / Clipboard
 

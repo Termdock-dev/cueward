@@ -1,6 +1,6 @@
 # Copy or duplicate explicitly selected package contents
 
-Source capability merged in PR #63. Check installed `files copy-tree plan --help` and `files copy-tree execute --help` for `--include-packages`. Use it only when the user's requested copy includes package contents. For a sibling duplicate, choose an exact new sibling destination; `files duplicate` remains regular-file-only.
+Source capability merged in PR #63. Check installed `files copy-tree plan --help` and `files copy-tree execute --help` for `--include-packages`. Use it only when the user's requested copy includes package contents. For a sibling duplicate that needs package contents, choose an exact new sibling destination here. `files duplicate` takes a file, directory/package or symlink object under its own budgets.
 
 ```bash
 cueward files metadata --root /absolute/directory --path Owned.app

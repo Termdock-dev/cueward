@@ -1,4 +1,4 @@
-# Verified single-file trash execution
+# Verified trash execution
 
 `files trash execute` implements a deletion-protected slice of [#42](https://github.com/Termdock-dev/cueward/issues/42). Execution was merged in PR #61; check installed command help. [Trash planning](files-trash.md) remains read-only and never authorizes execution. Separate [backup restoration](files-trash-restore.md) supports completed receipts; permanent deletion is not implemented.
 

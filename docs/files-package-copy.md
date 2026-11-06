@@ -4,7 +4,7 @@
 
 ## Select the contents explicitly
 
-Use the option only when the requested copy includes package contents. A package's Finder presentation does not make it an opaque file to this engine: every descendant consumes the existing entry/depth/byte budgets and must pass validation. An explicit sibling destination expresses duplication; `files duplicate` remains regular-file-only and no automatic Finder-style name is selected.
+Use the option only when the requested copy includes package contents. A package's Finder presentation does not make it an opaque file to this engine: every descendant consumes the existing entry/depth/byte budgets and must pass validation. An explicit sibling destination expresses duplication; `files duplicate` separately takes a file, directory/package or symlink object, and no automatic Finder-style name is selected.
 
 ```bash
 cueward files metadata --root /Users/me/Documents --path Owned.app

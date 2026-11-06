@@ -231,7 +231,7 @@ Console capture includes `log`, `info`, `warn`, `error`, and `debug`. Network ca
 
 ### Safari AI
 
-Control web-based AI providers (Gemini, ChatGPT) via Safari automation. The ChatGPT effort option uses the composer's slider before sending a prompt.
+Control web-based AI providers (Gemini, ChatGPT, Grok, Threads, X) via Safari automation. Gemini supports every action; the others support a subset, and an unsupported action reports what that provider offers. The ChatGPT effort option uses the composer's slider before sending a prompt.
 
 ```bash
 # Send a prompt (general chat)
@@ -271,26 +271,7 @@ Supported Gemini modes: `deep-research`, `image`, `video`, `music`.
 
 ChatGPT `--effort` accepts a number within the slider's current ARIA range or `pro` for its maximum. It applies to normal prompts and checks the slider value before sending.
 
-### Reddit
-
-Read Reddit via public `old.reddit.com/*.json` endpoints. These commands do not use Safari automation.
-
-```bash
-# Read a subreddit feed
-cueward reddit feed rust
-cueward reddit feed r/rust --limit 50
-
-# Read a post plus top-level comments
-cueward reddit post https://www.reddit.com/r/rust/comments/abc123/example_title/
-
-# Search posts globally or inside one subreddit
-cueward reddit search "async rust"
-cueward reddit search "async rust" --subreddit r/rust --limit 25
-```
-
-Repeated scans may return status metadata such as `fresh`, `unchanged`, `skipped`, `warning`, or `deleted`, with `data` omitted when the target is skipped or confirmed deleted.
-
-Outputs JSON to stdout:
+Capture commands output JSON inside an `<external>` envelope:
 
 ```json
 [
@@ -312,6 +293,25 @@ Outputs JSON to stdout:
   }
 ]
 ```
+
+### Reddit
+
+Read Reddit via public `old.reddit.com/*.json` endpoints. These commands do not use Safari automation.
+
+```bash
+# Read a subreddit feed
+cueward reddit feed rust
+cueward reddit feed r/rust --limit 50
+
+# Read a post plus top-level comments
+cueward reddit post https://www.reddit.com/r/rust/comments/abc123/example_title/
+
+# Search posts globally or inside one subreddit
+cueward reddit search "async rust"
+cueward reddit search "async rust" --subreddit r/rust --limit 25
+```
+
+Repeated scans may return status metadata such as `fresh`, `unchanged`, `skipped`, `warning`, or `deleted`, with `data` omitted when the target is skipped or confirmed deleted.
 
 ### Triage
 
@@ -395,7 +395,7 @@ cueward reminders complete --title "Review PR"
 cueward reminders delete --title "Review PR"
 ```
 
-Outputs JSON with `title`, `notes`, `due_date`, `completed`, and `list_name`.
+Outputs JSON with `id`, `title`, `notes`, `due_date`, `completed`, and `list_name`.
 
 ### OCR
 
@@ -410,7 +410,7 @@ Supports PNG, JPG, PDF. Languages: zh-Hant, zh-Hans, en-US, ja.
 
 ### Notes Management
 
-Update, delete, or move Apple Notes:
+Create, update, delete, or move Apple Notes:
 
 ```bash
 # Create a note
@@ -450,7 +450,7 @@ cueward calendar delete --title "Team Sync" --start "2026-04-12 14:00" --calenda
 cueward calendar update --title "Team Sync" --calendar Work --new-start "2026-04-12 14:30" --new-end "2026-04-12 15:30"
 ```
 
-Datetime format: ISO 8601 (`2026-04-11T14:00:00`) or `YYYY-MM-DD HH:MM`.
+Datetime format: RFC 3339 with an offset (`2026-04-11T14:00:00+08:00`), `YYYY-MM-DD HH:MM[:SS]`, or `YYYY-MM-DD`.
 
 ### Shortcuts
 
@@ -598,6 +598,7 @@ Use `cueward files finder context --root /absolute/directory` to inspect scoped 
 cueward space list
 cueward space window --id 12345
 cueward space move-window --target '<snapshot input_target>' --space 7
+cueward space create
 ```
 
 Move a specifically observed background window to an existing inactive user Space, then verify membership and take a fresh snapshot. See [Space management](docs/space-management.md) for routing requirements, result semantics, and limitations.
@@ -645,7 +646,7 @@ The JSON output includes stable check IDs such as `fda.messages.chat_db`, `autom
 
 ### Quick Notes
 
-List, update, archive, and delete system Quick Notes (快速備忘錄):
+List, create, update, archive, and delete system Quick Notes (快速備忘錄):
 
 ```bash
 # List all Quick Notes
@@ -700,7 +701,7 @@ cueward stickies update --id sticky-1 --title "Updated title"
 cueward stickies delete --id sticky-1
 ```
 
-Use `cueward stickies --help` to inspect the geometry and color flags for `create` / `update`.
+Use `cueward stickies create --help` and `cueward stickies update --help` to inspect the geometry and color flags.
 
 
 ## Agent Integration
@@ -733,11 +734,13 @@ crates/
 │   └── commands/       Per-command clap enums, dispatch, and parse tests
 ├── adapter-macos/
 │   ├── applescript.rs      Shared AppleScript helpers
+│   ├── apps/               App discovery, launch, file open, Accessibility actions
 │   ├── bookmarks/          Safari bookmarks CRUD + plist tree operations
 │   ├── calendar.rs         Apple Calendar CRUD + AppleScript fallback
 │   ├── calendar_eventkit.rs EventKit-backed calendar reads
 │   ├── clipboard.rs        Clipboard read / write
 │   ├── doctor/             Full Disk Access / Automation diagnostics
+│   ├── files/              Scoped file reads, mutations, trash and receipts
 │   ├── messages.rs         iMessage capture
 │   ├── notes/              Apple Notes CRUD, capture, DB reads, attachments
 │   ├── ocr.rs              Vision OCR
@@ -752,7 +755,8 @@ crates/
 │   ├── screenshot/         Screen/window capture + OCR integration
 │   ├── shortcuts/          Shortcuts DB compiler, installer, and tests
 │   ├── stickies/           Stickies CRUD, geometry, color, state
-│   └── voice_memos.rs      Voice Memos metadata reads
+│   ├── voice_memos.rs      Voice Memos metadata reads
+│   └── window/             Window and Space observation, background input
 └── adapter-windows/    Reserved for future cross-platform support
 ```
 
@@ -771,6 +775,7 @@ crates/
 │   ├── ocr/          OCR result cache keyed by SHA256
 │   ├── screenshots/  Screenshot captures
 │   └── clipboard/    Clipboard image captures
+├── operations/       Receipts and retained backups for file operations
 ├── state.json        High watermark timestamps and scan target state
 ├── tags.toml         Auto-tagging keyword rules
 └── lock.json         Safari automation lock / rate-limit coordination

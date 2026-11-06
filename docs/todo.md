@@ -51,10 +51,10 @@
 - [x] Video/Music: prompt → browser-native download via `<a download>`
 - [x] Conversation list/read from sidebar
 - [x] Provider-based CLI structure (`--provider gemini/chatgpt`)
-- [ ] ChatGPT provider implementation
-- [ ] Grok provider implementation
+- [x] ChatGPT provider implementation
+- [x] Grok provider implementation
 
 ## Phase 6+（未來）
 - [ ] 靈動島 Notch UI
 - [ ] Windows adapter
-- [ ] Calendar event 整合（目前只有 Reminders）
+- [x] Calendar event 整合

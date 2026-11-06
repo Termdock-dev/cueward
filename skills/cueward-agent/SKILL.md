@@ -1,6 +1,6 @@
 ---
 name: cueward-agent
-description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, reminders, calendars, screenshots, clipboard, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads, Spotlight content search, Finder context/reveal, explicit iCloud status/downloads, PDF/image/Quick Look previews, and authorized no-overwrite directory/file creation, file/directory duplication, recursive-copy planning/execution including explicitly selected package contents, read-only trash proposals and explicitly confirmed file/directory/link trash with retained verified backup and authorized backup-copy restoration, rename and same/cross-volume move including explicitly selected symlink objects or explicit independent batch rename planning/execution when the installed CLI supports them. Not for general web research or developing Cueward itself.
+description: Read local macOS app data and operate app interfaces with Cueward. Use for Safari tabs/history, Notes, Stickies, reminders, calendars, screenshots and OCR, clipboard, Voice Memos, Reddit reads, Shortcuts, background windows/Spaces, or scoped file search/metadata/reads, Spotlight content search, Finder context/reveal and tags, explicit iCloud status/downloads, PDF/image/Quick Look previews, and authorized no-overwrite directory/file creation, file/directory duplication, recursive-copy planning/execution including explicitly selected package contents, read-only trash proposals and explicitly confirmed file/directory/link trash with retained verified backup and authorized backup-copy restoration, rename and same/cross-volume move including explicitly selected symlink objects or explicit independent batch rename planning/execution when the installed CLI supports them. Not for general web research or developing Cueward itself.
 ---
 
 # Cueward Agent
@@ -11,7 +11,7 @@ Use Cueward for the user's actual Mac state and requested native actions. Honor 
 
 Run `command -v cueward` and `cueward --help` before relying on a newly documented capability. Check the relevant subcommand's `--help` for flags. Skill updates, source branches and the installed CLI can differ; unknown commands do not establish missing permissions. Report the missing installed capability instead of inventing a command or replacing the user's workflow.
 
-Use `cueward doctor --json` when an available operation reports a permission/prerequisite failure. `--live-safari` is an opt-in live probe, not required for every task. Background UI operations need an unlocked session; missing prerequisites are blocked/unverified, not successful empty results.
+Use `cueward doctor --json` when an operation reports a Full Disk Access or Automation failure. It does not check Accessibility, Screen Recording, EventKit or the Swift toolchain; those failures come from the command itself, so report them as written. `--live-safari` is an opt-in live probe, not required for every task. Background UI operations need an unlocked session; missing prerequisites are blocked/unverified, not successful empty results.
 
 ## Choose the data or action path
 

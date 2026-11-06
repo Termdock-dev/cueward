@@ -1,4 +1,4 @@
-# Observed Finder tag names and atomic initial tagging
+# Finder tag reads, atomic initial tagging and tag edits
 
 `files tags read/add/remove/receipt` implements Finder tag management for [#42](https://github.com/Termdock-dev/cueward/issues/42). Check installed help. Add/remove edit requested names on absent, empty or existing supported tag attributes, preserving unselected names, order and colors. A revision is an observation, not authorization.
 

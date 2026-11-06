@@ -33,7 +33,7 @@ Output is JSON inside Cueward's `<external>` data wrapper. A snapshot contains:
 - `window`: ID, owner PID, app, title, visibility, and window-frame bounds.
 - `screenshot`: PNG path, capture timestamp, and optional OCR text.
 - `image`: pixel `width` and `height`, `scale_x` and `scale_y`, and `origin: "window_frame_top_left"`.
-- `input_target`: a five-minute reference for [background keyboard input and scrolling](background-input.md), bound to the observed window and image dimensions.
+- `input_target`: a five-minute reference for [background keyboard and pointer input](background-input.md), [waits](window-wait.md) and `space move-window`, bound to the observed window and image dimensions.
 
 The PNG excludes the window shadow and attached windows such as sheets. It includes the selected window frame and its title bar. Image coordinates start at the image's top-left corner. Window bounds use macOS global screen coordinates in points, with a top-left origin; coordinates can be negative on other displays.
 
