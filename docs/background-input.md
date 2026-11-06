@@ -1,6 +1,6 @@
 # Background keyboard and pointer input
 
-Use a recent window snapshot to address input to a background app, including a window on another Space. Cueward does not activate the app, switch desktops, post global input, move the system pointer, or use the clipboard to type text.
+Use a recent window snapshot to address input to a background app, including a window on another Space. Cueward does not bring the app to the foreground, switch desktops, post global input, move the system pointer, or use the clipboard to type text. For clicks and drags, the target app is told it is active for about a quarter of a second. See [Click preparation](#click-preparation).
 
 ```sh
 cueward window snapshot --id 12345
@@ -38,15 +38,34 @@ Window-local wheel routing uses a dynamically discovered private macOS entry poi
 
 ## Clicks, drags, and dispatch readiness
 
-`click` uses the same snapshot pixel coordinates and window-local routing as scroll. It supports `--button left` (default) or `right`, with `--count 1` (default) or `2`. A double click sends two pairs with click counts 1 then 2. It is a separate action with different effects; never use it automatically to retry a single click that had no visible effect. AppKit may replay a previously ignored first click while handling a double click.
+`click` uses the same snapshot pixel coordinates and window-local routing as scroll. It supports `--button left` (default) or `right`, with `--count 1` (default) or `2`. A double click sends two pairs with click counts 1 then 2. It is a separate action with different effects; never use it automatically to retry a single click that had no visible effect.
 
 `drag` holds the left button along a straight path within the captured window. `--duration-ms` defaults to 500 and accepts 50–2000; identity checks can make elapsed time longer. Both endpoints must lie inside the snapshot. All events are prepared before mouse-down. A detected interruption releases the button to the original receiver at the last delivered point and reports `partially_sent`. Abrupt process termination can prevent that release. This command does not establish support for system drag-and-drop sessions or cross-app file dragging.
+
+Web content that reads the held button state cannot be dragged in the background. A canvas that checks `event.buttons` sees 0, because WebKit reads the button state of the whole login session and events sent to one process do not change it. The events reach the page, and the object stays where it was. Report this as unsupported rather than retrying.
 
 `input-status` posts no events. It returns `keyboard` and `pointer` objects with `dispatch_ready` and an optional `reason`. The check includes current window identity, foreground conflict, keyboard-window binding, and availability of the pointer-routing entry point. `application_acceptance` remains `unverified`: a ready route does not prove that an app, canvas, or control will process the event. Recheck the actual effect after delivery.
 
 `input_busy` reports whether another Cueward helper held the per-app input lock at the probe. A busy lock returns both routes as not ready instead of failing the status query. An idle probe releases its lock immediately; it does not reserve the app while AX checks run. This is a point-in-time observation, so readiness can change before the next command. Invalid or changed targets and permission errors still fail the query.
 
-Controls that reject background first clicks can ignore a single click despite a ready route. Click, double-click, and drag handling can differ even within one app. If an action has no effect, take a new observation and select an action supported by the task and current interface.
+Click, double-click, and drag handling can differ even within one app. If an action has no effect, take a new observation and select an action supported by the task and current interface.
+
+## Click preparation
+
+An inactive app spends a click on activating itself, so most views never receive it. Before a click or drag, Cueward prepares the target:
+
+1. It tells only the target process that it is active. WindowServer focus stays with the app the user is in, so their keyboard, pointer, menu bar, and foreground do not change.
+2. It clicks the title bar once, in the gap between the close and minimize buttons, to make the window key. That gap holds no control in a standard window. The position is measured through Accessibility for each window, because it differs between apps.
+3. It sends the requested click or drag.
+4. It tells the target it is inactive again, unless the user has switched to that app in the meantime.
+
+The result reports what happened in `pointer_preparation`:
+
+- `title_bar_click` — the window was prepared.
+- `no_safe_point` — the close button could not be found through Accessibility, so no title bar click was sent. The first click may be ignored. This is expected for windows without a standard title bar.
+- `unavailable` — the private activation entry point is missing on this system. The first click may be ignored.
+
+The title bar click is not counted in `events_sent`. The target app can observe the short activation: it receives its normal did-become-active notifications, its window can briefly look active, and that window becomes the app's key window. Direct termination of the helper during a click can leave the target believing it is active until its next activation change.
 
 ## Interruption and verification
 
@@ -60,6 +79,8 @@ Results contain `action`, `window_id`, `events_sent`, and a status:
 
 - `sent_unverified`: the helper posted the events. The intended effect has not been checked.
 - `partially_sent`: some events were posted before a detected interruption; `interruption` explains why.
+
+Clicks and drags also report `pointer_preparation`.
 
 `frontmost_pid_before`, `frontmost_pid_after`, and `foreground_changed` report endpoint observations. They do not detect every transient focus change or prove input isolation. Apps may activate themselves as a consequence of an action.
 

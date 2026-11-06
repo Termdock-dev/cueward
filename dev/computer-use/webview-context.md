@@ -1,5 +1,7 @@
 # WebView first-mouse and button-state context
 
+**Update 2026-11-06:** [click preparation](background-first-click.md) changes the ordinary single-click rows below to one exact effect. The canvas drag rows stand. The record below is kept as written.
+
 The #32 investigation now distinguishes App receipt, native first-mouse policy, WKWebView callbacks, DOM button state and actual effects. No production input route is changed; #32 and the dependent #31 accepted-drag case remain open.
 
 ```sh
