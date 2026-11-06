@@ -52,6 +52,22 @@ The [aggregate report](results/2026-10-04-physical-overlap.json) contains synthe
 | Corrected idle receiver | Separate fixed-height scroll content moves offset 0 to 160. Text, Cmd+A, pairs/modifiers and click effects remain correct. Canvas still has no callbacks/displacement. | Scroll setup corrected; no replacement human round was run. |
 | Independent idle interruption | Production returns `partially_sent`, seven events, `window changed`; original receiver monitor sees down/up. Canvas never starts a gesture. Maximum desktop gap 25.176 ms, stationary isolation check passed. | Dispatch stop/up observed; accepted gesture release unverified. |
 
+## Idle diagnostic after click preparation: 2026-11-07
+
+This run used Cueward 0.6.0 from crates.io and the unchanged fixtures. Nobody typed during it, so it does not replace the human round. The [aggregate](results/2026-11-07-physical-overlap-idle.json) keeps the counts.
+
+| Check | Observed result | Status |
+| --- | --- | --- |
+| Background round | Text, Cmd+A, replacement, one click, one drag and one scroll in a single run on an inactive Space. The canvas object moved exactly 80 by 40 points and released once. Scroll offset reached 160. | Passed |
+| Controlled interruption | The window changed during a drag. `partially_sent` with 3 events. The receiver saw the title bar pair, then down, dragged and up. The canvas released once. | Passed |
+| Desktop | Maximum sample gap 59.4 ms, with input attribution. | Passed at sampled resolution |
+
+The canvas failures above came from the receiver's first-mouse policy. [Click preparation](background-first-click.md) makes the window key first, so the ordinary receiver now accepts the drag without any change to it.
+
+The first evaluation of this run reported the interruption as failed. The check allowed exactly one press pair, and click preparation sends a second one on the title bar. The check now requires each press to be released before the next one and none to stay held, so a stuck button still fails.
+
+Still not covered: physical typing during the run, a target that becomes foreground during dispatch, physical WebView overlap and installed third-party apps.
+
 The initial scrollable NSTextView was resized to its viewport after attachment/layout. Minimum-size-only attempts before and after attachment also failed. A separate ordinary fixed-height scroll document now preserves the scroll challenge independently of short-text replacement. The corrected idle result does **not** retroactively pass the initial human round.
 
 In a separate local diagnostic source copy, changing only the canvas first-mouse policy to accept produced one down, 50 drags, one up and the expected 80-by-40-point displacement. The matched ordinary receiver produced zero view callbacks. This supports the first-mouse gate explanation for this receiver; it is not a production fix, ordinary-app acceptance, or a WebView root cause. The patch is not shipped. Apple's [NSView first-mouse documentation](https://developer.apple.com/documentation/appkit/nsview/acceptsfirstmouse%28for%3A%29) describes its default refusal and native controls that accept first mouse.

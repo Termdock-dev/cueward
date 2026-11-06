@@ -1,0 +1,30 @@
+{
+  "kind": "diagnostic",
+  "date": "2026-11-07",
+  "macos": "27.0.1",
+  "architecture": "arm64",
+  "cli": "cueward-cli 0.6.0 installed from crates.io",
+  "fixture_changed": false,
+  "context": "inactive Space, first save of a new NSDocument",
+  "cases": [
+    {
+      "record_target": "document process, document window",
+      "save_enabled_before": false,
+      "save_enabled_after_200_ms": false,
+      "save_enabled_after_1200_ms": false,
+      "receiver_active_after": true
+    },
+    {
+      "record_target": "document process, attached panel window",
+      "save_enabled_before": false,
+      "save_enabled_after_200_ms": false,
+      "save_enabled_after_1200_ms": false,
+      "receiver_active_after": true
+    }
+  ],
+  "panel_window_owner_is_document_process": true,
+  "artifact_created": false,
+  "panel_nodes_observed": 1952,
+  "read_limit": "One app inspect call returns at most 500 nodes, and the unmodified first-save probe now stops before Save and reports save_control_unavailable with panel_traversal_truncated true. Walking subtrees with --root reaches Save.",
+  "conclusion": "A target-only activation record makes the app report active and does not enable the Save control."
+}

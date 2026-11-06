@@ -1,0 +1,90 @@
+{
+  "kind": "idle_diagnostic_only_not_physical_acceptance",
+  "date": "2026-11-07",
+  "macos": "27.0.1",
+  "architecture": "arm64",
+  "cli": "cueward-cli 0.6.0 installed from crates.io",
+  "fixture_changed": false,
+  "target": "owned AppKit receivers on one inactive Space",
+  "actions": [
+    {
+      "name": "text",
+      "status": "sent_unverified",
+      "events_sent": 46
+    },
+    {
+      "name": "shortcut",
+      "status": "sent_unverified",
+      "events_sent": 2
+    },
+    {
+      "name": "replacement",
+      "status": "sent_unverified",
+      "events_sent": 42
+    },
+    {
+      "name": "click",
+      "status": "sent_unverified",
+      "events_sent": 2,
+      "pointer_preparation": "title_bar_click"
+    },
+    {
+      "name": "drag",
+      "status": "sent_unverified",
+      "events_sent": 52,
+      "pointer_preparation": "title_bar_click"
+    },
+    {
+      "name": "scroll",
+      "status": "sent_unverified",
+      "events_sent": 1
+    },
+    {
+      "name": "interrupted_drag",
+      "status": "partially_sent",
+      "events_sent": 3,
+      "pointer_preparation": "title_bar_click"
+    }
+  ],
+  "receiver_effects": {
+    "clicks": 1,
+    "object_moved_points": [
+      80,
+      40
+    ],
+    "releases": 1,
+    "scroll_offset": 160,
+    "select_alls": 1,
+    "exact_replacement_text": true
+  },
+  "interrupted_receiver": {
+    "press_sequence": [
+      "down",
+      "up",
+      "down",
+      "dragged",
+      "up"
+    ],
+    "canvas_down": 1,
+    "canvas_up": 1,
+    "releases": 1,
+    "dragging_after": false
+  },
+  "checks": {
+    "background": "passed",
+    "controlled_interruption": "passed",
+    "desktop": "passed"
+  },
+  "controlled_interruption_note": "First evaluation failed because the check allowed one press pair. Click preparation adds a title bar pair. The same record passes after the check pairs presses, and a held button still fails.",
+  "observer_max_interval_ms": 59.4,
+  "cleanup": {
+    "owned_processes_stopped": true,
+    "errors": []
+  },
+  "not_covered": [
+    "physical typing during the run",
+    "mid-flight target activation",
+    "physical WebView overlap",
+    "installed third-party apps"
+  ]
+}
