@@ -50,7 +50,7 @@ def execution_from_records(records, start_id, end_id):
 
 def observation_checks(execution, pids, pointer_policy="stationary"):
     """Assess collection completeness, retaining physical movement as unattributed."""
-    from task_acceptance.trace import check_trace
+    from task_acceptance.trace import check_trace, has_input_counts
 
     if pointer_policy not in ("stationary", "physical_concurrent"):
         raise ValueError("unknown pointer policy")
@@ -67,7 +67,7 @@ def observation_checks(execution, pids, pointer_policy="stationary"):
     if any(s.get("frontmost_pid") in pids or any(s.get("target_active", {}).get(str(pid)) is True for pid in pids)
            for s in samples):
         return {"status": "failed", "reason": "owned receiver became foreground or active"}
-    if pointer_policy == "physical_concurrent":
+    if pointer_policy == "physical_concurrent" and not all(has_input_counts(s) for s in samples):
         # Do not turn a user's intended mouse movement into automation interference,
         # or silently claim attribution by deleting the pointer observations.
         return {"status": "unverified", "reason": "physical pointer movement needs independent receiver/input attribution",
