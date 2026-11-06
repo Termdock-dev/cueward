@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::MacosError;
 use crate::safari_guard::with_safari_session;
 
-use super::target::{execute_js_in_tab, resolve_tab};
+use super::target::{execute_js_in_changing_tab, execute_js_in_tab, resolve_tab};
 use super::types::SafariWaitResult;
 
 /// A condition to poll in one Safari tab.
@@ -112,7 +112,7 @@ pub fn wait_until(
         let check_js = condition.check_js(navigation_start.as_ref())?;
         let deadline = Instant::now() + Duration::from_secs(timeout_seconds);
         loop {
-            let result = execute_js_in_tab(&check_js, &tab, "safari_wait")?;
+            let result = execute_js_in_changing_tab(&check_js, &tab, "safari_wait")?;
             match result.as_str() {
                 "true" => {
                     return Ok(SafariWaitResult {
