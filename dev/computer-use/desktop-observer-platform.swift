@@ -2,6 +2,48 @@ import AppKit
 import CoreGraphics
 import Darwin
 
+/// Counts input by source from a listen-only tap. Key codes and characters are never read.
+/// A source PID of zero is hardware; idle-time APIs cannot tell, because posted events reset them too.
+final class InputAttribution: @unchecked Sendable {
+    private(set) var physicalPointer = 0
+    private(set) var automatedPointer = 0
+    private(set) var physicalOther = 0
+    private var tap: CFMachPort?
+
+    func start() -> Bool {
+        let pointer: [CGEventType] = [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
+        let other: [CGEventType] = [.leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel, .keyDown]
+        let mask = (pointer + other).reduce(CGEventMask(0)) { $0 | (1 << CGEventMask($1.rawValue)) }
+        let callback: CGEventTapCallBack = { _, type, event, context in
+            if let context { Unmanaged<InputAttribution>.fromOpaque(context).takeUnretainedValue().record(type, event) }
+            return Unmanaged.passUnretained(event)
+        }
+        guard let created = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .tailAppendEventTap, options: .listenOnly,
+                                              eventsOfInterest: mask, callback: callback,
+                                              userInfo: Unmanaged.passUnretained(self).toOpaque()) else { return false }
+        tap = created
+        CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, created, 0), .commonModes)
+        CGEvent.tapEnable(tap: created, enable: true)
+        return true
+    }
+
+    private func record(_ type: CGEventType, _ event: CGEvent) {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+            return
+        }
+        let physical = event.getIntegerValueField(.eventSourceUnixProcessID) == 0
+        switch type {
+        case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
+            if physical { physicalPointer += 1 } else { automatedPointer += 1 }
+        case .keyDown:
+            if physical { physicalOther += 1 }
+        default:
+            if physical { physicalOther += 1 } else { automatedPointer += 1 }
+        }
+    }
+}
+
 /// Read-only desktop observation. No activation, input, capture or window enumeration.
 @MainActor final class DesktopObservation {
     typealias Connection = @convention(c) () -> Int32
@@ -10,6 +52,8 @@ import Darwin
     private let displaySpaces: DisplaySpaces
     private let receivers: [NSRunningApplication]
     private let library: UnsafeMutableRawPointer
+    private let input = InputAttribution()
+    private let inputAvailable: Bool
 
     init(pids: [Int32]) throws {
         guard let library = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY),
@@ -26,6 +70,7 @@ import Darwin
             }
             return app
         }
+        inputAvailable = input.start()
     }
 
     private func displayUUID(_ id: CGDirectDisplayID) throws -> String {
@@ -68,9 +113,14 @@ import Darwin
             active[String(app.processIdentifier)] = app.isActive
         }
         let pointer = event.location
-        return ["type": "sample", "ms": ms, "frontmost_pid": foreground.processIdentifier,
-                "pointer": [pointer.x, pointer.y], "visible_spaces": try visibleSpaces(),
-                "target_active": active,
-                "session_locked": session["CGSSessionScreenIsLocked"] as? Bool == true]
+        var value: [String: Any] = ["type": "sample", "ms": ms, "frontmost_pid": foreground.processIdentifier,
+                                    "pointer": [pointer.x, pointer.y], "visible_spaces": try visibleSpaces(),
+                                    "target_active": active,
+                                    "session_locked": session["CGSSessionScreenIsLocked"] as? Bool == true]
+        if inputAvailable {
+            value["input"] = ["physical_pointer": input.physicalPointer, "automated_pointer": input.automatedPointer,
+                              "physical_other": input.physicalOther]
+        }
+        return value
     }
 }

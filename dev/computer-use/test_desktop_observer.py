@@ -82,6 +82,81 @@ class EvidenceTests(unittest.TestCase):
         execution["samples"][1]["target_active"]["200"] = True
         self.assertEqual(observation_checks(execution, [200], "physical_concurrent")["status"], "failed")
 
+    def attributed(self):
+        execution = self.execution()
+        for sample in execution["samples"]:
+            sample["input"] = {"physical_pointer": 0, "automated_pointer": 0, "physical_other": 0}
+        return execution
+
+    def change(self, execution, index, field, value, counter=None):
+        for sample in execution["samples"][index:]:
+            sample[field] = value
+            if counter:
+                sample["input"][counter] += 1
+
+    def test_pointer_movement_with_physical_input_is_not_interference(self):
+        execution = self.attributed()
+        self.change(execution, 2, "pointer", [30, 40], "physical_pointer")
+        result = observation_checks(execution, [200])
+        self.assertEqual(result["status"], "passed")
+        self.assertTrue(result["metrics"]["input_attributed"])
+
+    def test_pointer_movement_without_physical_input_fails(self):
+        execution = self.attributed()
+        self.change(execution, 2, "pointer", [30, 40])
+        result = observation_checks(execution, [200])
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("without physical input", result["reason"])
+
+    def test_old_physical_input_does_not_explain_later_pointer_movement(self):
+        execution = self.attributed()
+        for index, sample in enumerate(execution["samples"]):
+            sample["ms"] = index * 90
+        for sample in execution["samples"]:
+            sample["input"]["physical_pointer"] = 1
+        execution["samples"][0]["input"]["physical_pointer"] = 0
+        self.change(execution, 4, "pointer", [30, 40])
+        execution["start_ms"], execution["end_ms"] = 1, 359
+        self.assertEqual(observation_checks(execution, [200])["status"], "failed")
+
+    def test_automated_global_pointer_input_fails_even_when_the_pointer_stays(self):
+        execution = self.attributed()
+        for sample in execution["samples"][2:]:
+            sample["input"]["automated_pointer"] = 1
+        result = observation_checks(execution, [200])
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("automated", result["reason"])
+
+    def test_foreground_and_space_changes_need_recent_physical_input(self):
+        for field, value in (("frontmost_pid", 101), ("visible_spaces", {"1": "9"})):
+            with self.subTest(field=field, input=False):
+                execution = self.attributed()
+                self.change(execution, 2, field, value)
+                self.assertEqual(observation_checks(execution, [200])["status"], "failed")
+            with self.subTest(field=field, input=True):
+                execution = self.attributed()
+                self.change(execution, 2, field, value, "physical_other")
+                self.assertEqual(observation_checks(execution, [200])["status"], "passed")
+
+    def test_physical_input_cannot_excuse_receiver_foreground_or_activation(self):
+        execution = self.attributed()
+        self.change(execution, 2, "frontmost_pid", 200, "physical_other")
+        self.assertEqual(observation_checks(execution, [200])["status"], "failed")
+        execution = self.attributed()
+        execution["samples"][2]["target_active"]["200"] = True
+        self.assertEqual(observation_checks(execution, [200])["status"], "failed")
+
+    def test_partial_input_evidence_keeps_the_strict_stationary_check(self):
+        execution = self.attributed()
+        self.change(execution, 2, "pointer", [30, 40], "physical_pointer")
+        del execution["samples"][3]["input"]
+        self.assertEqual(observation_checks(execution, [200])["status"], "failed")
+
+    def test_physical_concurrent_policy_uses_attribution_when_available(self):
+        execution = self.attributed()
+        self.change(execution, 2, "pointer", [30, 40], "physical_pointer")
+        self.assertEqual(observation_checks(execution, [200], "physical_concurrent")["status"], "passed")
+
 
 class SwiftModelTests(unittest.TestCase):
     @classmethod

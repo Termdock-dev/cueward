@@ -3,6 +3,11 @@
 import math
 
 MAX_INTERVAL_MS = 100
+# Input arrives on a different callback from sampling, so a change can lead or trail its count.
+POINTER_ATTRIBUTION_MS = 100
+# Foreground and Space changes finish after the click or key press that requested them.
+DESKTOP_ATTRIBUTION_MS = 1000
+INPUT_COUNTS = ("physical_pointer", "automated_pointer", "physical_other")
 
 
 def number(value):
@@ -21,13 +26,49 @@ def valid_sample(sample, pids):
             and all(type(sample["target_active"].get(str(pid))) is bool for pid in pids))
 
 
+def has_input_counts(sample):
+    counts = sample.get("input")
+    return isinstance(counts, dict) and all(type(counts.get(key)) is int and counts[key] >= 0 for key in INPUT_COUNTS)
+
+
+def input_advanced(samples, index, keys, before_ms):
+    """Report whether the named counts grew around one sample."""
+    moment = samples[index]["ms"]
+    first = index
+    while first > 0 and moment - samples[first]["ms"] < before_ms:
+        first -= 1
+    last = index
+    while last + 1 < len(samples) and samples[last + 1]["ms"] - moment <= POINTER_ATTRIBUTION_MS:
+        last += 1
+    return any(samples[last]["input"][key] > samples[first]["input"][key] for key in keys)
+
+
+def attributed_change(samples):
+    """Fail only changes that physical input cannot explain; automation has no excuse."""
+    for index in range(1, len(samples)):
+        previous, sample = samples[index - 1], samples[index]
+        if sample["input"]["automated_pointer"] > previous["input"]["automated_pointer"]:
+            return "automated input reached the global pointer stream"
+        if (sample["pointer"] != previous["pointer"]
+                and not input_advanced(samples, index, ("physical_pointer",), POINTER_ATTRIBUTION_MS)):
+            return "pointer moved without physical input"
+        if (any(sample[key] != previous[key] for key in ("frontmost_pid", "visible_spaces"))
+                and not input_advanced(samples, index, ("physical_pointer", "physical_other"), DESKTOP_ATTRIBUTION_MS)):
+            return "foreground or visible Space changed without physical input"
+    return None
+
+
 def interference(samples, pids, inactive_space, space):
     baseline = samples[0]
     for sample in samples:
-        if any(sample[key] != baseline[key] for key in ("frontmost_pid", "pointer", "visible_spaces")):
-            return "failed", "foreground, pointer or visible Space changed"
         if sample["frontmost_pid"] in pids or any(sample["target_active"][str(pid)] for pid in pids):
             return "failed", "receiver became foreground or active"
+    if all(has_input_counts(sample) for sample in samples):
+        reason = attributed_change(samples)
+        if reason:
+            return "failed", reason
+    elif any(sample[key] != baseline[key] for sample in samples for key in ("frontmost_pid", "pointer", "visible_spaces")):
+        return "failed", "foreground, pointer or visible Space changed"
     if inactive_space:
         if not isinstance(space, str) or not space:
             return "unverified", "missing inactive target Space identity"
@@ -81,6 +122,7 @@ def check_trace(evidence, inactive_space=False):
     observed = observer_checks(execution, pids)
     if observed:
         return *observed, metrics
+    metrics["input_attributed"] = all(has_input_counts(sample) for sample in samples)
     status, reason = interference(samples, pids, inactive_space, evidence.get("target_space"))
     if status == "failed":
         return status, reason, metrics
