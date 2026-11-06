@@ -1,5 +1,5 @@
 use super::input_live_tests::Receiver;
-use super::{InputDelivery, click, drag, input_status};
+use super::{InputDelivery, PointerPreparation, click, drag, input_status};
 
 #[test]
 #[ignore = "requires a logged-in macOS desktop, Accessibility and Screen Recording permissions"]
@@ -73,6 +73,10 @@ fn pointer_click_and_drag_reach_a_view_that_refuses_first_mouse() {
     let y = 140.0 * snapshot.image.scale_y;
     let clicked = click(&snapshot.input_target, x, y, "left", 1).expect("click");
     assert_eq!(clicked.status, InputDelivery::SentUnverified);
+    assert_eq!(
+        clicked.pointer_preparation,
+        Some(PointerPreparation::TitleBarClick)
+    );
     let state = receiver.wait_for(|s| s["events"].as_array().is_some_and(|e| e.len() == 2));
     let types: Vec<_> = state["events"]
         .as_array()

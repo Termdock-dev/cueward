@@ -99,6 +99,26 @@ fn pointer_validation_rejects_unsupported_buttons_and_unbounded_sequences() {
 }
 
 #[test]
+fn pointer_preparation_appears_only_when_the_helper_reports_it() {
+    let base = r#""action":"key","window_id":7,"status":"sent_unverified","events_sent":2,
+        "frontmost_pid_before":1,"frontmost_pid_after":1,"foreground_changed":false"#;
+    let keyboard: BackgroundInputResult =
+        serde_json::from_str(&format!("{{{base}}}")).expect("keyboard result");
+    assert_eq!(keyboard.pointer_preparation, None);
+    let serialized = serde_json::to_value(&keyboard).expect("serialized");
+    assert!(serialized.get("pointer_preparation").is_none());
+    for (name, expected) in [
+        ("title_bar_click", PointerPreparation::TitleBarClick),
+        ("no_safe_point", PointerPreparation::NoSafePoint),
+        ("unavailable", PointerPreparation::Unavailable),
+    ] {
+        let json = format!(r#"{{{base},"pointer_preparation":"{name}"}}"#);
+        let pointer: BackgroundInputResult = serde_json::from_str(&json).expect("pointer result");
+        assert_eq!(pointer.pointer_preparation, Some(expected));
+    }
+}
+
+#[test]
 #[ignore = "requires macOS Accessibility permission; no desktop input is posted"]
 fn status_returns_busy_observation_while_another_helper_owns_the_lock() {
     use crate::window::input_lock::lock_input;

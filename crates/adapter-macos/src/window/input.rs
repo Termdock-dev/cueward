@@ -15,6 +15,18 @@ pub enum InputDelivery {
     PartiallySent,
 }
 
+/// How a pointer action made the target app ready for a click it would otherwise spend on activation.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PointerPreparation {
+    /// One click on the title bar made the window key first.
+    TitleBarClick,
+    /// No title bar point was proven safe, so the first click may be ignored.
+    NoSafePoint,
+    /// The private activation route is missing, so the first click may be ignored.
+    Unavailable,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BackgroundInputResult {
     pub action: String,
@@ -23,6 +35,8 @@ pub struct BackgroundInputResult {
     pub events_sent: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interruption: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pointer_preparation: Option<PointerPreparation>,
     pub frontmost_pid_before: i32,
     pub frontmost_pid_after: i32,
     pub foreground_changed: bool,
