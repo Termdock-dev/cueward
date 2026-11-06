@@ -27,6 +27,8 @@ let startedAt = ProcessInfo.processInfo.systemUptime
 let frontBefore = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
 var eventsSent = 0
 var interruption: String?
+var pointerPreparation: String?
+var activationPosted = false
 
 // Optional native identity avoids relying on AX titles that dialogs may omit.
 typealias GetAXWindow = @convention(c) (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError
@@ -81,7 +83,10 @@ func readinessIssue(forKeyboard: Bool) -> String? {
 
 func maySend() -> Bool {
     if let issue = readinessIssue(forKeyboard: keyboard) {
-        if eventsSent == 0 { fail(issue) }
+        if eventsSent == 0 {
+            restorePointerTarget()
+            fail(issue)
+        }
         interruption = issue
         return false
     }
@@ -146,6 +151,70 @@ func mouseEvent(_ type: CGEventType, at point: CGPoint, button: CGMouseButton = 
     return event
 }
 
+// An inactive app spends a click on activating itself, so most views never see it. This record
+// tells only the target process that it is active. WindowServer focus stays with the user's app,
+// so their keyboard, pointer and foreground do not move.
+typealias ProcessForPID = @convention(c) (pid_t, UnsafeMutableRawPointer) -> OSStatus
+typealias PostEventRecord = @convention(c) (UnsafeRawPointer, UnsafePointer<UInt8>) -> Int32
+let postRecordSymbol = framework.flatMap { dlsym($0, "SLPSPostEventRecordTo") }
+let processLookupSymbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "GetProcessForPID")
+
+func postActivationRecord(_ state: UInt8) -> Bool {
+    guard let postRecordSymbol, let processLookupSymbol else { return false }
+    var serial: [UInt32] = [0, 0]
+    let lookup = unsafeBitCast(processLookupSymbol, to: ProcessForPID.self)
+    guard serial.withUnsafeMutableBytes({ lookup(pid, $0.baseAddress!) }) == noErr else { return false }
+    var record = [UInt8](repeating: 0, count: 0xf8)
+    record[0x04] = 0xf8
+    record[0x08] = 0x0d // NSEventTypeAppKitDefined
+    record[0x8a] = state // 1 activated, 2 deactivated
+    withUnsafeBytes(of: windowID) { record.replaceSubrange(0x3c..<0x40, with: $0) }
+    let post = unsafeBitCast(postRecordSymbol, to: PostEventRecord.self)
+    return serial.withUnsafeBytes { post($0.baseAddress!, record) } == 0
+}
+
+// The gap between the close and minimize buttons is the one title bar point that holds no control
+// in any standard window, including those with tabs or toolbars in the title bar. Button positions
+// differ between apps, so the point is measured.
+func titleBarPoint() -> CGPoint? {
+    let matches = matchingWindows()
+    guard matches.count == 1, let closeRaw = attribute(matches[0], kAXCloseButtonAttribute),
+          CFGetTypeID(closeRaw) == AXUIElementGetTypeID(),
+          let close = bounds(closeRaw as! AXUIElement) else { return nil }
+    var right = close.maxX + 8
+    if let minimizeRaw = attribute(matches[0], kAXMinimizeButtonAttribute),
+       CFGetTypeID(minimizeRaw) == AXUIElementGetTypeID(),
+       let minimize = bounds(minimizeRaw as! AXUIElement) { right = minimize.minX }
+    let local = CGPoint(x: (close.maxX + right) / 2 - x, y: close.midY - y)
+    guard right > close.maxX, local.x >= 0, local.y >= 0, local.x < width, local.y < height else { return nil }
+    return local
+}
+
+// A window that only becomes key during a click still counts that click as first mouse, so one
+// click is spent on the title bar. AX cannot show native key state, so this is never skipped.
+func preparePointerTarget() -> String {
+    // No event has gone out yet, so a target that is already foreground stops here.
+    _ = maySend()
+    // Everything that can fail happens before the target is told it is active.
+    let warmup = titleBarPoint().map { (mouseEvent(.leftMouseDown, at: $0), mouseEvent(.leftMouseUp, at: $0)) }
+    guard postActivationRecord(1) else { return "unavailable" }
+    activationPosted = true
+    Thread.sleep(forTimeInterval: 0.05)
+    guard let (down, up) = warmup else { return "no_safe_point" }
+    down.postToPid(pid)
+    up.postToPid(pid)
+    Thread.sleep(forTimeInterval: 0.08)
+    return "title_bar_click"
+}
+
+func restorePointerTarget() {
+    guard activationPosted else { return }
+    activationPosted = false
+    // An app the user really switched to must keep its active state.
+    if NSWorkspace.shared.frontmostApplication?.processIdentifier != pid { _ = postActivationRecord(2) }
+    Thread.sleep(forTimeInterval: 0.05)
+}
+
 func click() {
     let location = point()
     guard let name = request["button"] as? String, ["left", "right"].contains(name),
@@ -156,6 +225,7 @@ func click() {
         mouseEvent(right ? .rightMouseDown : .leftMouseDown, at: location, button: right ? .right : .left, count: Int64(ordinal)),
         mouseEvent(right ? .rightMouseUp : .leftMouseUp, at: location, button: right ? .right : .left, count: Int64(ordinal))
     ) }
+    pointerPreparation = preparePointerTarget()
     for (down, up) in pairs {
         guard maySend() else { break }
         down.postToPid(pid)
@@ -176,6 +246,7 @@ func drag() {
         let location = CGPoint(x: start.x + (end.x - start.x) * fraction, y: start.y + (end.y - start.y) * fraction)
         return (mouseEvent(.leftMouseDragged, at: location), mouseEvent(.leftMouseUp, at: location))
     }
+    pointerPreparation = preparePointerTarget()
     guard maySend() else { return }
     down.postToPid(pid)
     eventsSent += 1
@@ -243,6 +314,10 @@ case "drag": drag()
 default: fail("unsupported background input")
 }
 
+// Events still queued when this process exits are dropped.
+if eventsSent > 0 { Thread.sleep(forTimeInterval: 0.12) }
+restorePointerTarget()
+
 let frontAfter = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
 var result: [String: Any] = [
     "action": action, "window_id": windowID,
@@ -252,4 +327,5 @@ var result: [String: Any] = [
     "foreground_changed": frontBefore != frontAfter,
 ]
 if let interruption { result["interruption"] = interruption }
+if let pointerPreparation { result["pointer_preparation"] = pointerPreparation }
 emit(result)

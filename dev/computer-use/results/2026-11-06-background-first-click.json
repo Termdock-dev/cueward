@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "kind": "background_first_click",
+  "date": "2026-11-06",
+  "timezone": "Asia/Taipei",
+  "platform": {
+    "macos": "27.0.1",
+    "build": "26A434",
+    "architecture": "arm64",
+    "online_displays": 3
+  },
+  "receiver": "unmodified WKWebView in an owned accessory app, plus AppKit pointer fixture",
+  "pre_fix": {
+    "view_events_on_first_mouse_refusal": 0
+  },
+  "production_cli": {
+    "visible": {
+      "first_single_click": "passed",
+      "subsequent_single_click": "passed",
+      "canvas_drag": "failed"
+    },
+    "inactive": {
+      "first_single_click": "passed",
+      "subsequent_single_click": "passed",
+      "canvas_drag": "failed",
+      "desktop_check": "passed"
+    }
+  },
+  "soak": {
+    "seconds": 40,
+    "clicks_sent": 14,
+    "dom_clicks": 14,
+    "rejected": 0,
+    "average_key_ms": 209,
+    "physical_keys": 152,
+    "physical_keys_during_key_windows": 11,
+    "physical_keys_to_receiver": 0,
+    "foreground_or_menu_or_space_changes": 0,
+    "synthetic_events_on_global_stream": 0
+  },
+  "sender_variants": {
+    "focus_record_only": {
+      "click_effects": 0
+    },
+    "focus_record_with_title_bar_click": {
+      "runs": 5,
+      "click_effects_per_run": 1
+    },
+    "make_key_record_pair": "receiver stopped handling events"
+  },
+  "held_button": {
+    "clean_runs": 5,
+    "pressed_values": [
+      0
+    ],
+    "contaminated_runs": 1,
+    "physical_drag_events_in_contaminated_run": 79
+  },
+  "delivery_on_exit": {
+    "immediate_exit": "0 of 40 events",
+    "170_ms_wait": "40 of 40 events"
+  },
+  "codex_contrast": {
+    "version": "26.1027.1001730",
+    "click_effects": 2,
+    "canvas_drag": "failed",
+    "target_active_seconds": 23.0,
+    "physical_keys_during_active": 16,
+    "physical_keys_to_receiver": 0,
+    "title_bar_point": [
+      30,
+      16
+    ]
+  },
+  "attribution": {
+    "no_automation_30s": {
+      "pointer_changes": 188,
+      "physical": 188
+    },
+    "command_mix_27_commands": {
+      "pointer_changes": 1258,
+      "non_physical_sources": 0,
+      "receiver_activations": 0
+    }
+  },
+  "limits": [
+    "Owned fixtures only; real-app verification outstanding.",
+    "Stage Manager was enabled; windows outside the stage could not be bound.",
+    "20 ms sampling cannot exclude shorter transients."
+  ]
+}

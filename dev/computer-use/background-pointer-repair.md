@@ -1,5 +1,7 @@
 # Background pointer repair work in progress
 
+**Superseded for clicks on 2026-11-06.** [Click preparation](background-first-click.md) gives exactly-once clicks on the ordinary receiver. It tells the target it is active, which the first condition below excluded; the project owner accepted that trade because the user's foreground, keyboard and pointer stay unchanged and the capability is otherwise missing. Canvas drags that read held-button state remain unsupported. The record below is kept as written.
+
 No generic raw-pointer sender correction has been established for #32. The diagnostic work merged in PR #68 preserves the failing ordinary-receiver baseline, distinguishing actual effects from dispatch receipts. Production routing, target binding and interruption guards remain unchanged. #31, #32, #33 and #36 are not closed by these diagnostic tools.
 
 ## Reproduce the acceptance gap

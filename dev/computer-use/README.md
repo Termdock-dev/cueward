@@ -60,7 +60,7 @@ Columns are independently calculated medians and need not add up. The screenshot
 
 All five interpreted helper key pairs and all five CLI key pairs reached the receiver. Four of five precompiled pairs arrived; one returned `sent_unverified` with two posted events but produced no receiver down/up within the check or in the final trace. Fourteen total pairs arrived, releases stayed paired, the receiver text stayed empty and the fixture was inactive at the final observation. The report's overall input verification is therefore **failed**. An earlier unpaced run also lost precompiled effects; its timings are not substituted for this run's recorded samples.
 
-These samples show a large interpreter startup/transport residual and much smaller final JSON serialization cost. They justify investigating helper startup, but do not establish a usable input optimization. The missing precompiled effect remains unexplained: event delivery/lifetime and command pacing are hypotheses, not confirmed causes. Production continues to use its existing helper route. No cache, persistent helper, service or new dependency is introduced, and no speedup is claimed for the delivered CLI.
+These samples show a large interpreter startup/transport residual and much smaller final JSON serialization cost. They justify investigating helper startup, but do not establish a usable input optimization. The missing precompiled effect was later explained by [events lost on exit](background-first-click.md#delivery-on-exit). At the time it remained unexplained: event delivery/lifetime and command pacing are hypotheses, not confirmed causes. Production continues to use its existing helper route. No cache, persistent helper, service or new dependency is introduced, and no speedup is claimed for the delivered CLI.
 
 The initial matching wait uncovered unconditional reads of irrelevant AXDescription attributes. The production wait now reads only selector/condition attributes; deterministic tests preserve required-attribute failures, and the native text receiver and existing wait desktop tests pass. This correction enables the matching-wait baseline without weakening role or secure-value checks.
 # First-save context comparison
@@ -69,4 +69,4 @@ See [first-save-context.md](first-save-context.md) for the observer-backed diagn
 
 # Background pointer repair
 
-The repair investigation and rejected sender hypotheses are recorded in [background-pointer-repair.md](background-pointer-repair.md). Diagnostic tooling and passing evaluator tests do not establish a functional fix.
+[Background first click](background-first-click.md) records the click preparation that replaced the failing ordinary route. The earlier repair investigation and rejected sender hypotheses are recorded in [background-pointer-repair.md](background-pointer-repair.md). Diagnostic tooling and passing evaluator tests do not establish a functional fix.

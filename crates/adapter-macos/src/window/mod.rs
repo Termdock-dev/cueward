@@ -24,8 +24,8 @@ pub use diff::{
     PixelBounds, SnapshotDiff, SnapshotDiffStatus, SnapshotPixelDiff, diff_window_snapshot,
 };
 pub use input::{
-    BackgroundInputResult, BackgroundInputStatus, InputDelivery, InputRouteStatus, click, drag,
-    input_status, key, scroll, type_text,
+    BackgroundInputResult, BackgroundInputStatus, InputDelivery, InputRouteStatus,
+    PointerPreparation, click, drag, input_status, key, scroll, type_text,
 };
 pub use inspection::{inspect_window, inspect_window_subtree, inspect_window_surface};
 pub use snapshot::{SnapshotImage, WindowSnapshot, snapshot_window};

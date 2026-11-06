@@ -69,8 +69,7 @@ func validateCatalogWindow(allowOffscreen: Bool = false, exactBounds: Bool = fal
     }
 }
 
-func bindWindow() -> AXUIElement {
-    validateCatalogWindow(allowOffscreen: true)
+func matchingWindows() -> [AXUIElement] {
     var candidates = elements(application, kAXWindowsAttribute)
     for name in [kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
         if let raw = attribute(application, name), CFGetTypeID(raw) == AXUIElementGetTypeID() {
@@ -78,11 +77,16 @@ func bindWindow() -> AXUIElement {
             if !candidates.contains(where: { CFEqual($0, element) }) { candidates.append(element) }
         }
     }
-    let matches = candidates.filter { element in
+    return candidates.filter { element in
         guard text(attribute(element, kAXTitleAttribute)) == expectedTitle,
               let frame = bounds(element) else { return false }
         return sameBounds(frame, expectedBounds)
     }
+}
+
+func bindWindow() -> AXUIElement {
+    validateCatalogWindow(allowOffscreen: true)
+    let matches = matchingWindows()
     guard matches.count == 1 else {
         fail("window binding is unproven: \(matches.count) AX windows match window \(windowID)")
     }
