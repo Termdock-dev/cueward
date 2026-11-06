@@ -7,7 +7,9 @@ repository.workspace = true
 homepage.workspace = true
 readme.workspace = true
 rust-version.workspace = true
-description = "CLI for capturing and searching local knowledge from macOS native sources."
+description = "macOS CLI that gives AI agents local memory and computer use: read native app data and files, and operate background windows."
+keywords = ["macos", "automation", "ai-agents", "computer-use", "accessibility"]
+categories = ["command-line-utilities", "os::macos-apis"]
 
 [[bin]]
 name = "cueward"
