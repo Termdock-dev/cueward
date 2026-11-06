@@ -44,12 +44,18 @@ pub(super) fn select_tab(
     Ok(selected)
 }
 
-pub(super) fn tab_identity_guard(tab: &SafariTab) -> String {
+fn tab_position_guard(tab: &SafariTab) -> String {
     format!(
         r#"if (count of tabs of w) < {tab_index} then error "target tab closed"
-              set targetTab to tab {tab_index} of w
-              {metadata_guard}"#,
+              set targetTab to tab {tab_index} of w"#,
         tab_index = tab.index + 1,
+    )
+}
+
+pub(super) fn tab_identity_guard(tab: &SafariTab) -> String {
+    format!(
+        "{position_guard}\n              {metadata_guard}",
+        position_guard = tab_position_guard(tab),
         metadata_guard = tab_metadata_guard(tab),
     )
 }
@@ -74,16 +80,33 @@ pub(super) fn execute_js_in_tab(
     tab: &SafariTab,
     context: &str,
 ) -> Result<String, MacosError> {
+    run_js_in_tab(js_code, tab, context, &tab_identity_guard(tab))
+}
+
+/// Run JavaScript in a tab whose URL and title are expected to change, such as during a wait.
+pub(super) fn execute_js_in_changing_tab(
+    js_code: &str,
+    tab: &SafariTab,
+    context: &str,
+) -> Result<String, MacosError> {
+    run_js_in_tab(js_code, tab, context, &tab_position_guard(tab))
+}
+
+fn run_js_in_tab(
+    js_code: &str,
+    tab: &SafariTab,
+    context: &str,
+    tab_guard: &str,
+) -> Result<String, MacosError> {
     let js_expr = escape_body(js_code);
     let js_command = js_apple_event_command("targetTab", None);
-    let identity_guard = tab_identity_guard(tab);
     let script = format!(
         r#"
         {prelude}
         tell application "Safari"
           repeat with w in every window
             if (id of w) is {window_id} then
-              {identity_guard}
+              {tab_guard}
               set jsCode to {js_expr}
               {js_command}
               if rawResult is missing value then error "JavaScript did not return a string"
@@ -95,7 +118,6 @@ pub(super) fn execute_js_in_tab(
         "#,
         prelude = safari_script_prelude(),
         window_id = tab.window_id,
-        identity_guard = identity_guard,
         js_command = js_command,
     );
     let output = run_capture(&script, context).map_err(|error| {
