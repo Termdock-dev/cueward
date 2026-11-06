@@ -41,15 +41,15 @@ cargo install --path crates/cli
 Requires Rust 1.88+ (edition 2024). The CLI is macOS-only; the Windows adapter remains a reserved, unpublished stub.
 Running the Safari JavaScript behavior tests also requires Node.js on `PATH`.
 
-## What's New in 0.5.0
+## What's New in 0.6.0
 
-Cueward `0.5.0` includes the changes since the published `0.3.2` release:
+Cueward `0.6.0` includes the changes since `0.5.0`:
 
-- Scoped file browsing, reads, search, metadata, previews, Finder context and explicit iCloud download requests
-- Guarded file management, including copy/duplicate, rename/move, bounded tree/package copy, batch rename, trash with verified backups and non-overwriting backup restoration
-- App, window and Space discovery, AX inspection/actions, snapshot diffs and bounded background-operation workflows
-- Modular Safari/CLI implementations and maintained agent skill references
-- Rust 1.88 minimum; locked-session operation and generic background canvas/drag acceptance remain unverified. See the [release notes](docs/releases/0.5.0.md) for support boundaries.
+- Background `window click` and `window drag` now reach views that ignore a first click, including web pages in Safari and Chrome. The user's foreground, keyboard and pointer do not change. See [click preparation](docs/background-input.md#click-preparation)
+- Results of clicks and drags report `pointer_preparation`
+- Window commands bind by native window ID, so apps such as Chrome that extend their Accessibility title now work
+- Docs, CLI help and the agent skill match the current commands
+- Background drags in web content that reads the held button state are unsupported. See the [release notes](docs/releases/0.6.0.md) for support boundaries
 
 ### macOS Permissions
 
