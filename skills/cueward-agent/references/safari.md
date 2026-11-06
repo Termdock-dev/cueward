@@ -59,5 +59,7 @@ cueward safari ai --provider chatgpt save-images https://chatgpt.com/c/abc123 --
 ```
 
 - Use this for browser-resident AI conversations and media workflows.
-- Prefer `list` then `read` when the user asks about a prior AI conversation.
+- Prefer `list` then `read` when the user asks about a prior AI conversation. Support differs by provider: Gemini has every action; ChatGPT has `prompt`, `list` and `save-images`; Grok has `prompt`, `list` and `read`.
+- `--provider x` and `--provider threads` are social feeds, not AI conversations. They return posts, so never treat their output as a model reply: X `prompt` searches posts, X `list` reads the feed, X `read` reads one post, and Threads `list` reads the feed.
+- Also available, with flags in `--help`: `safari open`, `close`, `close-tabs`, `click`, `scroll`, `scroll-and-read`, and for Gemini `ai mode`, `poll` and `save-media`.
 

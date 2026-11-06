@@ -1,6 +1,6 @@
 # Read-only trash proposals
 
-`cueward files trash plan` implements the planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Read-only planning was merged in PR #60; check installed `--help`. It describes one selected filesystem entry before the user decides whether to trash it. Separately confirmed ordinary-file removal uses [verified trash execution](files-trash-execution.md); completed ordinary-file receipts have separate [backup restoration](files-trash-restore.md). Permanent deletion is excluded.
+`cueward files trash plan` implements the planning slice of [issue #42](https://github.com/Termdock-dev/cueward/issues/42). Read-only planning was merged in PR #60; check installed `--help`. It describes one selected filesystem entry before the user decides whether to trash it. Separately confirmed file, directory and link removal uses [verified trash execution](files-trash-execution.md); completed ordinary-file receipts have separate [backup restoration](files-trash-restore.md). Permanent deletion is excluded.
 
 ## Select and observe
 

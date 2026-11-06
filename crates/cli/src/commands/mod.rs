@@ -168,7 +168,7 @@ pub(crate) enum Command {
         #[arg(long)]
         notify: bool,
     },
-    /// Create a reminder or calendar event
+    /// Create a reminder
     Plan {
         /// Reminder/event title
         #[arg(long)]
@@ -180,7 +180,7 @@ pub(crate) enum Command {
         #[arg(long, default_value = "Cueward")]
         list: String,
     },
-    /// Read Apple Reminders
+    /// Read and manage Apple Reminders
     Reminders {
         #[command(subcommand)]
         action: RemindersAction,
@@ -195,12 +195,12 @@ pub(crate) enum Command {
         /// Path to image or PDF file
         path: String,
     },
-    /// Read current Safari tabs and active tab
+    /// Read and operate Safari tabs, bookmarks and web AI providers
     Safari {
         #[command(subcommand)]
         action: SafariAction,
     },
-    /// Manage Apple Notes (update, delete, move)
+    /// Manage Apple Notes (create, update, delete, move)
     Notes {
         #[command(subcommand)]
         action: NotesAction,

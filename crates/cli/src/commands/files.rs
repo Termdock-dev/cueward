@@ -99,7 +99,7 @@ pub(crate) enum FilesAction {
     },
     /// Create an independent sibling object under an exact new name; never overwrite.
     Duplicate(duplicate::DuplicateArgs),
-    /// Observe a bounded batch of explicit sibling renames; execution is not supported.
+    /// Plan or execute a bounded batch of explicit sibling renames.
     RenameBatch {
         #[command(subcommand)]
         action: batch_rename::BatchRenameCommand,
