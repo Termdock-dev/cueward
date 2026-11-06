@@ -125,6 +125,29 @@ cueward capture --source safari --since 7d
 cueward capture --source notes --since 3h
 ```
 
+Capture commands output JSON inside an `<external>` envelope:
+
+```json
+[
+  {
+    "source": "safari",
+    "timestamp": "2026-04-07T03:14:16Z",
+    "content": "Rust Concurrency Patterns - Blog",
+    "url": "https://example.com/rust-concurrency",
+    "title": "Rust Concurrency Patterns - Blog"
+  },
+  {
+    "source": "notes",
+    "timestamp": "2026-04-07T01:16:16Z",
+    "content": "Meeting notes from product sync...",
+    "title": "Product Sync 2026-04-07",
+    "metadata": {
+      "folder": "Work"
+    }
+  }
+]
+```
+
 ### Safari
 
 Read current Safari tabs, not just browsing history:
@@ -231,7 +254,9 @@ Console capture includes `log`, `info`, `warn`, `error`, and `debug`. Network ca
 
 ### Safari AI
 
-Control web-based AI providers (Gemini, ChatGPT, Grok, Threads, X) via Safari automation. Gemini supports every action; the others support a subset, and an unsupported action reports what that provider offers. The ChatGPT effort option uses the composer's slider before sending a prompt.
+Control web-based AI providers (Gemini, ChatGPT, Grok) via Safari automation. Gemini supports every action; ChatGPT supports `prompt`, `list` and `save-images`; Grok supports `prompt`, `list` and `read`. An unsupported action reports what that provider offers.
+
+`--provider x` and `--provider threads` read social feeds through the same commands and return posts, not AI replies: X `prompt` searches posts, X `list` reads the feed, X `read` reads one post, and Threads `list` reads the feed. The ChatGPT effort option uses the composer's slider before sending a prompt.
 
 ```bash
 # Send a prompt (general chat)
@@ -270,29 +295,6 @@ cueward safari ai --provider gemini --profile Work list
 Supported Gemini modes: `deep-research`, `image`, `video`, `music`.
 
 ChatGPT `--effort` accepts a number within the slider's current ARIA range or `pro` for its maximum. It applies to normal prompts and checks the slider value before sending.
-
-Capture commands output JSON inside an `<external>` envelope:
-
-```json
-[
-  {
-    "source": "safari",
-    "timestamp": "2026-04-07T03:14:16Z",
-    "content": "Rust Concurrency Patterns - Blog",
-    "url": "https://example.com/rust-concurrency",
-    "title": "Rust Concurrency Patterns - Blog"
-  },
-  {
-    "source": "notes",
-    "timestamp": "2026-04-07T01:16:16Z",
-    "content": "Meeting notes from product sync...",
-    "title": "Product Sync 2026-04-07",
-    "metadata": {
-      "folder": "Work"
-    }
-  }
-]
-```
 
 ### Reddit
 
