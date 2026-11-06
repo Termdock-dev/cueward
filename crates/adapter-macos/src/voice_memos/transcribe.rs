@@ -36,6 +36,7 @@ struct Transcription {
 enum HelperResult {
     Transcribed { locale: String, text: String },
     NoSpeech { locale: String },
+    UnreadableAudio,
     UnsupportedLocale { locale: String, installed: Vec<String> },
     LocaleNotInstalled { locale: String, installed: Vec<String> },
     Error { message: String },
@@ -122,6 +123,9 @@ fn interpret_result(result: HelperResult) -> Result<Transcription, MacosError> {
         HelperResult::NoSpeech { locale } => Err(MacosError::Other(format!(
             "no speech detected with locale {locale}; no transcript was produced"
         ))),
+        HelperResult::UnreadableAudio => Err(MacosError::Other(
+            "the recording's audio file is empty or damaged and cannot be read".into(),
+        )),
         HelperResult::UnsupportedLocale { locale, installed } => Err(MacosError::Other(format!(
             "locale {locale} is not supported for transcription; installed locales: {}",
             locale_list(&installed)
@@ -179,6 +183,16 @@ mod tests {
                 locale: "zh_TW".into(),
                 text: "今天開會".into(),
             }
+        );
+    }
+
+    #[test]
+    fn unreadable_audio_names_the_file_as_the_problem() {
+        let message = parse_error(r#"{"status":"unreadable_audio"}"#);
+
+        assert_eq!(
+            message,
+            "the recording's audio file is empty or damaged and cannot be read"
         );
     }
 

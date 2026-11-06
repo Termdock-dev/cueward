@@ -46,6 +46,9 @@ func installedLocale(matching requested: Locale) async throws -> Locale {
 }
 
 func transcribe(path: String, requested: Locale) async throws -> HelperResult {
+    guard let file = try? AVAudioFile(forReading: URL(fileURLWithPath: path)) else {
+        return HelperResult(status: "unreadable_audio")
+    }
     let locale = try await installedLocale(matching: requested)
     let transcriber = SpeechTranscriber(
         locale: locale,
@@ -61,7 +64,6 @@ func transcribe(path: String, requested: Locale) async throws -> HelperResult {
         ))
     }
     let analyzer = SpeechAnalyzer(modules: [transcriber])
-    let file = try AVAudioFile(forReading: URL(fileURLWithPath: path))
     let reader = Task { () -> (text: String, peakConfidence: Double?) in
         var text = ""
         var peakConfidence: Double?
