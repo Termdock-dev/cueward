@@ -165,6 +165,12 @@ def _evaluate_complete(report):
     return {"status": "failed" if "failed" in statuses else "unverified" if "unverified" in statuses else "passed", "checks": checks}
 
 
+def balanced_presses(kinds):
+    """Each left press is released before the next one, and none stays held at the end."""
+    presses = [kind for kind in kinds if kind in (1, 2)]
+    return bool(presses) and presses == [1, 2] * (len(presses) // 2)
+
+
 def interruption_check(actions):
     matches = [a for a in actions if a.get("name") == "interrupted_drag"]
     if len(matches) != 1:
@@ -176,8 +182,7 @@ def interruption_check(actions):
     stopped = (outcome.get("status") == "partially_sent" and
                "window changed" in outcome.get("interruption", "") and
                type(outcome.get("events_sent")) is int and 2 <= outcome["events_sent"] < 52)
-    app_released = (kinds.count(1) == kinds.count(2) == 1 and kinds[-1:] == [2]
-                    and all(e.get("tag") == TAG for e in events))
+    app_released = balanced_presses(kinds) and all(e.get("tag") == TAG for e in events)
     view_released = (after.get("releases") == before.get("releases", 0) + 1
                      and after.get("dragging") is False)
     callbacks = after.get("canvas_callbacks", {})

@@ -32,3 +32,13 @@ This reproduces the creation-context distinction on the current build. It suppor
 ## Initialization and real-app follow-up
 
 The [2026-10-04 initialization contrasts](first-save-initialization.md) add complete-bundle and launch-delegate controls plus an unmodified TextEdit artifact comparison. They do not establish a product defect, repair the disabled panel or replace these historical results with an acceptance pass.
+
+## Target-only activation: 2026-11-07
+
+Click preparation raised one more possible cause: the Save control might stay disabled only because the app is inactive. The [aggregate](results/2026-11-07-first-save-activation.json) records the test.
+
+On an inactive Space, the unchanged fixture opened its first Save panel with Save disabled. Cueward's target-only activation record was then sent, first for the document window and then for the attached panel window. The panel window belongs to the document process. Both times the app reported itself active, and Save was still disabled after 200 ms and after 1,200 ms. No artifact was created.
+
+Activation of the target alone does not explain the disabled control, so the click preparation route does not solve #33. Foreground activation and forced panel input remain outside this work.
+
+One `app inspect` call returns at most 500 nodes, and this panel exposed 1,952. The unmodified [first-save probe](first-save-probe.py) now stops before Save and reports `save_control_unavailable` with `panel_traversal_truncated: true`. Walking subtrees with `--root` reaches the control. An agent has to do the same.
