@@ -30,10 +30,6 @@ var interruption: String?
 var pointerPreparation: String?
 var activationPosted = false
 
-// Optional native identity avoids relying on AX titles that dialogs may omit.
-typealias GetAXWindow = @convention(c) (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError
-let axWindowSymbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "_AXUIElementGetWindow")
-
 func focusedWindowMatches() -> Bool {
     // Inactive Spaces may omit AXWindows while still exposing AXFocusedWindow.
     guard let raw = attribute(application, kAXFocusedWindowAttribute),

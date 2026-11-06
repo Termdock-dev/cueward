@@ -1,5 +1,5 @@
 use super::input_live_tests::Receiver;
-use super::{InputDelivery, PointerPreparation, click, drag, input_status};
+use super::{InputDelivery, PointerPreparation, click, drag, input_status, inspect_window};
 
 #[test]
 #[ignore = "requires a logged-in macOS desktop, Accessibility and Screen Recording permissions"]
@@ -108,6 +108,22 @@ fn pointer_click_and_drag_reach_a_view_that_refuses_first_mouse() {
     let last = events.last().expect("release");
     assert_eq!(last["type"], 2);
     assert_eq!(last["x"], 180.0);
+}
+
+#[test]
+#[ignore = "requires a logged-in macOS desktop, Accessibility and Screen Recording permissions"]
+fn windows_bind_by_native_identity_when_the_accessibility_title_differs() {
+    let receiver = Receiver::with_source(include_str!("pointer_fixture.swift"), "ax-title");
+    let snapshot = receiver.snapshot(1);
+    inspect_window(snapshot.window.window_id, 20, 3, false, false).expect("inspect");
+    let x = 120.0 * snapshot.image.scale_x;
+    let y = 140.0 * snapshot.image.scale_y;
+    let clicked = click(&snapshot.input_target, x, y, "left", 1).expect("click");
+    assert_eq!(
+        clicked.pointer_preparation,
+        Some(PointerPreparation::TitleBarClick)
+    );
+    receiver.wait_for(|s| s["events"].as_array().is_some_and(|e| e.len() == 2));
 }
 
 #[test]

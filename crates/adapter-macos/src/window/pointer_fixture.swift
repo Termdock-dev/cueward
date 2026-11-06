@@ -2,7 +2,8 @@ import AppKit
 import Foundation
 
 let stateURL = URL(fileURLWithPath: CommandLine.arguments[1])
-let interrupt = CommandLine.arguments.dropFirst(2).first == "interrupt"
+let mode = CommandLine.arguments.dropFirst(2).first
+let interrupt = mode == "interrupt"
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 var events: [[String: Any]] = []
@@ -41,6 +42,8 @@ for index in 0..<2 {
     let frame = NSRect(x: 180 + index * 60, y: 160, width: 400, height: 280)
     let window = NSWindow(contentRect: frame, styleMask: [.titled, .closable], backing: .buffered, defer: false)
     window.title = "Cueward pointer fixture \(index)"
+    // Browsers append their own name to the Accessibility title, so it differs from the catalog title.
+    if mode == "ax-title" { window.setAccessibilityTitle("Cueward pointer fixture \(index) - App") }
     window.isReleasedWhenClosed = false
     let canvas = Canvas(frame: NSRect(origin: .zero, size: frame.size), acceptsBackground: index == 0)
     window.contentView = canvas
