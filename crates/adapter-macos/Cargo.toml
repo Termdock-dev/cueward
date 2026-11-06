@@ -8,6 +8,8 @@ homepage.workspace = true
 readme.workspace = true
 rust-version.workspace = true
 description = "macOS adapter for Cueward with Safari, Notes, Messages, Reminders, Calendar, Screenshot, Clipboard, and OCR integrations."
+keywords = ["macos", "automation", "applescript", "accessibility", "safari"]
+categories = ["os::macos-apis"]
 
 [dependencies]
 cueward-core = { workspace = true }
