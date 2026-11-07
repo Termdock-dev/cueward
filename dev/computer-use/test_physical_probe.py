@@ -115,6 +115,18 @@ class DispatchTests(unittest.TestCase):
             PROBE.probe("unused-cli", Path(temporary))
         self.assertGreater(observer.call_args.kwargs["duration_ms"], permitted * 1000)
 
+    def test_receivers_outlive_the_observer(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(PROBE.subprocess, "run"), \
+                patch.object(PROBE.subprocess, "Popen", return_value=Mock(pid=200)) as receivers, \
+                patch.object(PROBE, "wait_state"), patch.object(PROBE, "read_state", return_value={"window_id": 1}), \
+                patch.object(PROBE, "compile_observer"), \
+                patch.object(PROBE, "DesktopObserver", side_effect=RuntimeError("stop")) as observer:
+            PROBE.probe("unused-cli", Path(temporary))
+        lifetimes = [float(value) for call in receivers.call_args_list for value in call.args[0][3:]]
+        self.assertEqual(len(lifetimes), 2)
+        for seconds in lifetimes:
+            self.assertGreater(seconds * 1000, observer.call_args.kwargs["duration_ms"])
+
     def test_expiry_during_snapshot_is_checked_before_dispatch(self):
         with tempfile.TemporaryDirectory() as temporary:
             state = Path(temporary) / "state.json"
