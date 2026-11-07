@@ -194,7 +194,7 @@ def probe(cli, directory, idle=False):
                 processes.append(subprocess.Popen([str(fixture), str(paths[mode]), mode], stdout=log, stderr=log, start_new_session=True))
             wait_state(paths[mode])
         report["receiver_pids"] = [p.pid for p in processes]
-        with DesktopObserver(binary, report["receiver_pids"], directory / "trace.jsonl", duration_ms=300_000) as observer:
+        with DesktopObserver(binary, report["receiver_pids"], directory / "trace.jsonl", duration_ms=900_000) as observer:
             setup = ObservedCLI(cli, observer)
             report["setup_receipts"] = setup.receipts
             for mode in paths:
