@@ -1,0 +1,60 @@
+{
+  "kind": "diagnostic",
+  "date": "2026-11-07",
+  "macos": "27.0.1",
+  "architecture": "arm64",
+  "cli": "cueward-cli 0.6.0 installed from crates.io",
+  "target": "one owned Safari window per case, closed by verified window id",
+  "dialogs": [
+    {
+      "kind": "alert",
+      "before": "do JavaScript timed out with -1712",
+      "ax_node": "AXGroup with subrole AXDialog, name is the message",
+      "controls": [
+        "關閉"
+      ],
+      "action": "app press",
+      "foreground_changed": false,
+      "after": "do JavaScript and safari exec returned 2"
+    },
+    {
+      "kind": "confirm",
+      "ax_node": "AXGroup with subrole AXDialog",
+      "controls": [
+        "取消",
+        "好"
+      ],
+      "action": "app press 好",
+      "foreground_changed": false,
+      "page_received": "true"
+    },
+    {
+      "kind": "prompt",
+      "ax_node": "AXGroup with subrole AXDialog",
+      "controls": [
+        "取消",
+        "好",
+        "AXTextField"
+      ],
+      "action": "app set-value then app press 好",
+      "foreground_changed": false,
+      "page_received": "typed by ax"
+    }
+  ],
+  "trusted_click": {
+    "wkwebview": {
+      "pointer_preparation": "title_bar_click",
+      "dom_clicks": 1,
+      "isTrusted": {
+        "mousedown": true,
+        "mouseup": true,
+        "click": true
+      },
+      "foreground_changed": false
+    },
+    "safari": {
+      "result": "no conclusion",
+      "reason": "The window was outside the current Stage Manager stage. The snapshot was 160 by 216, pointer_preparation was no_safe_point, and the click had no page effect."
+    }
+  }
+}

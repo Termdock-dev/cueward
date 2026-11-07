@@ -73,6 +73,8 @@ cueward app press --target '<fresh app node target>'
 cueward app set-value --target '<fresh app text target>' --value '<intended text>'
 ```
 
+One inspection returns at most 500 nodes and 12 levels. A file panel can expose about 2,000 nodes, so a control can be missing while `truncated` is true. Walk down with `--root` from an observed ref instead of concluding the control is absent.
+
 Use App inspection for apps without document windows or when the host app exposes a panel that cannot be bound to its capture window. The root catalog returns `w0`, `w1`, and `menu` as available; it does not issue targets. Explore a returned root or subtree to find eligible controls. Reinspect roots after a dialog opens or closes. Do not assume a window or menu path is stable.
 
 `receiver_pid` identifies the actual AX process, which may differ from the host. Both must remain in the background for App actions. Targets bind process instances, current window context, and observed ancestors; they expire after five minutes. Secure and disabled nodes have no target. Partial reads also suppress targets unless only optional `AXDescription` and/or `AXIdentifier` are unavailable. `unavailable_attributes` means the corresponding attribute is unknown, not empty; inspect relevant descendants when a target is absent. Unreadable security metadata stops inspection before field values are read. App inspection requires an unlocked session and Accessibility permission.
