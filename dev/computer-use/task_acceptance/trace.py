@@ -43,28 +43,60 @@ def input_advanced(samples, index, keys, before_ms):
     return any(samples[last]["input"][key] > samples[first]["input"][key] for key in keys)
 
 
-def attributed_change(samples):
-    """Fail only changes that physical input cannot explain; automation has no excuse."""
+def command_spans(receipts, marks):
+    """Return each command's marked interval, or None when any boundary is unknown."""
+    if (not isinstance(marks, dict) or not isinstance(receipts, list) or not receipts
+            or not all(isinstance(r, dict) and isinstance(r.get("start_marker"), str)
+                       and isinstance(r.get("end_marker"), str) for r in receipts)):
+        return None
+    spans = [(marks.get(r["start_marker"]), marks.get(r["end_marker"])) for r in receipts]
+    return spans if all(number(start) and number(end) and end >= start for start, end in spans) else None
+
+
+def cueward_could_act(spans, previous, sample):
+    """Helpers exit with their command, so a change outside every span is not Cueward's."""
+    return spans is None or any(sample["ms"] >= start and previous["ms"] <= end + DESKTOP_ATTRIBUTION_MS
+                                for start, end in spans)
+
+
+def command_coverage_gap(samples, spans):
+    """Return the largest sample gap in which a Cueward command could have acted."""
+    return max((b["ms"] - a["ms"] for a, b in zip(samples, samples[1:]) if cueward_could_act(spans, a, b)), default=0)
+
+
+def unexplained_changes(samples):
+    """Yield each change that physical input cannot explain, with the samples around it."""
     for index in range(1, len(samples)):
         previous, sample = samples[index - 1], samples[index]
         if sample["input"]["automated_pointer"] > previous["input"]["automated_pointer"]:
-            return "automated input reached the global pointer stream"
-        if (sample["pointer"] != previous["pointer"]
+            yield previous, sample, "automated input reached the global pointer stream"
+        elif (sample["pointer"] != previous["pointer"]
                 and not input_advanced(samples, index, ("physical_pointer",), POINTER_ATTRIBUTION_MS)):
-            return "pointer moved without physical input"
-        if (any(sample[key] != previous[key] for key in ("frontmost_pid", "visible_spaces"))
+            yield previous, sample, "pointer moved without physical input"
+        elif (any(sample[key] != previous[key] for key in ("frontmost_pid", "visible_spaces"))
                 and not input_advanced(samples, index, ("physical_pointer", "physical_other"), DESKTOP_ATTRIBUTION_MS)):
-            return "foreground or visible Space changed without physical input"
-    return None
+            yield previous, sample, "foreground or visible Space changed without physical input"
 
 
-def interference(samples, pids, inactive_space, space):
+def attributed_change(samples, spans=None):
+    """Fail changes that neither physical input nor another process can explain."""
+    return next((reason for previous, sample, reason in unexplained_changes(samples)
+                 if cueward_could_act(spans, previous, sample)), None)
+
+
+def external_changes(samples, spans):
+    """Count changes made while no Cueward command could have made them."""
+    return sum(not cueward_could_act(spans, previous, sample)
+               for previous, sample, _ in unexplained_changes(samples))
+
+
+def interference(samples, pids, inactive_space, space, spans=None):
     baseline = samples[0]
     for sample in samples:
         if sample["frontmost_pid"] in pids or any(sample["target_active"][str(pid)] for pid in pids):
             return "failed", "receiver became foreground or active"
     if all(has_input_counts(sample) for sample in samples):
-        reason = attributed_change(samples)
+        reason = attributed_change(samples, spans)
         if reason:
             return "failed", reason
     elif any(sample[key] != baseline[key] for sample in samples for key in ("frontmost_pid", "pointer", "visible_spaces")):
@@ -123,7 +155,10 @@ def check_trace(evidence, inactive_space=False):
     if observed:
         return *observed, metrics
     metrics["input_attributed"] = all(has_input_counts(sample) for sample in samples)
-    status, reason = interference(samples, pids, inactive_space, evidence.get("target_space"))
+    spans = command_spans(receipts, execution.get("marks"))
+    if spans is not None and metrics["input_attributed"]:
+        metrics["external_desktop_changes"] = external_changes(samples, spans)
+    status, reason = interference(samples, pids, inactive_space, evidence.get("target_space"), spans)
     if status == "failed":
         return status, reason, metrics
     times = [s["ms"] for s in samples]
@@ -131,8 +166,11 @@ def check_trace(evidence, inactive_space=False):
         return "unverified", "nonmonotonic observation times", metrics
     if times[0] > start or times[-1] < end:
         return "unverified", "execution interval not covered", metrics
+    if spans and times[-1] < max(end for _, end in spans) + DESKTOP_ATTRIBUTION_MS:
+        return "unverified", "execution did not cover the second after the last command", metrics
     gaps = [b - a for a, b in zip(times, times[1:])]
     metrics["observer_max_interval_ms"] = max(gaps)
-    if max(gaps) > MAX_INTERVAL_MS:
+    metrics["observer_max_command_interval_ms"] = command_coverage_gap(samples, spans)
+    if metrics["observer_max_command_interval_ms"] > MAX_INTERVAL_MS:
         return "unverified", "observation gap exceeds 100 ms", metrics
     return status, reason, metrics

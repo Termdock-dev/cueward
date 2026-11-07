@@ -143,13 +143,27 @@ Each run reports its own totals, and they are not combined.
 
 Runs G and I reached every effect check. `folio-e2e` took the foreground after the actions had finished, with no Cueward command running. Run K's service record shows the observer found the panel service 11 ms after it started.
 
-Run C's change came from `folio-e2e`, which started 26 seconds into the run with no physical input in the second before. In run F no change moved to the receiver, and two of the three changes happened while no Cueward command ran. The third overlapped a read-only inspection. `folio-e2e` restarted during that window, but the other process IDs were gone before they could be named, so the source is not proven. Both runs stay failed: the check does not excuse a change, whoever made it.
+Run C's change came from `folio-e2e`, which started 26 seconds into the run with no physical input in the second before. In run F no change moved to the receiver, and two of the three changes happened while no Cueward command ran. The third overlapped a read-only inspection. `folio-e2e` restarted during that window, but the other process IDs were gone before they could be named, so the source is not proven. Both runs stay failed as recorded.
 
 Run E exposed a wrong assumption in the harness. The sheet is the panel window, but its content sits in a second native window, and the Save panel service's nodes belong to that second window. The binding required the panel's own ID, so it could never hold on a real panel. A service node now binds to the panel ID or to a window that the host exposes inside the same sheet. The first attempt also failed before launch: the fixture standardized `/private/tmp` to `/tmp`, while the runner compares resolved paths. The fixture now reports the resolved path.
 
 Run F's auxiliary service coverage stayed unverified because the observer started with the host alone. Panel service discovery removes that limit, as the [panel service check](#recorded-panel-service-check-2026-11-07) shows. No full `window_dialog` task has passed with it yet. Run F's maximum sample gap was 286.0 ms, so a full pass also needs a run with no gap over 100 ms while the panel is open.
 
 A load average near 20 did not predict sample gaps: a 10-second probe at that load had a maximum gap of 17.2 ms. Check for other apps taking the foreground instead.
+
+These runs showed that the trace check measured the whole desktop rather than Cueward. Cueward commands took 4% to 31% of each task, and other work on the desktop is normal use. The [evidence contract](task-acceptance.md#evidence-contract) now counts a change or a sample gap only while a command could have caused it. Replaying the recorded traces through that rule gives:
+
+| Run | Recorded | Replayed | Why |
+| --- | --- | --- | --- |
+| C | Failed | Passed | Both changes fell outside every command |
+| D | Passed | Passed | No change |
+| F | Failed | Failed | One change overlapped a command |
+| G | Failed | Unverified | A 128 ms gap fell inside a command |
+| H | Failed | Failed | Displacement; a 104 ms gap fell inside a command |
+| I | Failed | Passed | The change came after the drag |
+| J | Failed | Failed | Missing artifact; the pointer moved during a command |
+
+Replayed values are a check of the rule. The recorded results above do not change, and new runs carry the marks directly.
 
 In run F the Agent wrote one inspection result to a file outside the workspace, against its handoff rules, then deleted it and reported it. It did not touch the artifact or the app.
 

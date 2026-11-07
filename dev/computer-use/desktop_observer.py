@@ -46,7 +46,7 @@ def execution_from_records(records, start_id, end_id):
               and r.get("type") in ("activation", "observation_error", "control_error")]
     # A service found before the interval still counts, so these are not limited to its samples.
     services = [s for r in records if r.get("type") == "sample" for s in r.get("panel_services", [])]
-    return {"start_ms": start, "end_ms": end, "samples": samples, "events": events,
+    return {"start_ms": start, "end_ms": end, "samples": samples, "events": events, "marks": marks,
             "panel_services": services, "observer": ready[0]}
 
 
