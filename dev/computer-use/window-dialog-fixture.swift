@@ -172,9 +172,16 @@ final class OwnedDialogDocument: NSDocument, NSTextViewDelegate {
         window.orderFront(nil)
     }
 
+    // standardizedFileURL strips /private from /private/tmp, and the runner compares resolved paths.
+    var resolvedPath: String {
+        guard let resolved = realpath(ownedFile.path, nil) else { return ownedFile.path }
+        defer { free(resolved) }
+        return String(cString: resolved)
+    }
+
     var windowIdentity: [String: Any] {
         ["pid": getpid(), "window_id": ownedWindow?.windowNumber ?? 0,
-         "file": ownedFile.path, "ax_identifier": axIdentifier]
+         "file": resolvedPath, "ax_identifier": axIdentifier]
     }
 
     var observation: [String: Any] {

@@ -69,6 +69,29 @@ Separate operator diagnostics established the native sheet association and remot
 
 An offline regression also reproduced a dev-broker output escape through `window snapshot --output=...`. Test-only commit `6938815` failed two subcases; fix `9109ac5` rejects both attached and separate output options before dispatch. The affected scope/transport suite then passed 17 tests. Production Cueward input and Rust sources are unchanged in this work.
 
+## Recorded attempts: 2026-11-07
+
+Each row used a separate fresh Agent and receiver with Cueward 0.6.1. Another project's test app ran on the same desktop during these runs. The [aggregate](results/2026-11-07-native-agent.json) keeps the details.
+
+| Run / task | Broker requests | Independent result | Full acceptance |
+| --- | ---: | --- | --- |
+| C / existing document | 13 | Exact artifact; zero activations | Failed: foreground changed without physical input |
+| D / existing document | 14 | Exact artifact; zero activations; maximum sample gap 79.1 ms | **Passed** |
+| E / window dialog | 6 | Stopped by the harness when the Save panel opened | Failed: harness rejected the panel |
+| F / window dialog | 26 | Exact artifact; native save and bystander checks passed; zero activations | Failed: foreground changed without physical input |
+
+Each run reports its own totals, and they are not combined.
+
+Run C's change came from `folio-e2e`, which started 26 seconds into the run with no physical input in the second before. In run F no change moved to the receiver, and two of the three changes happened while no Cueward command ran. The third overlapped a read-only inspection. `folio-e2e` restarted during that window, but the other process IDs were gone before they could be named, so the source is not proven. Both runs stay failed: the check does not excuse a change, whoever made it.
+
+Run E exposed a wrong assumption in the harness. The sheet is the panel window, but its content sits in a second native window, and the Save panel service's nodes belong to that second window. The binding required the panel's own ID, so it could never hold on a real panel. A service node now binds to the panel ID or to a window that the host exposes inside the same sheet. The first attempt also failed before launch: the fixture standardized `/private/tmp` to `/tmp`, while the runner compares resolved paths. The fixture now reports the resolved path.
+
+`window_dialog` cannot pass yet even on a quiet desktop. As described above, the observer starts with the host alone, so auxiliary service coverage stays unverified.
+
+A load average near 20 did not predict sample gaps: a 10-second probe at that load had a maximum gap of 17.2 ms. Check for other apps taking the foreground instead.
+
+In run F the Agent wrote one inspection result to a file outside the workspace, against its handoff rules, then deleted it and reported it. It did not touch the artifact or the app.
+
 ## Recorded attempts: 2026-11-06
 
 Each row used a separate fresh Agent and receiver, with the observer's input attribution and the unchanged fixture. A person used the computer during the runs. The Agent handoff held only the goal, the owned PID and window, the broker command form and the generic app documentation.
