@@ -99,6 +99,22 @@ class DispatchTests(unittest.TestCase):
             runner.execute()
         self.assertGreaterEqual((times["closed"] - times["finished"]) * 1000, DESKTOP_ATTRIBUTION_MS)
 
+    def test_observer_outlives_every_permitted_wait(self):
+        runner = PROBE.Round("unused-cli", Mock(), {"actions": []}, {"human": Path("unused"), "background": Path("unused")})
+        runner.main_actions, runner.action, runner.finish_recording = Mock(), Mock(), Mock()
+        permitted = PROBE.ROUND_SECONDS
+        with patch.object(PROBE, "wait_state", return_value={"pid": 200, "started_at": 1}) as waits, \
+                patch.object(PROBE, "read_state", return_value={}), patch.object(PROBE, "ROUND_SECONDS", 0), \
+                patch.object(PROBE.time, "sleep"):
+            runner.execute()
+        permitted += sum(call.kwargs["timeout"] for call in waits.call_args_list)
+        with tempfile.TemporaryDirectory() as temporary, patch.object(PROBE.subprocess, "run"), \
+                patch.object(PROBE.subprocess, "Popen", return_value=Mock(pid=200)), patch.object(PROBE, "wait_state"), \
+                patch.object(PROBE, "read_state", return_value={"window_id": 1}), patch.object(PROBE, "compile_observer"), \
+                patch.object(PROBE, "DesktopObserver", side_effect=RuntimeError("stop")) as observer:
+            PROBE.probe("unused-cli", Path(temporary))
+        self.assertGreater(observer.call_args.kwargs["duration_ms"], permitted * 1000)
+
     def test_expiry_during_snapshot_is_checked_before_dispatch(self):
         with tempfile.TemporaryDirectory() as temporary:
             state = Path(temporary) / "state.json"
