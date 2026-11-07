@@ -192,6 +192,6 @@ func save() {
 }
 let timer = Timer(timeInterval: 0.02, repeats: true) { _ in save() }
 for mode in [RunLoop.Mode.default, .modalPanel, .eventTracking] { RunLoop.main.add(timer, forMode: mode) }
-DispatchQueue.main.asyncAfter(deadline: .now() + 600) { app.terminate(nil) }
+DispatchQueue.main.asyncAfter(deadline: .now() + Double(CommandLine.arguments[3])!) { app.terminate(nil) }
 save()
 app.run()

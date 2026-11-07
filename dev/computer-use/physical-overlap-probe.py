@@ -20,6 +20,15 @@ def read_state(path):
     return json.loads(path.read_text())
 # Commands slow down under load while a person types: a drag took 7.5 s at load 45.
 ROUND_SECONDS = 60
+OBSERVER_MS = 900_000
+# A receiver only exits by itself if this probe dies, so it must not end a live round.
+RECEIVER_SECONDS = OBSERVER_MS // 1000 + 60
+
+
+def start_receiver(fixture, directory, path, mode):
+    with (directory / (mode + ".log")).open("x") as log:
+        return subprocess.Popen([str(fixture), str(path), mode, str(RECEIVER_SECONDS)],
+                                stdout=log, stderr=log, start_new_session=True)
 
 
 def wait_state(path, predicate=lambda value: True, timeout=10):
@@ -190,11 +199,10 @@ def probe(cli, directory, idle=False):
         binary = compile_observer(directory)
         for mode in ("background", "interrupt"):
             paths[mode] = directory / (mode + ".json")
-            with (directory / (mode + ".log")).open("x") as log:
-                processes.append(subprocess.Popen([str(fixture), str(paths[mode]), mode], stdout=log, stderr=log, start_new_session=True))
+            processes.append(start_receiver(fixture, directory, paths[mode], mode))
             wait_state(paths[mode])
         report["receiver_pids"] = [p.pid for p in processes]
-        with DesktopObserver(binary, report["receiver_pids"], directory / "trace.jsonl", duration_ms=900_000) as observer:
+        with DesktopObserver(binary, report["receiver_pids"], directory / "trace.jsonl", duration_ms=OBSERVER_MS) as observer:
             setup = ObservedCLI(cli, observer)
             report["setup_receipts"] = setup.receipts
             for mode in paths:
@@ -205,8 +213,7 @@ def probe(cli, directory, idle=False):
                 report["target_space"] = space
             if not idle:
                 paths["human"] = directory / "human.json"
-                with (directory / "human.log").open("x") as log:
-                    processes.append(subprocess.Popen([str(fixture), str(paths["human"]), "human"], stdout=log, stderr=log, start_new_session=True))
+                processes.append(start_receiver(fixture, directory, paths["human"], "human"))
                 wait_state(paths["human"])
                 report["status"] = "waiting_for_human"
                 write_json(output, report)
