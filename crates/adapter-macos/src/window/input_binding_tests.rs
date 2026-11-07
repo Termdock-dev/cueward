@@ -115,18 +115,23 @@ fn keyboard_status_binds_native_identity_and_preserves_legacy_fallback() {
 fn pointer_input_refuses_a_frame_that_is_only_a_thumbnail() {
     let directory = tempfile::tempdir().expect("fixture directory");
     let binary = compile_status(directory.path());
-    let observed = status(&binary, directory.path(), "thumbnail");
-    assert_eq!(observed["pointer"]["dispatch_ready"], false, "{observed}");
-    assert!(
-        observed["pointer"]["reason"]
-            .as_str()
-            .is_some_and(|reason| reason.contains("thumbnail")),
-        "{observed}"
-    );
-    for action in ["click", "drag", "scroll"] {
-        let output = helper(&binary, "thumbnail", &request(action, directory.path()));
-        let text = String::from_utf8_lossy(&output.stderr);
-        assert!(!output.status.success(), "{action}: {text}");
-        assert!(text.contains("thumbnail"), "{action}: {text}");
+    for scenario in ["thumbnail", "legacy-thumbnail"] {
+        let observed = status(&binary, directory.path(), scenario);
+        assert_eq!(
+            observed["pointer"]["dispatch_ready"], false,
+            "{scenario}: {observed}"
+        );
+        assert!(
+            observed["pointer"]["reason"]
+                .as_str()
+                .is_some_and(|reason| reason.contains("thumbnail")),
+            "{scenario}: {observed}"
+        );
+        for action in ["click", "drag", "scroll"] {
+            let output = helper(&binary, scenario, &request(action, directory.path()));
+            let text = String::from_utf8_lossy(&output.stderr);
+            assert!(!output.status.success(), "{scenario} {action}: {text}");
+            assert!(text.contains("thumbnail"), "{scenario} {action}: {text}");
+        }
     }
 }
