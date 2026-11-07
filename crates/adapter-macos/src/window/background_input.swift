@@ -81,7 +81,7 @@ func readinessIssue(forKeyboard: Bool) -> String? {
 // full window, so a point read from that picture hits a different control. Position alone can
 // differ without harm: coordinates are relative to the window.
 func thumbnailIssue() -> String? {
-    let matches = matchingWindows()
+    let matches = matchingWindows(comparingBounds: false)
     guard matches.count == 1, let frame = bounds(matches[0]),
           !sameBounds(CGRect(origin: expectedBounds.origin, size: frame.size), expectedBounds) else { return nil }
     return "snapshot shows a thumbnail, not the real window, as with a window outside the Stage Manager stage; "
