@@ -41,15 +41,14 @@ cargo install --path crates/cli
 Requires Rust 1.88+ (edition 2024). The CLI is macOS-only; the Windows adapter remains a reserved, unpublished stub.
 Running the Safari JavaScript behavior tests also requires Node.js on `PATH`.
 
-## What's New in 0.6.0
+## What's New in 0.6.1
 
-Cueward `0.6.0` includes the changes since `0.5.0`:
+Cueward `0.6.1` includes the changes since `0.6.0`:
 
-- Background `window click` and `window drag` now reach views that ignore a first click, including web pages in Safari and Chrome. The user's foreground, keyboard and pointer do not change. See [click preparation](docs/background-input.md#click-preparation)
-- Results of clicks and drags report `pointer_preparation`
-- Window commands bind by native window ID, so apps such as Chrome that extend their Accessibility title now work
-- Docs, CLI help and the agent skill match the current commands
-- Background drags in web content that reads the held button state are unsupported. See the [release notes](docs/releases/0.6.0.md) for support boundaries
+- `voice-memos transcribe` turns a recording into text on this Mac. See [Voice Memos](#voice-memos)
+- `safari wait --url` and `safari wait --navigation` now work across a real navigation
+- Background clicks, drags and the other `0.6.0` changes are in the [0.6.0 release notes](docs/releases/0.6.0.md)
+- See the [release notes](docs/releases/0.6.1.md) for support boundaries
 
 ### macOS Permissions
 
