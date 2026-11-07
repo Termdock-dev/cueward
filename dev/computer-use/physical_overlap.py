@@ -3,7 +3,7 @@ import math
 import re
 
 from task_acceptance.trace import (MAX_INTERVAL_MS, command_coverage_gap, command_spans, cueward_could_act,
-                                   interference, number, observer_checks, valid_sample)
+                                   interference, number, observer_checks, outlasts_commands, valid_sample)
 
 TAG = 0x43554549
 MODIFIERS = 0x1E0000
@@ -12,6 +12,18 @@ SHIFT, COMMAND = 1 << 17, 1 << 20
 
 def result(status, reason, **metrics):
     return {"status": status, "reason": reason, **metrics}
+
+
+def human_desktop(samples, human_pid, spans):
+    """Typing advances the input counts all round, so they cannot excuse a change during a command."""
+    covered = [(a, b) for a, b in zip(samples, samples[1:]) if cueward_could_act(spans, a, b)]
+    if any(a[key] != b[key] for a, b in covered for key in ("frontmost_pid", "visible_spaces")):
+        return "failed", "foreground or visible Space changed while a command could act"
+    if any(b["frontmost_pid"] != human_pid for _, b in covered):
+        return "unverified", "human window was not foreground during a command"
+    if not outlasts_commands(samples, spans):
+        return "unverified", "desktop did not cover the second after the last command"
+    return None
 
 
 def trace_check(execution, pids, human_pid, target_space, spans=None):
@@ -38,8 +50,9 @@ def trace_check(execution, pids, human_pid, target_space, spans=None):
         return result("unverified", "desktop gap exceeds 100 ms", maximum_gap_ms=gap)
     if spans is not None:
         status, reason = interference(samples, pids, True, target_space, spans)
-        if status != "passed":
-            return result(status, reason, maximum_gap_ms=gap)
+        problem = (status, reason) if status != "passed" else human_desktop(samples, human_pid, spans)
+        if problem:
+            return result(*problem, maximum_gap_ms=gap)
     else:
         baseline = samples[0]["visible_spaces"]
         if any(s["frontmost_pid"] != human_pid or s["visible_spaces"] != baseline

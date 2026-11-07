@@ -7,6 +7,7 @@ import subprocess
 import time
 import uuid
 
+from agent_session import POST_COMMAND_SECONDS
 from desktop_observer import DesktopObserver, compile_observer, observation_checks
 from observed_cli import ObservedCLI
 from physical_overlap import background_check, evaluate, interruption_check
@@ -138,6 +139,7 @@ class Round:
             self.main_actions()
             if not idle:
                 self.action("foreground_refusal", "human", lambda shot, state: self.pointer("foreground_refusal", shot, state))
+                time.sleep(POST_COMMAND_SECONDS)
                 while time.monotonic() - started < ROUND_SECONDS:
                     time.sleep(0.05)
                 wait_state(self.paths["human"], lambda s: s["phase"] == "acknowledged", timeout=60)
