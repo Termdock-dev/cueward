@@ -47,12 +47,13 @@ Console/network capture starts at the first diagnostic command in that page, end
 
 ```bash
 cueward app list
-cueward app inspect --pid <safari-pid> --root w0 --depth 12 --limit 500
+cueward app inspect --pid <safari-pid>
+cueward app inspect --pid <safari-pid> --root <observed-window-root> --depth 12 --limit 500
 cueward app set-value --target '<fresh prompt field target>' --value '<text>'
 cueward app press --target '<fresh dialog button target>'
 ```
 
-The dialog is a node with subrole `AXDialog`, and its name is the message. Button names follow the system language. A `prompt` also has an `AXTextField`. The page receives the answer, so read the message and choose the button the user's task calls for. A dialog in a background tab of a window was not tested.
+Each Safari window is its own root, so check every window root the first command lists. The dialog is a node with subrole `AXDialog`, and its name is the message. Button names follow the system language. A `prompt` also has an `AXTextField`. The page receives the answer, so read the message and choose the button the user's task calls for. A dialog in a background tab of a window was not tested.
 
 ## Bookmarks
 
