@@ -1,10 +1,14 @@
 """A desktop change is held against Cueward only while one of its commands could have made it."""
+from pathlib import Path
+import tempfile
+import time
 import unittest
 
 from desktop_observer import execution_from_records
-from task_acceptance.trace import check_trace, command_coverage_gap, command_spans
+from agent_session import AgentSession
+from task_acceptance.trace import DESKTOP_ATTRIBUTION_MS, check_trace, command_coverage_gap, command_spans
 
-STEP_MS, END_MS = 50, 4000
+STEP_MS, END_MS = 50, 5000
 
 
 def evidence(command=(3000, 3500), marks=True):
@@ -139,6 +143,44 @@ class CommandAttributionTests(unittest.TestCase):
         drop(record, 500, 800)
         spans = command_spans([], record["execution"]["marks"])
         self.assertEqual(command_coverage_gap(record["execution"]["samples"], spans), 400)
+
+    def test_a_run_ending_inside_the_post_command_window_stays_unverified(self):
+        record = evidence(command=(4500, 4800))
+        status, reason, _ = self.status(record)
+        self.assertEqual(status, "unverified")
+        self.assertIn("after the last command", reason)
+
+    def test_a_run_covering_the_post_command_window_can_pass(self):
+        self.assertEqual(self.status(evidence(command=(3500, 3900)))[0], "passed")
+
+    def test_a_failure_is_not_hidden_by_a_short_tail(self):
+        record = evidence(command=(4500, 4800))
+        change(record, 4600, "frontmost_pid", 300)
+        self.assertEqual(self.status(record)[0], "failed")
+
+    def test_reversed_markers_are_not_a_command_interval(self):
+        receipt = {"start_marker": "begin", "end_marker": "finish"}
+        self.assertIsNone(command_spans([receipt], {"begin": 20, "finish": 10}))
+
+    def test_recording_stays_open_through_the_post_command_window(self):
+        marks = []
+
+        class Observer:
+            def mark(self, name):
+                marks.append((name, time.monotonic()))
+                return name
+
+            def execution(self, start, end):
+                return {}
+
+        with tempfile.TemporaryDirectory() as folder:
+            session = AgentSession("cueward", Observer(), 1, 2, Path(folder) / "session.json", {})
+            with session.recording():
+                session.commands.call = lambda *arguments: {"status": "observed"}
+                session.invoke(["app", "inspect", "--pid", "1"])
+                finished = time.monotonic()
+        closed = dict(marks)["agent-task-end"]
+        self.assertGreaterEqual((closed - finished) * 1000, DESKTOP_ATTRIBUTION_MS)
 
     def test_execution_keeps_the_observer_marks(self):
         rows = [{"type": "ready", "schema": 1}]
