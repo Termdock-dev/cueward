@@ -1,6 +1,6 @@
 # Fresh native document task execution
 
-This continues [#36](https://github.com/Termdock-dev/cueward/issues/36) with runnable owned `existing_document`, `calculation` and `window_dialog` tasks. The [document/calculation aggregate](results/2026-10-04-native-agent.json) records successful post-fix disk results, but **zero full task passes** because foreground and pointer observations changed. The [2026-11-06 aggregate](results/2026-11-06-native-agent.json) records the first full task pass, `calculation`, after the observer gained [input attribution](desktop-observer.md). The [window/dialog aggregate](results/2026-10-05-window-dialog-agent.json) retains a failed initial attempt and a locked-session prerequisite check. #36 remains incomplete; #33 is not repaired by this change.
+This continues [#36](https://github.com/Termdock-dev/cueward/issues/36) with runnable owned `existing_document`, `calculation`, `window_dialog` and [WebView pointer](#webview-pointer-tasks) tasks. The [document/calculation aggregate](results/2026-10-04-native-agent.json) records successful post-fix disk results, but **zero full task passes** because foreground and pointer observations changed. The [2026-11-06 aggregate](results/2026-11-06-native-agent.json) records the first full task pass, `calculation`, after the observer gained [input attribution](desktop-observer.md). The [window/dialog aggregate](results/2026-10-05-window-dialog-agent.json) retains a failed initial attempt and a locked-session prerequisite check. #36 remains incomplete; #33 is not repaired by this change.
 
 ## Product defect found during execution
 
@@ -68,6 +68,28 @@ The initial fresh Agent dispatched five CLI commands. It edited and read back th
 Separate operator diagnostics established the native sheet association and remote receiver behavior, leading to the fail-closed binding implementation above. They did not run the task to completion and do not count as fresh-agent passes. A newly prepared second run stopped at preflight because the desktop was locked while AX/Screen Recording permission remained available. No fixture or fresh Agent launched; its separate report is **0 passed, 0 failed, 1 blocked, 7 unverified**. The original failed attempt is not upgraded by the correction or prerequisite record.
 
 An offline regression also reproduced a dev-broker output escape through `window snapshot --output=...`. Test-only commit `6938815` failed two subcases; fix `9109ac5` rejects both attached and separate output options before dispatch. The affected scope/transport suite then passed 17 tests. Production Cueward input and Rust sources are unchanged in this work.
+
+## WebView pointer tasks
+
+`--task webview_first_click`, `--task canvas_drag` and `--task canvas_interrupted` use the run and hand-off steps above. Each task needs a separate fresh Agent, receiver and socket directory. Setup reserves `operator/<task>/` once, so rerunning a task needs another prepared run. These tasks have no artifact, so `owned-scope.json` holds only the task, family and goal text from the goal record.
+
+The receiver is `webview-fixture.swift` loading the unchanged `webview-fixture.html`. It is a bare binary, so LaunchServices has nothing to unregister and `cleanup.json` has no bundle entry. It has no first-mouse, hit-testing or event override.
+
+The runner reads `initial` from the receiver before it writes `owned-scope.json`. A page that is not fresh stops the task before any Agent gets scope, and the task is recorded as blocked. Pointer hover adds page events, so a physical pointer over the new window blocks a canvas task. It does not block `webview_first_click`, whose contract checks only the counter.
+
+The broker permits `window snapshot`, `window inspect`, `app inspect` and one pointer action: `window click --count 1` for `webview_first_click`, `window drag` for the canvas tasks. It refuses `app press`, `app set-value` and the other pointer action before dispatch, because each could change the page without the task's counted dispatch. `dispatch_count` is the sum of `AgentSession.dispatches`, never an Agent claim. When the session ends, the runner deletes the snapshot images the CLI reported for the owned window.
+
+After the observer closes, the runner waits three seconds for late page effects, because the [context investigation](webview-context.md) measured effects up to 906 ms after the CLI returned. It then requires a new receiver snapshot and page state newer than the closed observer. A page that stopped reporting fails the final read, and the attempt keeps its receipts and trace without a receiver record.
+
+Only `canvas_interrupted` launches the fixture with its `interrupt` argument. The other two receivers have no added event monitor. In this mode the fixture changes its title on the first tagged `leftMouseDragged` in its own window. Click preparation sends only a down and an up on the title bar, and a click sends no dragged event, so neither can fire it. Production's next check reports `window changed`, stops, releases at the last delivered point and returns `partially_sent`.
+
+`controlled_interruption` is true only when the receiver reports `interruption_triggered` as false in `initial` and true in the final state. The runner never assumes it. A drag too short for production to see the new title returns `sent_unverified`, and the interruption check stays unverified.
+
+`canvas_drag` is expected to fail its displacement check. The page moves the object only while `event.buttons` holds the left button, and the [recorded production drag](background-first-click.md#results) delivered `buttons` 0. That failure is the honest result. Do not change the page or the check to pass it. `canvas_interrupted` needs no displacement, but it still needs the paired release.
+
+The evidence keeps the fixture's `active` and `activations` values, and the evaluator does not check them for these tasks. Click preparation tells the target process it is active, so the fixture's own counter can grow with each dispatch. The desktop observer's `target_active` samples and activation events still apply.
+
+No fresh Agent has run these tasks. Offline tests manufacture evidence. A smoke reached `ready` for each task and finished without sending input. A separate in-process check confirmed the title trigger with synthetic events: the title-bar pair, a real down and an untagged drag did not fire it, and a tagged drag did. Delivery through the production `window drag` route in this fixture is unverified until an operator run.
 
 ## Recorded attempts: 2026-11-07
 

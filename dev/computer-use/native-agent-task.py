@@ -12,6 +12,7 @@ from native_agent_task import (TASKS, compile_fixture, independent_evidence, lau
 from native_agent_task import incomplete_session_evidence, unregister_fixture
 from task_acceptance.evaluate import evaluate, load_json
 from task_acceptance.setup import write_json
+from webview_agent_task import TASKS as WEBVIEW_TASKS, run_webview_task
 
 
 def write_report(run, evidence):
@@ -54,6 +55,9 @@ def cleanup_receiver(process, binary, output, task_id):
 
 
 def run_task(cli, run, task_id, socket):
+    if task_id in WEBVIEW_TASKS:
+        return run_webview_task(cli, run, task_id, socket, write_report=write_report,
+                                record_failure=record_failure, cleanup_receiver=cleanup_receiver)
     if task_id == "window_dialog":
         from window_dialog_task import run_dialog_task
         return run_dialog_task(cli, run, socket, write_report=write_report,
@@ -94,7 +98,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--run", type=Path, required=True)
-    parser.add_argument("--task", choices=TASKS, required=True)
+    parser.add_argument("--task", choices=(*TASKS, *WEBVIEW_TASKS), required=True)
     parser.add_argument("--socket", type=Path, required=True)
     args = parser.parse_args()
     subprocess.run(["swift", "-e", 'import ApplicationServices; import CoreGraphics; guard let s=CGSessionCopyCurrentDictionary() as? [String:Any], s["CGSSessionScreenIsLocked"] as? Bool != true, AXIsProcessTrusted(), CGPreflightScreenCaptureAccess() else { exit(1) }'],

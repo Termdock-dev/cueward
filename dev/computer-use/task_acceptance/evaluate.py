@@ -169,6 +169,11 @@ def stopped_by_window_change(receipt):
             and type(sent) is int and sent >= 2)
 
 
+def fresh_canvas(state):
+    return (state.get("object") == {"x": 100, "y": 80} and state.get("dragging") is False
+            and state.get("releases") == 0 and state.get("events") == [])
+
+
 def canvas_checks(task_id, evidence, observer, initial, final):
     if not all(k in state for state in (initial, final) for k in ("object", "events", "dragging", "releases")):
         return [check("canvas", "unverified", "missing object/event/release observation")]
@@ -182,9 +187,7 @@ def canvas_checks(task_id, evidence, observer, initial, final):
                 and all(e.get("trusted") is True for e in events if e.get("type") in ("mousedown", "mouseup"))
                 and next((e.get("buttons") for e in events if e.get("type") == "mouseup"), None) == 0)
     checks = [check("release", "passed" if released else "failed", "one observed down/up pair and no retained drag")]
-    fresh = (initial.get("object") == {"x": 100, "y": 80} and initial.get("dragging") is False
-             and initial.get("releases") == 0 and initial.get("events") == [])
-    checks.append(check("fresh_canvas", "passed" if fresh else "failed", "separate fresh receiver with no prior drag events"))
+    checks.append(check("fresh_canvas", "passed" if fresh_canvas(initial) else "failed", "separate fresh receiver with no prior drag events"))
     if task_id == "canvas_interrupted":
         interrupted = (observer.get("controlled_interruption") is True
                        and any(stopped_by_window_change(r) for r in evidence.get("receipts", [])))
