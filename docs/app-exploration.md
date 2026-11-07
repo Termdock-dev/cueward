@@ -12,7 +12,7 @@ cueward app inspect --pid 123 --root w0 --depth 3 --limit 100
 cueward app inspect --pid 123 --root w0.1 --depth 2
 ```
 
-The first inspection lists window roots (`w0`, `w1`, ...) and, when the app exposes one, the menu root (`menu`). A background app can expose windows only. Root numbers are positions: when a window or panel opens or closes, the same `wN` can name a different window with no error, so list roots again and check the title. Root discovery does not issue action targets. Choose a returned `ref` and inspect its subtree to obtain controls and eligible targets. Root refs are paths in the current observation; rediscover them after windows open, close, or change context.
+The first inspection lists window roots (`w0`, `w1`, ...) and, when the app exposes one, the menu root (`menu`). A background app can expose windows only. Root numbers are positions. They can change when a window or panel opens or closes, and also while a panel stays open, and the same `wN` can then name a different window with no error. Check the title of the root you read before you act on it. Root discovery does not issue action targets. Choose a returned `ref` and inspect its subtree to obtain controls and eligible targets. Root refs are paths in the current observation; rediscover them after windows open, close, or change context.
 
 Inspection accepts 1–500 nodes and 1–12 levels per request, with paths capped at 12 levels below an application root. `truncated` reports omitted descendants or roots. Explore relevant subtrees when limits are reached. Apps exposing more than 64 window roots are rejected.
 
