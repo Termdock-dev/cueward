@@ -69,4 +69,6 @@ See [first-save-context.md](first-save-context.md) for the observer-backed diagn
 
 # Background pointer repair
 
+[Input with Stage Manager on](stage-manager.md) records wrong-target clicks on thumbnails and how input behaves when a window changes around a command.
+
 [Background first click](background-first-click.md) records the click preparation that replaced the failing ordinary route. The earlier repair investigation and rejected sender hypotheses are recorded in [background-pointer-repair.md](background-pointer-repair.md). Diagnostic tooling and passing evaluator tests do not establish a functional fix.
