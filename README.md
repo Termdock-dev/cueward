@@ -41,15 +41,13 @@ cargo install --path crates/cli
 Requires Rust 1.88+ (edition 2024). The CLI is macOS-only; the Windows adapter remains a reserved, unpublished stub.
 Running the Safari JavaScript behavior tests also requires Node.js on `PATH`.
 
-## What's New in 0.6.1
+## What's New in 0.6.2
 
-Cueward `0.6.1` includes the changes since `0.6.0`:
+Cueward `0.6.2` includes the changes since `0.6.1`:
 
-- `voice-memos transcribe` turns a recording into text on this Mac. See [Voice Memos](#voice-memos)
-- `safari wait --url` and `safari wait --navigation` now work across a real navigation
-- The agent skill explains how to answer JavaScript dialogs in the background
-- Background clicks, drags and the other `0.6.0` changes are in the [0.6.0 release notes](docs/releases/0.6.0.md)
-- See the [release notes](docs/releases/0.6.1.md) for support boundaries
+- `window click`, `drag` and `scroll` now refuse a window outside the current Stage Manager stage, where a point from its thumbnail could hit the wrong control. Use `app inspect` and `app press` for those windows
+- Voice Memos transcription and the other `0.6.1` changes are in the [0.6.1 release notes](docs/releases/0.6.1.md)
+- See the [release notes](docs/releases/0.6.2.md) for support boundaries
 
 ### macOS Permissions
 
