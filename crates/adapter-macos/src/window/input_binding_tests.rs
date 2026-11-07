@@ -33,12 +33,8 @@ fn compile_status(directory: &Path) -> std::path::PathBuf {
     binary
 }
 
-fn status(binary: &Path, directory: &Path, scenario: &str) -> Value {
+fn helper(binary: &Path, scenario: &str, request: &Value) -> std::process::Output {
     let pid = std::process::id();
-    let payload = json!({
-        "action": "status", "issued_at": super::now_seconds().expect("clock"),
-        "caller_pid": pid, "lock_path": directory.join("input.lock"),
-    });
     let mut child = Command::new(binary)
         .args([
             pid.to_string(),
@@ -59,9 +55,22 @@ fn status(binary: &Path, directory: &Path, scenario: &str) -> Value {
         .stdin
         .take()
         .expect("stdin")
-        .write_all(&serde_json::to_vec(&payload).expect("request"))
+        .write_all(&serde_json::to_vec(request).expect("request"))
         .expect("send request");
-    let output = child.wait_with_output().expect("status output");
+    child.wait_with_output().expect("helper output")
+}
+
+fn request(action: &str, directory: &Path) -> Value {
+    json!({
+        "action": action, "issued_at": super::now_seconds().expect("clock"),
+        "caller_pid": std::process::id(), "lock_path": directory.join("input.lock"),
+        "x": 40.0, "y": 40.0, "to_x": 60.0, "to_y": 60.0, "button": "left", "count": 1,
+        "duration_ms": 100, "delta_x": 0, "delta_y": -40,
+    })
+}
+
+fn status(binary: &Path, directory: &Path, scenario: &str) -> Value {
+    let output = helper(binary, scenario, &request("status", directory));
     assert!(
         output.status.success(),
         "{scenario}: {}",
@@ -100,4 +109,29 @@ fn keyboard_status_binds_native_identity_and_preserves_legacy_fallback() {
         assert_eq!(observed["application_acceptance"], "unverified");
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn pointer_input_refuses_a_frame_that_is_only_a_thumbnail() {
+    let directory = tempfile::tempdir().expect("fixture directory");
+    let binary = compile_status(directory.path());
+    for scenario in ["thumbnail", "legacy-thumbnail"] {
+        let observed = status(&binary, directory.path(), scenario);
+        assert_eq!(
+            observed["pointer"]["dispatch_ready"], false,
+            "{scenario}: {observed}"
+        );
+        assert!(
+            observed["pointer"]["reason"]
+                .as_str()
+                .is_some_and(|reason| reason.contains("thumbnail")),
+            "{scenario}: {observed}"
+        );
+        for action in ["click", "drag", "scroll"] {
+            let output = helper(&binary, scenario, &request(action, directory.path()));
+            let text = String::from_utf8_lossy(&output.stderr);
+            assert!(!output.status.success(), "{scenario} {action}: {text}");
+            assert!(text.contains("thumbnail"), "{scenario} {action}: {text}");
+        }
+    }
 }

@@ -73,7 +73,7 @@ func validateCatalogWindow(allowOffscreen: Bool = false, exactBounds: Bool = fal
 typealias GetAXWindow = @convention(c) (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError
 var axWindowSymbol: UnsafeMutableRawPointer? { dlsym(UnsafeMutableRawPointer(bitPattern: -2), "_AXUIElementGetWindow") }
 
-func matchingWindows() -> [AXUIElement] {
+func matchingWindows(comparingBounds: Bool = true) -> [AXUIElement] {
     var candidates = elements(application, kAXWindowsAttribute)
     for name in [kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
         if let raw = attribute(application, name), CFGetTypeID(raw) == AXUIElementGetTypeID() {
@@ -90,8 +90,9 @@ func matchingWindows() -> [AXUIElement] {
         if !native.isEmpty { return native }
     }
     return candidates.filter { element in
-        guard text(attribute(element, kAXTitleAttribute)) == expectedTitle,
-              let frame = bounds(element) else { return false }
+        guard text(attribute(element, kAXTitleAttribute)) == expectedTitle else { return false }
+        guard comparingBounds else { return true }
+        guard let frame = bounds(element) else { return false }
         return sameBounds(frame, expectedBounds)
     }
 }

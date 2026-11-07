@@ -67,6 +67,8 @@ The result reports what happened in `pointer_preparation`:
 
 The title bar click is not counted in `events_sent`. The target app can observe the short activation: it receives its normal did-become-active notifications, its window can briefly look active, and that window becomes the app's key window. Direct termination of the helper during a click can leave the target believing it is active until its next activation change.
 
+A window outside the Stage Manager stage is refused before any event is created. The window list gives it a thumbnail frame while Accessibility gives its real frame, and pixel coordinates cannot be mapped between them because the thumbnail is tilted. Use `app inspect` and `app press` for such a window.
+
 ## Interruption and verification
 
 Input uses a private event source with explicit modifier flags. Concurrent raw-input commands to the same PID are rejected with a per-process file lock held by the event-posting helper. The lock stays held if the CLI caller exits while the helper is still alive. Before each event pair or wheel event, the helper checks whether its caller still exists and stops further input after detecting its exit. This does not lock out user input, other automation tools, or AX actions.

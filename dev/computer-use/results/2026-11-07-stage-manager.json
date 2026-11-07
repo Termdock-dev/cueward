@@ -1,0 +1,48 @@
+{
+  "kind": "diagnostic",
+  "date": "2026-11-07",
+  "macos": "27.0.1",
+  "architecture": "arm64",
+  "cli": "cueward-cli 0.6.1 installed from crates.io",
+  "environment": "owner's working desktop, Stage Manager on, other agents and builds running",
+  "fixture_placement": {
+    "accessory_on_stage": "3 of 3",
+    "regular_thumbnails_in_a_row": 29,
+    "regular_on_stage_afterwards": "3 of 3",
+    "cause": "unknown"
+  },
+  "off_stage_before_fix": {
+    "snapshot_pixels": [
+      196,
+      194
+    ],
+    "real_window_points": [
+      720,
+      472
+    ],
+    "thumbnail_click_pressed_the_top_button": "3 of 3",
+    "pointer_dispatch_ready": true,
+    "app_press_correct": "3 of 3"
+  },
+  "stale_click_on_sheet_button": {
+    "pressed": "0 of 6",
+    "status": "sent_unverified"
+  },
+  "real_app_frames": {
+    "off_stage_thumbnails_differing_from_accessibility": 3,
+    "on_stage_matching_accessibility": 3,
+    "without_accessibility_windows": 2
+  },
+  "after_fix_input_status_sweeps": {
+    "sweeps": 3,
+    "full_size_background_windows_refused_as_thumbnail": 0,
+    "real_thumbnail_refused": 1
+  },
+  "off_stage_after_fix": {
+    "click_refused": "3 of 3",
+    "scroll_refused": "3 of 3",
+    "pointer_dispatch_ready": false,
+    "app_press_correct": "2 of 2",
+    "app_press_stopped_by_desktop_lock": 1
+  }
+}

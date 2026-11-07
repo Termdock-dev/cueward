@@ -60,6 +60,6 @@ A helper that exits right after `postToPid` loses its events: 0 of 40 arrived, a
 ## Limits
 
 - Real Electron apps were not tested, because every one on this machine holds user data. Chrome is the nearest coverage.
-- With Stage Manager on, the catalog showed thumbnail-sized windows such as 94 by 104 points while Accessibility reported 673 by 439. Turning it off removed the difference. Clicks on windows outside the stage are unverified.
+- With Stage Manager on, the catalog showed thumbnail-sized windows such as 94 by 104 points while Accessibility reported 673 by 439. Turning it off removed the difference. The [Stage Manager measurement](stage-manager.md) found that pointer input hit the wrong control there, so it is now refused.
 - Applications that react to did-become-active notifications will see each click.
 - Sampling at 20 ms cannot exclude shorter transients.

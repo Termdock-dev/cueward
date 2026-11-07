@@ -33,7 +33,7 @@ func AXUIElementCopyAttributeValue(_ element: AXUIElement, _ name: CFString,
         if scenario == "wrong-bounds" { point.x += 100 }
         output.pointee = AXValueCreate(.cgPoint, &point)
     case kAXSizeAttribute:
-        var size = expectedBounds.size
+        var size = scenario.hasSuffix("thumbnail") ? CGSize(width: 720, height: 472) : expectedBounds.size
         output.pointee = AXValueCreate(.cgSize, &size)
     default: return .attributeUnsupported
     }

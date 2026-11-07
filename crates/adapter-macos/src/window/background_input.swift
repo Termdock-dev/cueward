@@ -77,6 +77,17 @@ func readinessIssue(forKeyboard: Bool) -> String? {
     return nil
 }
 
+// Outside the current stage, Stage Manager lists a tilted thumbnail while events still land in the
+// full window, so a point read from that picture hits a different control. Position alone can
+// differ without harm: coordinates are relative to the window.
+func thumbnailIssue() -> String? {
+    let matches = matchingWindows(comparingBounds: false)
+    guard matches.count == 1, let frame = bounds(matches[0]),
+          !sameBounds(CGRect(origin: expectedBounds.origin, size: frame.size), expectedBounds) else { return nil }
+    return "snapshot shows a thumbnail, not the real window, as with a window outside the Stage Manager stage; "
+        + "pointer input was not sent. Use app inspect and app press"
+}
+
 func maySend() -> Bool {
     if let issue = readinessIssue(forKeyboard: keyboard) {
         if eventsSent == 0 {
@@ -105,7 +116,7 @@ if action == "status" {
         "window_id": windowID,
         "input_busy": inputBusy,
         "keyboard": routeStatus(busyReason ?? readinessIssue(forKeyboard: true)),
-        "pointer": routeStatus(busyReason ?? readinessIssue(forKeyboard: false) ?? (windowLocationSymbol == nil ? routingUnavailable : nil)),
+        "pointer": routeStatus(busyReason ?? readinessIssue(forKeyboard: false) ?? thumbnailIssue() ?? (windowLocationSymbol == nil ? routingUnavailable : nil)),
         "application_acceptance": "unverified",
     ])
     exit(0)
@@ -276,6 +287,8 @@ func keyPair(code: CGKeyCode, unicode: String = "", flags: CGEventFlags = []) ->
     eventsSent += 2
     return true
 }
+
+if !keyboard, let issue = thumbnailIssue() { fail(issue) }
 
 switch action {
 case "type_text":
