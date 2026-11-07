@@ -4,6 +4,7 @@ import WebKit
 let stateURL = URL(fileURLWithPath: CommandLine.arguments[1])
 let htmlURL = URL(fileURLWithPath: CommandLine.arguments[2])
 let lifetime = CommandLine.arguments.count > 3 ? min(max(Double(CommandLine.arguments[3]) ?? 180, 1), 900) : 180
+let interruptOnDrag = CommandLine.arguments.count > 4 && CommandLine.arguments[4] == "interrupt"
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 let window = NSWindow(contentRect: NSRect(x: 100, y: 160, width: 500, height: 340),
@@ -17,6 +18,8 @@ var pointerChanges = 0
 var previousFront = NSWorkspace.shared.frontmostApplication?.processIdentifier
 let initialPointer = NSEvent.mouseLocation
 var domState: [String: Any] = [:]
+var domUpdates = 0
+var interruptionTriggered = false
 func save() {
     observations += 1
     let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
@@ -24,10 +27,10 @@ func save() {
     if NSEvent.mouseLocation != initialPointer { pointerChanges += 1 }
     let value: [String: Any] = [
         "window_id": window.windowNumber, "pid": getpid(), "active": app.isActive,
-        "activations": activations, "observations": observations,
+        "activations": activations, "observations": observations, "observation_sequence": observations,
         "foreground_changes": foregroundChanges, "pointer_different_samples": pointerChanges,
         "content_top": window.frame.height - (window.contentView?.frame.height ?? 0),
-        "dom": domState,
+        "dom": domState, "dom_updates": domUpdates, "interruption_triggered": interruptionTriggered,
     ]
     if let data = try? JSONSerialization.data(withJSONObject: value) {
         try? data.write(to: stateURL, options: .atomic)
@@ -35,7 +38,7 @@ func save() {
 }
 final class Receiver: NSObject, WKScriptMessageHandler {
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        if let value = message.body as? [String: Any] { domState = value; save() }
+        if let value = message.body as? [String: Any] { domState = value; domUpdates += 1; save() }
     }
 }
 let receiver = Receiver()
@@ -46,6 +49,16 @@ let web = WKWebView(frame: NSRect(x: 0, y: 0, width: 500, height: 340), configur
 window.contentView = web
 web.loadFileURL(htmlURL, allowingReadAccessTo: htmlURL.deletingLastPathComponent())
 window.orderFront(nil)
+// Identity-change stimulus, not an input override. Click preparation warms the title bar with a
+// tagged down and up, and only a real drag sends dragged events, so the warm-up cannot fire this.
+let interruption = interruptOnDrag ? NSEvent.addLocalMonitorForEvents(matching: .leftMouseDragged) { event in
+    if !interruptionTriggered && event.windowNumber == window.windowNumber
+        && event.cgEvent?.getIntegerValueField(.eventSourceUserData) == 0x43554549 {
+        window.title = "Cueward changed WKWebView receiver"
+        interruptionTriggered = true
+    }
+    return event
+} : nil
 let observer = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
     object: app, queue: .main) { _ in activations += 1 }
 Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { _ in save() }
