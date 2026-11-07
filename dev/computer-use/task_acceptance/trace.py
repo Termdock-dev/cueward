@@ -45,9 +45,11 @@ def input_advanced(samples, index, keys, before_ms):
 
 def command_spans(receipts, marks):
     """Return each command's marked interval, or None when any boundary is unknown."""
-    if not isinstance(marks, dict):
+    if (not isinstance(marks, dict) or not isinstance(receipts, list) or not receipts
+            or not all(isinstance(r, dict) and isinstance(r.get("start_marker"), str)
+                       and isinstance(r.get("end_marker"), str) for r in receipts)):
         return None
-    spans = [(marks.get(r.get("start_marker")), marks.get(r.get("end_marker"))) for r in receipts]
+    spans = [(marks.get(r["start_marker"]), marks.get(r["end_marker"])) for r in receipts]
     return spans if all(number(start) and number(end) for start, end in spans) else None
 
 
