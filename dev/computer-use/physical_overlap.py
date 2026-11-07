@@ -2,7 +2,8 @@
 import math
 import re
 
-from task_acceptance.trace import MAX_INTERVAL_MS, number, observer_checks, valid_sample
+from task_acceptance.trace import (MAX_INTERVAL_MS, command_coverage_gap, command_spans, cueward_could_act,
+                                   interference, number, observer_checks, valid_sample)
 
 TAG = 0x43554549
 MODIFIERS = 0x1E0000
@@ -13,7 +14,8 @@ def result(status, reason, **metrics):
     return {"status": status, "reason": reason, **metrics}
 
 
-def trace_check(execution, pids, human_pid, target_space):
+def trace_check(execution, pids, human_pid, target_space, spans=None):
+    """Judge the desktop. With command spans, only a change Cueward could cause counts."""
     samples = execution.get("samples", [])
     start, end = execution.get("start_ms"), execution.get("end_ms")
     if not (pids and all(type(pid) is int and pid > 0 for pid in pids)
@@ -25,21 +27,34 @@ def trace_check(execution, pids, human_pid, target_space):
     native = observer_checks(execution, pids)
     if native:
         return result(*native)
-    if any(e.get("type") == "activation" and e.get("pid") != human_pid for e in execution["events"]):
+    if any(e.get("type") == "activation" and e.get("pid") != human_pid and cueward_could_act(spans, e, e)
+           for e in execution["events"]):
         return result("failed", "another foreground App activated between samples")
     times = [s["ms"] for s in samples]
     if times[0] > start or times[-1] < end or any(b <= a for a, b in zip(times, times[1:])):
         return result("unverified", "nonmonotonic or uncovered task interval")
-    gap = max(b - a for a, b in zip(times, times[1:]))
+    gap = command_coverage_gap(samples, spans)
     if gap > MAX_INTERVAL_MS:
         return result("unverified", "desktop gap exceeds 100 ms", maximum_gap_ms=gap)
-    baseline = samples[0]["visible_spaces"]
-    if any(s["frontmost_pid"] != human_pid or s["visible_spaces"] != baseline
-           or any(s["target_active"][str(pid)] for pid in pids)
-           or target_space in s["visible_spaces"].values() for s in samples):
-        return result("failed", "foreground/visible Space/receiver activity changed", maximum_gap_ms=gap)
+    if spans is not None:
+        status, reason = interference(samples, pids, True, target_space, spans)
+        if status != "passed":
+            return result(status, reason, maximum_gap_ms=gap)
+    else:
+        baseline = samples[0]["visible_spaces"]
+        if any(s["frontmost_pid"] != human_pid or s["visible_spaces"] != baseline
+               or any(s["target_active"][str(pid)] for pid in pids)
+               or target_space in s["visible_spaces"].values() for s in samples):
+            return result("failed", "foreground/visible Space/receiver activity changed", maximum_gap_ms=gap)
     return result("passed", "human foreground and background isolation at sampled resolution",
                   maximum_gap_ms=gap, pointer_positions=len({tuple(s["pointer"]) for s in samples}))
+
+
+def spelled_by_keys(downs):
+    """An input method can report one case for every key, so physical Shift also decides case."""
+    letters = [e.get("characters", "") for e in downs]
+    shifted = [c.upper() if e["flags"] & SHIFT else c.lower() for c, e in zip(letters, downs)]
+    return {"".join(letters), "".join(shifted)}
 
 
 def paired_keys(events):
@@ -101,7 +116,7 @@ def human_check(state, first_text, last_text, lower_uptime, upper_uptime):
         trial = [e for e in state.get("events", [])
                  if state["started_at"] <= e.get("uptime", -1) <= state["uptime"]]
         trial_downs = [e for e in trial if e["type"] == 10]
-        checks["content_matches_key_events"] = "".join(e.get("characters", "") for e in trial_downs) == text
+        checks["content_matches_key_events"] = text in spelled_by_keys(trial_downs)
         checks["key_release"] = paired_keys(trial)
         checks["modifier_release"] = state["physical_modifiers"] & MODIFIERS == 0
         if not all(checks.values()):
@@ -141,7 +156,8 @@ def _evaluate_complete(report):
         return {"status": "unverified", "reason": "missing shared clock origin"}
     lo, hi = origin + execution["start_ms"] / 1000, origin + execution["end_ms"] / 1000
     checks = {
-        "desktop": trace_check(execution, report["receiver_pids"], report["human_pid"], report["target_space"]),
+        "desktop": trace_check(execution, report["receiver_pids"], report["human_pid"], report["target_space"],
+                               command_spans(report.get("receipts"), report.get("marker_times"))),
         "background": background_check(report["background_initial"], report["background_final"], report["first_text"], report["last_text"]),
         "human": human_check(report["human_final"], report["first_text"], report["last_text"], lo, hi),
         "pointer_correlation": pointer_correlation(execution, report["human_final"]["events"]),
