@@ -14,7 +14,8 @@ import Darwin
 
     init(_ configuration: ObserverConfiguration) throws {
         self.configuration = configuration
-        observer = try DesktopObservation(pids: configuration.pids)
+        observer = try DesktopObservation(pids: configuration.pids, panelServices: configuration.panelServices,
+                                          uptimeOrigin: initial)
     }
 
     func now() -> Double { (ProcessInfo.processInfo.systemUptime - initial) * 1000 }
@@ -29,7 +30,7 @@ import Darwin
 
     func sample() {
         do {
-            var value = try observer.sample(ms: now())
+            var value = try observer.sample(now: now)
             value["sample_end_ms"] = now()
             emit(value)
         }

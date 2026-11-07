@@ -1,6 +1,6 @@
 # Fresh native document task execution
 
-This continues [#36](https://github.com/Termdock-dev/cueward/issues/36) with runnable owned `existing_document`, `calculation` and `window_dialog` tasks. The [document/calculation aggregate](results/2026-10-04-native-agent.json) records successful post-fix disk results, but **zero full task passes** because foreground and pointer observations changed. The [2026-11-06 aggregate](results/2026-11-06-native-agent.json) records the first full task pass, `calculation`, after the observer gained [input attribution](desktop-observer.md). The [window/dialog aggregate](results/2026-10-05-window-dialog-agent.json) retains a failed initial attempt and a locked-session prerequisite check. #36 remains incomplete; #33 is not repaired by this change.
+This continues [#36](https://github.com/Termdock-dev/cueward/issues/36) with runnable owned `new_document`, `existing_document`, `cross_app`, `calculation`, `window_dialog` and [WebView pointer](#webview-pointer-tasks) tasks. The [document/calculation aggregate](results/2026-10-04-native-agent.json) records successful post-fix disk results, but **zero full task passes** because foreground and pointer observations changed. The [2026-11-06 aggregate](results/2026-11-06-native-agent.json) records the first full task pass, `calculation`, after the observer gained [input attribution](desktop-observer.md). The [window/dialog aggregate](results/2026-10-05-window-dialog-agent.json) retains a failed initial attempt and a locked-session prerequisite check. #36 remains incomplete; #33 is not repaired by this change.
 
 ## Product defect found during execution
 
@@ -59,7 +59,7 @@ Actual Agent inspections/actions supply the `initial`, `dialog`, `resumed` phase
 
 Unlike `new_document`, the `window_dialog` goal has no exact-once save-submission condition. Its native IO check requires positive integer read/save/write counts. The fixture increments `save_requests` when `save` or `saveAs` is invoked, before the panel or write completes, so the count is not a count of successful disk saves. This does not authorize blindly replaying an uncertain action; the Agent must observe before any new decision, and actual receipts remain available for review.
 
-The shared save-panel service is an auxiliary receiver, not a newly owned process. Cleanup never terminates it. The [evaluator contract](task-acceptance.md#shared-save-panel-receivers) requires auxiliary activation coverage across the entire execution interval. The current desktop observer starts with the host alone; late discovery of a service cannot supply missing earlier samples. Such service coverage stays `unverified`, even if panel traversal and disk save eventually succeed. Standalone service-owned panels are not implemented by this runner.
+The shared save-panel service is an auxiliary receiver, not a newly owned process. Cleanup never terminates it. The desktop observer starts with the host alone, so this runner turns on [panel service discovery](desktop-observer.md#coverage-and-limits). The observer reports the service from the sample where it first sees it and records its kernel start time. Those records reach the evidence in `execution.panel_services`, and the service PID stays out of `receiver_pids`. The [evaluator contract](task-acceptance.md#shared-save-panel-receivers) decides whether that coverage holds. A late first sight or a sample hole stays `unverified`, even if panel traversal and disk save eventually succeed. Standalone service-owned panels are not implemented by this runner.
 
 ### Recorded window/dialog work: 2026-10-05
 
@@ -68,6 +68,58 @@ The initial fresh Agent dispatched five CLI commands. It edited and read back th
 Separate operator diagnostics established the native sheet association and remote receiver behavior, leading to the fail-closed binding implementation above. They did not run the task to completion and do not count as fresh-agent passes. A newly prepared second run stopped at preflight because the desktop was locked while AX/Screen Recording permission remained available. No fixture or fresh Agent launched; its separate report is **0 passed, 0 failed, 1 blocked, 7 unverified**. The original failed attempt is not upgraded by the correction or prerequisite record.
 
 An offline regression also reproduced a dev-broker output escape through `window snapshot --output=...`. Test-only commit `6938815` failed two subcases; fix `9109ac5` rejects both attached and separate output options before dispatch. The affected scope/transport suite then passed 17 tests. Production Cueward input and Rust sources are unchanged in this work.
+
+## New document and cross-app tasks
+
+Both tasks use the same entry point, and their logic is in `document_agent_task.py`. They share one prepared run, and `new_document` must run first. Use a fresh Agent and socket directory for each:
+
+```sh
+python3 -B dev/computer-use/native-agent-task.py \
+  --cli "$PWD/target/release/cueward" --run "$run" \
+  --task new_document --socket "$socketdir/a.sock"
+```
+
+### `new_document`
+
+The destination must not exist yet. The runner launches the [NSDocument fixture](document-fixture.swift) and moves only that window to an existing inactive Space, the way [first-save-probe.py](first-save-probe.py) does. Setup never creates or switches a Space. It stops if no inactive Space exists, if the move reports a foreground or visible-Space change, or if the window did not land on the chosen Space. A stopped setup serves no Agent and records `attempted: false` with `fixture_unavailable`. The Agent does all editing and saving.
+
+The fixture takes its destination as positional arguments, so it runs as a bare executable. Inside a bundle, AppKit treats those paths as open requests ([initialization contrasts](first-save-initialization.md)). A bare executable has no bundle to unregister. The only change to the fixture is the read-only `observation_sequence` field.
+
+Evidence holds `target_space`, `save_requests`, `contents`, `file_created`, `panel_window_id` and the fresh final receiver fields. The evaluator reads the artifact itself. A run with no artifact still records a complete attempt, with `failure_category: missing_artifact`.
+
+While [#33](https://github.com/Termdock-dev/cueward/issues/33) stays open, expect Save to be disabled in the first panel, so the task ends failed with no artifact. That is the correct result. Do not move the window to a visible Space, activate anything or force the control. One `app inspect` call returns at most 500 nodes and this panel exposes more, so an Agent has to walk subtrees with `--root`, inside the 64-request budget.
+
+The broker checks a target's `app.pid`, which is the app that was inspected. A panel control may report another `receiver_pid`, but its target still names the owned app, so it passes. A target issued for any other app is rejected. The 2026-11-07 run F reached a real panel through the same token check.
+
+### `cross_app`
+
+`cross_app` depends on a passed `new_document` in the same run. Before it reserves or launches anything, the runner evaluates `native-agent-evidence.json`. Without a passed `new_document` it prints why and exits 1. It writes no record, so `cross_app` stays `unverified` with reason `not run`. It can still run later in that run if `new_document` passes. A failed `new_document` cannot be repeated in the same run, so that needs a new prepared run.
+
+`producer_pid` comes only from the `new_document` observer in that evidence. The evaluator also leaves an attempted `cross_app` `unverified` when `new_document` did not pass, for evidence that did not come from this runner.
+
+The [reader](document-reader-fixture.swift) is a separate owned bundle. It starts with nothing open and shows the file only after the Agent presses Open. It has no document class, no editable view and no save path, so its only output is its private state file. Evidence holds `file`, `content`, `read_requests`, `error`, `producer_pid` and the fresh final receiver fields. The evaluator still compares the disk bytes.
+
+## WebView pointer tasks
+
+`--task webview_first_click`, `--task canvas_drag` and `--task canvas_interrupted` use the run and hand-off steps above. Each task needs a separate fresh Agent, receiver and socket directory. Setup reserves `operator/<task>/` once, so rerunning a task needs another prepared run. These tasks have no artifact, so `owned-scope.json` holds only the task, family and goal text from the goal record.
+
+The receiver is `webview-fixture.swift` loading the unchanged `webview-fixture.html`. It is a bare binary, so LaunchServices has nothing to unregister and `cleanup.json` has no bundle entry. It has no first-mouse, hit-testing or event override.
+
+The runner reads `initial` from the receiver before it writes `owned-scope.json`. A page that is not fresh stops the task before any Agent gets scope, and the task is recorded as blocked. Pointer hover adds page events, so a physical pointer over the new window blocks a canvas task. It does not block `webview_first_click`, whose contract checks only the counter.
+
+The broker permits `window snapshot`, `window inspect`, `app inspect` and one pointer action: `window click --count 1` for `webview_first_click`, `window drag` for the canvas tasks. It refuses `app press`, `app set-value` and the other pointer action before dispatch, because each could change the page without the task's counted dispatch. `dispatch_count` is the sum of `AgentSession.dispatches`, never an Agent claim. When the session ends, the runner deletes the snapshot images the CLI reported for the owned window.
+
+After the observer closes, the runner waits three seconds for late page effects, because the [context investigation](webview-context.md) measured effects up to 906 ms after the CLI returned. It then requires a new receiver snapshot and page state newer than the closed observer. A page that stopped reporting fails the final read, and the attempt keeps its receipts and trace without a receiver record.
+
+Only `canvas_interrupted` launches the fixture with its `interrupt` argument. The other two receivers have no added event monitor. In this mode the fixture changes its title on the first tagged `leftMouseDragged` in its own window. Click preparation sends only a down and an up on the title bar, and a click sends no dragged event, so neither can fire it. Production's next check reports `window changed`, stops, releases at the last delivered point and returns `partially_sent`.
+
+`controlled_interruption` is true only when the receiver reports `interruption_triggered` as false in `initial` and true in the final state. The runner never assumes it. A drag too short for production to see the new title returns `sent_unverified`, and the interruption check stays unverified.
+
+`canvas_drag` is expected to fail its displacement check. The page moves the object only while `event.buttons` holds the left button, and the [recorded production drag](background-first-click.md#results) delivered `buttons` 0. That failure is the honest result. Do not change the page or the check to pass it. `canvas_interrupted` needs no displacement, but it still needs the paired release.
+
+The evidence keeps the fixture's `active` and `activations` values, and the evaluator does not check them for these tasks. Click preparation tells the target process it is active, so the fixture's own counter can grow with each dispatch. The desktop observer's `target_active` samples and activation events still apply.
+
+Fresh Agents ran all three tasks on 2026-11-07. See [recorded attempts](#recorded-attempts-2026-11-07). Offline tests manufacture evidence and do not replace those runs.
 
 ## Recorded attempts: 2026-11-07
 
@@ -79,18 +131,49 @@ Each row used a separate fresh Agent and receiver with Cueward 0.6.1. Another pr
 | D / existing document | 14 | Exact artifact; zero activations; maximum sample gap 79.1 ms | **Passed** |
 | E / window dialog | 6 | Stopped by the harness when the Save panel opened | Failed: harness rejected the panel |
 | F / window dialog | 26 | Exact artifact; native save and bystander checks passed; zero activations | Failed: foreground changed without physical input |
+| G / WebView first click | 10 | Counter rose exactly once; trusted down, up and click | Failed: foreground changed without physical input |
+| H / canvas drag | 6 | Released once; object did not move; 25 moves with `buttons` 0 | Failed: displacement, as documented |
+| I / canvas interrupted | 7 | `partially_sent` with 3 events; released once; interruption passed | Failed: foreground changed without physical input |
+| J / new document | 17 | Save disabled in the first panel; no artifact | Failed: missing artifact, as #33 records |
+| K / window dialog | 16 | Stopped when the desktop locked itself at 164.6 s | Failed: says nothing about the task |
 
 Each run reports its own totals, and they are not combined.
+
+`cross_app` has no attempt: it needs a passed `new_document` in the same run, and #33 blocks that.
+
+Runs G and I reached every effect check. `folio-e2e` took the foreground after the actions had finished, with no Cueward command running. Run K's service record shows the observer found the panel service 11 ms after it started.
 
 Run C's change came from `folio-e2e`, which started 26 seconds into the run with no physical input in the second before. In run F no change moved to the receiver, and two of the three changes happened while no Cueward command ran. The third overlapped a read-only inspection. `folio-e2e` restarted during that window, but the other process IDs were gone before they could be named, so the source is not proven. Both runs stay failed: the check does not excuse a change, whoever made it.
 
 Run E exposed a wrong assumption in the harness. The sheet is the panel window, but its content sits in a second native window, and the Save panel service's nodes belong to that second window. The binding required the panel's own ID, so it could never hold on a real panel. A service node now binds to the panel ID or to a window that the host exposes inside the same sheet. The first attempt also failed before launch: the fixture standardized `/private/tmp` to `/tmp`, while the runner compares resolved paths. The fixture now reports the resolved path.
 
-`window_dialog` cannot pass yet even on a quiet desktop. As described above, the observer starts with the host alone, so auxiliary service coverage stays unverified.
+Run F's auxiliary service coverage stayed unverified because the observer started with the host alone. Panel service discovery removes that limit, as the [panel service check](#recorded-panel-service-check-2026-11-07) shows. No full `window_dialog` task has passed with it yet. Run F's maximum sample gap was 286.0 ms, so a full pass also needs a run with no gap over 100 ms while the panel is open.
 
 A load average near 20 did not predict sample gaps: a 10-second probe at that load had a maximum gap of 17.2 ms. Check for other apps taking the foreground instead.
 
 In run F the Agent wrote one inspection result to a file outside the workspace, against its handoff rules, then deleted it and reported it. It did not touch the artifact or the app.
+
+## Recorded panel service check: 2026-11-07
+
+This check ran the observer alone, with no Agent. A document fixture opened a Save panel through `cueward app press` and closed it through the panel's Cancel button. Each run lasted at least 25 seconds. Other work on the desktop kept the load average between 30 and 85.
+
+| Measure across 8 runs | Result |
+| --- | --- |
+| Bound service found, matching the AX receiver PID | 8 of 8 |
+| Kernel start to first sight | 9.63 to 30.19 ms, median 14.4 ms |
+| Samples missing after first sight | 0 |
+| Samples with the service frontmost or active | 0 |
+| Service still running at task end, after the panel closed | 8 of 8 |
+| Service gone 2 seconds after its client exited | 8 of 8 |
+| Service in `NSWorkspace.runningApplications` with the panel open | 8 of 8 |
+
+Each trace then went through the real `check_auxiliary_receiver_trace`, with synthetic window identities. Two traces passed that check and `interference_trace`. The other six stayed unverified on the auxiliary check because a sample gap exceeded 100 ms. So service coverage can hold on a real panel, and sample gaps are what remains. This does not count as a task pass.
+
+`KERN_PROC_ALL` took 0.33 ms at the median and 1.26 ms at p99 for 752 processes. In one timed run the service activation reads took 0.39 ms at the median and 10.99 ms at p99. The largest single read in that run was the Space catalog, at 147.5 ms. The median sample interval was 19.95 to 21.18 ms with discovery and 20.08 to 20.34 ms without it.
+
+Gaps over 100 ms did not follow discovery in a consistent way. In paired panel runs with discovery second, while the load rose, they totaled 72 against 11. With discovery first, they totaled 0 against 1. Two discovery runs had 39 and 30 such gaps, and the cause of those two is not proven.
+
+In these runs the service started 556 to 3,511 ms after the press began. In one earlier run it started 1,958 ms before the press, for an unknown reason. The evaluator handles a service that starts at any point in the task, or before it.
 
 ## Recorded attempts: 2026-11-06
 
@@ -130,4 +213,4 @@ PR #71 review follow-up reproduced false passing when final activation occurred 
 
 All three receivers stayed inactive with zero owned activation events; visible Space maps stayed stable across three observed displays. Maximum sampling gaps were 42.4, 43.8 and 64.2 ms. Foreground and pointer changes were retained without attribution or filtering. Transport intervals include Agent/start waiting, not just inference time. Sampling cannot exclude shorter transients, and disk success does not override isolation failure. All owned receiver/observer executable paths were absent after cleanup; no user windows or files were selected.
 
-Cross-app artifact consumption, completed window/dialog acceptance, accepted canvas drag/interruption, unintegrated real apps and controlled physical-input/lock coverage remain outstanding. These synthetic native tasks do not satisfy the whole issue.
+Accepted first save, cross-app artifact consumption, completed window/dialog acceptance, accepted canvas drag/interruption, unintegrated real apps and controlled physical-input/lock coverage remain outstanding. These synthetic native tasks do not satisfy the whole issue.

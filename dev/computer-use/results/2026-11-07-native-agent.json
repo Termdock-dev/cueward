@@ -64,6 +64,86 @@
         }
       ],
       "reason": "No change moved to the receiver. folio-e2e restarted about 195 s into the run, but the other process ids were gone before they could be named, so the source is not proven."
+    },
+    {
+      "run": "G",
+      "task": "webview_first_click",
+      "broker_requests": 10,
+      "status": "failed",
+      "dispatches": 1,
+      "counter": {
+        "initial": 0,
+        "final": 1
+      },
+      "dom_trusted": {
+        "mousedown": true,
+        "mouseup": true,
+        "click": true
+      },
+      "target_active_ever": false,
+      "failed_check": "interference_trace",
+      "reason": "folio-e2e took the foreground 68.8 s into the run, with no physical input in the previous second and no Cueward command running."
+    },
+    {
+      "run": "H",
+      "task": "canvas_drag",
+      "broker_requests": 6,
+      "status": "failed",
+      "dispatches": 1,
+      "events_sent": 27,
+      "displacement": [
+        0,
+        0
+      ],
+      "move_events": 25,
+      "move_buttons": [
+        0
+      ],
+      "release": "passed",
+      "fresh_canvas": "passed",
+      "failed_check": "displacement",
+      "unverified_check": "interference_trace",
+      "reason": "Expected. The page moves the object only while event.buttons holds the left button, and background events report 0."
+    },
+    {
+      "run": "I",
+      "task": "canvas_interrupted",
+      "broker_requests": 7,
+      "status": "failed",
+      "dispatches": 1,
+      "cli_status": "partially_sent",
+      "events_sent": 3,
+      "interruption": "passed",
+      "release": "passed",
+      "fresh_canvas": "passed",
+      "target_active_ever": false,
+      "failed_check": "interference_trace",
+      "reason": "folio-e2e took the foreground 48.8 s into the run, after the drag had finished."
+    },
+    {
+      "run": "J",
+      "task": "new_document",
+      "broker_requests": 17,
+      "status": "failed",
+      "artifact": "missing",
+      "save_requests": 1,
+      "receiver_activations": 0,
+      "failed_checks": [
+        "artifact",
+        "interference_trace"
+      ],
+      "reason": "Save and New Folder stayed disabled in the first panel on an inactive Space, as #33 records. The trace check also failed because the pointer moved without physical input in the run."
+    },
+    {
+      "run": "K",
+      "task": "window_dialog",
+      "broker_requests": 16,
+      "status": "failed",
+      "unverified_check": "interference_trace",
+      "panel_service_seen": {
+        "start_to_first_sight_ms": 11.0
+      },
+      "reason": "The desktop locked itself 164.6 s into the run with no physical input, and the broker stopped. This run says nothing about the task."
     }
   ],
   "panel_structure": {
@@ -71,5 +151,8 @@
     "content": "second native window id shared by host and save panel service nodes",
     "nodes_observed": 6000
   },
-  "totals_are_per_run": true
+  "totals_are_per_run": true,
+  "not_runnable_yet": {
+    "cross_app": "Needs a passed new_document in the same run, and #33 blocks that."
+  }
 }

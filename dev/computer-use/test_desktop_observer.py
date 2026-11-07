@@ -3,9 +3,11 @@
 import copy
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 from desktop_observer import DesktopObserver, execution_from_records, observation_checks
@@ -157,6 +159,17 @@ class EvidenceTests(unittest.TestCase):
         self.change(execution, 2, "pointer", [30, 40], "physical_pointer")
         self.assertEqual(observation_checks(execution, [200], "physical_concurrent")["status"], "passed")
 
+    def test_panel_service_found_before_the_interval_is_kept(self):
+        data = records()
+        early = {"pid": 300, "start_ms": -5000, "first_seen_ms": 0}
+        later = {"pid": 301, "start_ms": 45, "first_seen_ms": 60}
+        next(r for r in data if r.get("ms") == 0)["panel_services"] = [early]
+        next(r for r in data if r.get("ms") == 60)["panel_services"] = [later]
+        execution = execution_from_records(data, "start", "end")
+        self.assertEqual(execution["samples"][0]["ms"], 20)
+        self.assertEqual(execution["panel_services"], [early, later])
+        self.assertEqual(self.execution()["panel_services"], [])
+
 
 class SwiftModelTests(unittest.TestCase):
     @classmethod
@@ -172,10 +185,18 @@ do {
     switch value["action"] as? String {
     case "config":
         let config = try ObserverConfiguration(value["value"] as! [String: Any])
-        result = ["pids": config.pids, "interval": config.intervalMS]
+        result = ["pids": config.pids, "interval": config.intervalMS, "panel_services": config.panelServices]
     case "command":
         let command = try observerCommand(JSONSerialization.data(withJSONObject: value["value"]!))
         result = ["command": command.0, "id": command.1 as Any? ?? NSNull()]
+    case "start_ms":
+        result = ["ms": kernelStartMS(ticks: (value["ticks"] as! NSNumber).uint64Value, numer: value["numer"] as! UInt32,
+                                      denom: value["denom"] as! UInt32, origin: value["origin"] as! Double)]
+    case "tracker":
+        var tracker = PanelServiceTracker()
+        result = ["found": (value["rounds"] as! [[[Int]]]).map { round in
+            tracker.update(round.map { ListedProcess(pid: Int32($0[0]), startTicks: UInt64($0[1])) }).map { Int($0.pid) }
+        }]
     default:
         result = try correlateDisplaySpaces(value["rows"] as! [[String: Any]],
             online: value["online"] as! [String: String], mainUUID: value["main"] as! String)
@@ -226,6 +247,90 @@ do {
             self.assertIn("error", self.run_model({"action": "command", "value": value}))
         self.assertEqual(self.run_model({"action": "command", "value": {"command": "mark", "id": "task-start"}})["result"]["id"], "task-start")
 
+    def start_ms(self, ticks, numer, denom, origin):
+        value = {"action": "start_ms", "ticks": ticks, "numer": numer, "denom": denom, "origin": origin}
+        return self.run_model(value)["result"]["ms"]
+
+    def test_kernel_start_ticks_convert_to_observer_milliseconds(self):
+        # Apple silicon ticks at 24 MHz (125/3 ns); Intel reports 1/1.
+        self.assertAlmostEqual(self.start_ms(2_400_000_000, 125, 3, 99.5), 500, places=6)
+        self.assertAlmostEqual(self.start_ms(5_000_000_000, 1, 1, 4), 1000, places=6)
+        self.assertAlmostEqual(self.start_ms(2_400_000_000, 125, 3, 101), -1000, places=6)
+
+    def test_kernel_start_conversion_keeps_precision_after_a_month_of_uptime(self):
+        month = 30 * 86_400
+        self.assertAlmostEqual(self.start_ms(month * 24_000_000, 125, 3, month - 0.25), 250, places=3)
+
+    def test_tracker_reports_each_process_once_and_a_reused_pid_again(self):
+        rounds = [[[10, 1]], [[10, 1], [11, 2]], [[11, 2]], [[10, 3], [11, 2]], [[10, 4], [11, 2]], []]
+        result = self.run_model({"action": "tracker", "rounds": rounds})["result"]["found"]
+        self.assertEqual(result, [[10], [11], [], [10], [10], []])
+
+    def test_panel_service_discovery_is_opt_in(self):
+        value = {"pids": [200], "interval_ms": 20, "duration_ms": 1000}
+        self.assertIs(self.run_model({"action": "config", "value": value})["result"]["panel_services"], False)
+        enabled = value | {"panel_services": True}
+        self.assertIs(self.run_model({"action": "config", "value": enabled})["result"]["panel_services"], True)
+
+
+class SwiftKernelListingTests(unittest.TestCase):
+    """Exercise the real kernel reads against child processes; no panel or desktop is needed."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.temp = tempfile.TemporaryDirectory(prefix="cueward-kernel-listing-")
+        root = Path(cls.temp.name)
+        source = root / "main.swift"
+        source.write_text('''
+import Foundation
+if CommandLine.arguments[1] == "--hold" { sleep(30); exit(0) }
+var timebase = mach_timebase_info_data_t()
+mach_timebase_info(&timebase)
+var listing = KernelProcessListing()
+let rows: [[String: Any]] = try listing.processes(named: CommandLine.arguments[1]).map {
+    ["pid": Int($0.pid), "uptime_ms": kernelStartMS(ticks: $0.startTicks, numer: timebase.numer,
+                                                    denom: timebase.denom, origin: 0)]
+}
+print(String(data: try JSONSerialization.data(withJSONObject: rows), encoding: .utf8)!)
+''')
+        cls.binary = root / "KernelListing"
+        subprocess.run(["swiftc", "-swift-version", "6", "-module-cache-path", str(root / "cache"),
+                        str(HERE / "desktop-observer-model.swift"), str(HERE / "desktop-observer-panels.swift"),
+                        str(source), "-o", str(cls.binary)], check=True, capture_output=True, timeout=90)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temp.cleanup()
+
+    def listed(self, name):
+        return json.loads(subprocess.run([str(self.binary), name], text=True, capture_output=True,
+                                         check=True, timeout=5).stdout)
+
+    def test_real_process_is_found_by_full_name_with_its_start_on_the_uptime_clock(self):
+        root = Path(self.temp.name)
+        # Both names share the 16 bytes the kernel keeps, so only the full path can separate them.
+        wanted, other = root / "cueward-listing-wanted", root / "cueward-listing-other"
+        for path in (wanted, other):
+            shutil.copy(self.binary, path)
+        before = time.monotonic()
+        process = subprocess.Popen([str(wanted), "--hold"])
+        after = time.monotonic()
+        neighbor = subprocess.Popen([str(other), "--hold"])
+        try:
+            rows = self.listed(wanted.name)
+            self.assertIsNone(process.poll())
+            self.assertEqual([row["pid"] for row in rows], [process.pid])
+            self.assertGreaterEqual(rows[0]["uptime_ms"] / 1000, before)
+            self.assertLessEqual(rows[0]["uptime_ms"] / 1000, after)
+            process.kill()
+            process.wait(timeout=3)
+            self.assertEqual(self.listed(wanted.name), [])
+            self.assertEqual([row["pid"] for row in self.listed(other.name)], [neighbor.pid])
+        finally:
+            for child in (process, neighbor):
+                child.kill()
+                child.wait(timeout=3)
+
 
 class TransportTests(unittest.TestCase):
     def test_real_pipe_marker_acknowledgement_stop_and_exclusive_log(self):
@@ -268,9 +373,9 @@ class SwiftRunLoopTests(unittest.TestCase):
         platform.write_text('''
 import Foundation
 @MainActor final class DesktopObservation {
-    init(pids: [Int32]) throws {}
-    func sample(ms: Double) throws -> [String: Any] {
-        ["type":"sample", "ms":ms, "frontmost_pid":100, "pointer":[10,20],
+    init(pids: [Int32], panelServices: Bool, uptimeOrigin: Double) throws {}
+    func sample(now: @MainActor () -> Double) throws -> [String: Any] {
+        ["type":"sample", "ms":now(), "frontmost_pid":100, "pointer":[10,20],
          "visible_spaces":["1":"2"], "target_active":["200":false], "session_locked":false]
     }
 }

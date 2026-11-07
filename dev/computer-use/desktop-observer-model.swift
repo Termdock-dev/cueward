@@ -12,6 +12,7 @@ struct ObserverConfiguration {
     let pids: [Int32]
     let intervalMS: Double
     let durationMS: Double
+    let panelServices: Bool
 
     init(_ value: [String: Any]) throws {
         guard let raw = value["pids"] as? [Any], !raw.isEmpty, raw.count <= 32 else {
@@ -30,7 +31,33 @@ struct ObserverConfiguration {
         }
         intervalMS = interval
         durationMS = duration
+        panelServices = value["panel_services"] as? Bool == true
     }
+}
+
+struct ListedProcess {
+    let pid: Int32
+    let startTicks: UInt64
+}
+
+/// Keep the processes in the latest listing. A PID that returns with another start time is
+/// another process, so it counts as newly found.
+struct PanelServiceTracker {
+    private(set) var live: [Int32: UInt64] = [:]
+
+    mutating func update(_ listed: [ListedProcess]) -> [ListedProcess] {
+        let found = listed.filter { live[$0.pid] != $0.startTicks }
+        live = Dictionary(listed.map { ($0.pid, $0.startTicks) }, uniquingKeysWith: { _, last in last })
+        return found
+    }
+}
+
+/// Convert a kernel `mach_absolute_time` value to observer milliseconds. `systemUptime` counts the
+/// same ticks, so sleep and wall-clock changes cannot shift the result. The result is negative for
+/// a process older than the observer.
+func kernelStartMS(ticks: UInt64, numer: UInt32, denom: UInt32, origin: Double) -> Double {
+    let seconds = Double(ticks) / Double(denom) * Double(numer) / 1_000_000_000
+    return (seconds - origin) * 1000
 }
 
 func finiteNumber(_ value: Any?) -> Double? {

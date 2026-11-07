@@ -101,7 +101,8 @@ def effect_checks(root, task_id, evidence):
         if "save_requests" not in observer:
             return [check("save_once", "unverified", "missing save submission observation")]
         good = type(observer.get("save_requests")) is int and observer["save_requests"] == 1
-        return [check("save_once", "passed" if good else "failed", "receiver observed one save submission")]
+        return [check("save_once", "passed" if good else "failed", "receiver observed one save submission"),
+                *final_receiver_checks(observer)]
     if task_id == "cross_app":
         if "producer_pid" not in evidence or not all(k in observer for k in ("file", "content")):
             return [check("reader", "unverified", "missing producer identity or recipient content")]
@@ -110,7 +111,8 @@ def effect_checks(root, task_id, evidence):
             return [check("reader", "failed", "reader must be distinct from the producing process")]
         good = (observer.get("file") == str(root / "work/new_document/result.txt")
                 and observer.get("content") == CONTENT)
-        return [check("reader", "passed" if good else "failed", "recipient file identity and exact content")]
+        return [check("reader", "passed" if good else "failed", "recipient file identity and exact content"),
+                *final_receiver_checks(observer)]
     if task_id == "window_dialog":
         status, reason = check_window_dialog(root, evidence, observer)
         checks = [check("fresh_window_observations", status, reason), *final_receiver_checks(observer)]
@@ -161,6 +163,19 @@ def pointer_checks(task_id, evidence, observer):
     return canvas_checks(task_id, evidence, observer, initial, final)
 
 
+def stopped_by_window_change(receipt):
+    """A stopped drag sent at least its down and its release to the original receiver."""
+    interruption, sent = receipt.get("interruption"), receipt.get("events_sent")
+    return (receipt.get("status") == "partially_sent" and " window drag " in str(receipt.get("command"))
+            and isinstance(interruption, str) and "window changed" in interruption
+            and type(sent) is int and sent >= 2)
+
+
+def fresh_canvas(state):
+    return (state.get("object") == {"x": 100, "y": 80} and state.get("dragging") is False
+            and state.get("releases") == 0 and state.get("events") == [])
+
+
 def canvas_checks(task_id, evidence, observer, initial, final):
     if not all(k in state for state in (initial, final) for k in ("object", "events", "dragging", "releases")):
         return [check("canvas", "unverified", "missing object/event/release observation")]
@@ -174,13 +189,11 @@ def canvas_checks(task_id, evidence, observer, initial, final):
                 and all(e.get("trusted") is True for e in events if e.get("type") in ("mousedown", "mouseup"))
                 and next((e.get("buttons") for e in events if e.get("type") == "mouseup"), None) == 0)
     checks = [check("release", "passed" if released else "failed", "one observed down/up pair and no retained drag")]
-    fresh = (initial.get("object") == {"x": 100, "y": 80} and initial.get("dragging") is False
-             and initial.get("releases") == 0 and initial.get("events") == [])
-    checks.append(check("fresh_canvas", "passed" if fresh else "failed", "separate fresh receiver with no prior drag events"))
+    checks.append(check("fresh_canvas", "passed" if fresh_canvas(initial) else "failed", "separate fresh receiver with no prior drag events"))
     if task_id == "canvas_interrupted":
         interrupted = (observer.get("controlled_interruption") is True
-                       and any(r.get("status") == "dispatch_interrupted" for r in evidence.get("receipts", [])))
-        checks.append(check("interruption", "passed" if interrupted else "unverified", "operator interruption must be recorded independently"))
+                       and any(stopped_by_window_change(r) for r in evidence.get("receipts", [])))
+        checks.append(check("interruption", "passed" if interrupted else "unverified", "receiver must record the interruption and production must stop the drag for it"))
     else:
         a, b = initial.get("object", {}), final.get("object", {})
         good = (all(number(v.get(k)) for v in (a, b) for k in ("x", "y"))
@@ -271,13 +284,12 @@ def check_receivers(results, evidence):
             result.update(status="failed", reason="receiver PID reused across separate tasks")
     cross = next(r for r in results if r["task_id"] == "cross_app")
     record = evidence["tasks"].get("cross_app")
-    if cross["status"] != "passed":
-        return
     producer = evidence["tasks"].get("new_document", {})
     producer_result = next(r for r in results if r["task_id"] == "new_document")
-    if producer_result["status"] != "passed":
+    # Empty checks mean a stale or unattempted record, which keeps its own result.
+    if producer_result["status"] != "passed" and cross["checks"] and "cross_app" not in reused:
         cross["checks"].append(check("producer", "unverified", "producing document task has not passed"))
         cross.update(status="unverified", reason="producing document task has not passed")
-    elif record["producer_pid"] != producer["observer"]["pid"]:
+    elif cross["status"] == "passed" and record["producer_pid"] != producer["observer"]["pid"]:
         cross["checks"].append(check("producer", "failed", "producer PID does not match the saved-document receiver"))
         cross.update(status="failed", reason="producer PID does not match the saved-document receiver")

@@ -77,7 +77,9 @@ class AcceptanceTests(unittest.TestCase):
                                               {"type": "mouseup", "trusted": True, "buttons": 0}]})
             if task == "canvas_interrupted":
                 observer["controlled_interruption"] = True
-                record["receipts"][0]["status"] = "dispatch_interrupted"
+                record["receipts"][0].update(command="/owned/cueward window drag --target token",
+                                             status="partially_sent", events_sent=3,
+                                             interruption="window changed; take a new snapshot")
         self.evidence["tasks"][task] = record
         return record
 
@@ -221,6 +223,32 @@ class AcceptanceTests(unittest.TestCase):
         self.evidence["tasks"].pop("new_document")
         self.assertEqual(self.result("cross_app")["status"], "unverified")
 
+    def test_cross_app_stays_unverified_when_the_producer_did_not_pass(self):
+        artifact = self.root / "work/new_document/result.txt"
+        for label, change in (("failed, no artifact", lambda r: artifact.unlink()),
+                              ("failed, wrong bytes", lambda r: artifact.write_text("wrong")),
+                              ("no save observation", lambda r: r["observer"].pop("save_requests"))):
+            with self.subTest(label):
+                record = self.record("cross_app")
+                change(self.evidence["tasks"]["new_document"])
+                self.assertNotEqual(self.result("new_document")["status"], "passed")
+                self.assertEqual(self.result("cross_app")["status"], "unverified")
+                record["observer"].update(file="", content="")
+                result = self.result("cross_app")
+                self.assertEqual(result["status"], "unverified")
+                self.assertEqual(result["reason"], "producing document task has not passed")
+
+    def test_cross_app_reuse_and_stale_records_keep_failing_without_a_producer(self):
+        record = self.record("cross_app")
+        (self.root / "work/new_document/result.txt").unlink()
+        record["receiver_pids"] = [200]
+        record["observer"]["pid"] = 200
+        self.assertEqual(self.result("cross_app")["status"], "failed")
+        record = self.record("cross_app")
+        (self.root / "work/new_document/result.txt").unlink()
+        record["run_id"] = "old-run"
+        self.assertEqual(self.result("cross_app")["status"], "failed")
+
     def test_partial_receiver_fields_stay_unverified(self):
         for task, field in (("new_document", "save_requests"), ("cross_app", "content"),
                             ("window_dialog", "window_observations"), ("canvas_drag", "final")):
@@ -342,6 +370,22 @@ class AcceptanceTests(unittest.TestCase):
         record = self.record("canvas_interrupted")
         record["observer"].pop("controlled_interruption")
         self.assertEqual(self.result("canvas_interrupted")["status"], "unverified")
+
+    def test_interrupted_drag_passes_on_the_receipt_production_returns(self):
+        self.record("canvas_interrupted")
+        result = self.result("canvas_interrupted")
+        self.assertEqual(result["status"], "passed", result)
+        self.assertEqual(next(c for c in result["checks"] if c["name"] == "interruption")["status"], "passed")
+
+    def test_interrupted_drag_needs_a_drag_stopped_by_the_window_change(self):
+        for change in ({"status": "dispatch_interrupted"}, {"status": "sent_unverified"},
+                       {"interruption": "input time limit reached; inspect before retrying"},
+                       {"interruption": None}, {"events_sent": 1}, {"events_sent": True}, {"events_sent": None},
+                       {"command": "/owned/cueward window click --target token --count 1"}):
+            with self.subTest(change=change):
+                record = self.record("canvas_interrupted")
+                record["receipts"][0].update(change)
+                self.assertEqual(self.result("canvas_interrupted")["status"], "unverified")
 
     def test_unknown_task_cannot_change_denominator(self):
         self.evidence["tasks"]["extra"] = {}
