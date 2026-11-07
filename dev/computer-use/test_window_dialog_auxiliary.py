@@ -3,10 +3,12 @@ from copy import deepcopy
 import tempfile
 import unittest
 
+from desktop_observer import execution_from_records
 from task_acceptance.evaluate import evaluate, load_json
 from task_acceptance.setup import EDITED, prepare
-from task_acceptance.window_dialog import check_auxiliary_receiver_trace, check_window_dialog
+from task_acceptance.window_dialog import PANEL_SERVICE, check_auxiliary_receiver_trace, check_window_dialog
 from test_window_dialog_native import binding, state
+from window_dialog_task import dialog_evidence
 
 
 class DialogAuxiliaryTests(unittest.TestCase):
@@ -301,6 +303,117 @@ class DialogAuxiliaryTests(unittest.TestCase):
             self.assertEqual(result["status"], "failed", result)
             self.assertEqual(next(check for check in result["checks"] if check["name"] == "interference_trace")["status"],
                              "failed")
+
+    def discovered(self, started=40, seen=50, times=(0, 50, 100)):
+        """The observer launched with the host alone and found service 200 at `seen`."""
+        record = self.record()
+        execution = record["execution"]
+        execution["samples"] = [deepcopy(execution["samples"][0]) | {"ms": ms} for ms in times]
+        execution["end_ms"] = times[-1] - 10
+        execution["observer"]["receiver_pids"] = [100]
+        execution["panel_services"] = [{"pid": 200, "executable": PANEL_SERVICE,
+                                        "start_ms": started, "first_seen_ms": seen}]
+        for sample in execution["samples"]:
+            if sample["ms"] < seen:
+                del sample["target_active"]["200"]
+        return record
+
+    def assert_unverified(self, record, reason):
+        status, detail = check_auxiliary_receiver_trace(self.run, record, record["observer"])
+        self.assertEqual(status, "unverified", detail)
+        self.assertIn(reason, detail)
+        self.assertEqual(self.result(record)["status"], "unverified")
+
+    def test_service_covered_from_first_sight_passes_without_becoming_owned(self):
+        record = self.discovered()
+        self.assertNotIn("200", record["execution"]["samples"][0]["target_active"])
+        self.assertEqual(self.auxiliary_trace(record), "passed")
+        self.assertEqual(self.result(record)["status"], "passed")
+        self.assertEqual(record["receiver_pids"], [100])
+
+    def test_first_sight_gap_limit_is_100_ms(self):
+        times = (0, 50, 100, 150, 200)
+        self.assertEqual(self.auxiliary_trace(self.discovered(started=50, seen=150, times=times)), "passed")
+        self.assert_unverified(self.discovered(started=49, seen=150, times=times), "more than 100 ms")
+
+    def test_service_older_than_the_task_needs_coverage_from_the_first_sample(self):
+        self.assertEqual(self.auxiliary_trace(self.discovered(started=-5000, seen=-20)), "passed")
+        self.assertEqual(self.auxiliary_trace(self.discovered(started=-5000, seen=0)), "passed")
+        for started, seen in ((-5000, 50), (5, 6), (10, 50)):
+            with self.subTest(started=started, seen=seen):
+                self.assert_unverified(self.discovered(started=started, seen=seen), "predates the task")
+
+    def test_discovered_service_active_or_frontmost_fails_in_any_sample(self):
+        for change in (lambda s: s[1]["target_active"].update({"200": True}),
+                       lambda s: s[2]["target_active"].update({"200": True}),
+                       lambda s: s[1].update(frontmost_pid=200),
+                       lambda s: s[0].update(frontmost_pid=200)):
+            record = self.discovered()
+            change(record["execution"]["samples"])
+            self.assertEqual(self.auxiliary_trace(record), "failed")
+            self.assertEqual(self.result(record)["status"], "failed")
+
+    def test_discovered_service_activation_event_fails(self):
+        record = self.discovered()
+        record["execution"]["events"].append({"type": "activation", "ms": 30, "pid": 200})
+        self.assertEqual(self.auxiliary_trace(record), "failed")
+
+    def test_sample_holes_and_contradictory_discovery_stay_unverified(self):
+        changes = [
+            ("first sight", lambda e: e["samples"][2]["target_active"].pop("200")),
+            ("first sight", lambda e: e["samples"][1]["target_active"].pop("200")),
+            ("first sight", lambda e: e["samples"][2]["target_active"].update({"200": None})),
+            ("before its first sight", lambda e: e["samples"][0]["target_active"].update({"200": False})),
+            ("contradict", lambda e: e["panel_services"][0].update(start_ms=60)),
+            ("contradict", lambda e: e["panel_services"][0].update(start_ms=490, first_seen_ms=500)),
+            ("single discovery record", lambda e: e.update(panel_services=[])),
+            ("single discovery record", lambda e: e.pop("panel_services")),
+            ("single discovery record", lambda e: e.update(panel_services={})),
+            ("single discovery record", lambda e: e["panel_services"].append(deepcopy(e["panel_services"][0]))),
+            ("single discovery record", lambda e: e["panel_services"][0].update(pid=201)),
+            ("identify", lambda e: e["panel_services"][0].update(executable="xpcproxy")),
+            ("identify", lambda e: e["panel_services"][0].pop("start_ms")),
+            ("identify", lambda e: e["panel_services"][0].update(first_seen_ms="50")),
+            ("within 100 ms", lambda e: e["samples"][-1].update(ms=200)),
+            ("within 100 ms", lambda e: e["samples"][1].update(ms=0)),
+        ]
+        for index, (reason, change) in enumerate(changes):
+            record = self.discovered()
+            change(record["execution"])
+            with self.subTest(index=index):
+                self.assert_unverified(record, reason)
+
+    def test_unknown_observer_scope_is_not_repaired_by_discovery(self):
+        for receivers in ([200], [100, 999], [100, 100]):
+            record = self.discovered()
+            record["execution"]["observer"]["receiver_pids"] = receivers
+            with self.subTest(receivers=receivers):
+                self.assertEqual(self.auxiliary_trace(record), "unverified")
+
+    def test_another_client_service_is_recorded_but_does_not_change_the_result(self):
+        record = self.discovered()
+        record["execution"]["panel_services"].insert(0, {"pid": 300, "executable": PANEL_SERVICE,
+                                                         "start_ms": -9000, "first_seen_ms": -30})
+        for sample in record["execution"]["samples"]:
+            sample["target_active"]["300"] = True
+        self.assertEqual(self.result(record)["status"], "passed")
+
+    def test_observer_records_reach_the_evaluator_through_the_dialog_evidence(self):
+        record = self.discovered()
+        first, second, third = ({"type": "sample"} | sample for sample in record["execution"]["samples"])
+        second["panel_services"] = record["execution"]["panel_services"]
+        trace = [{"type": "ready", "schema": 1, "receiver_pids": [100]}, first,
+                 {"type": "mark", "id": "start", "ms": 10}, second,
+                 {"type": "mark", "id": "end", "ms": 90}, third]
+        session = {key: record[key] for key in ("run_id", "task_id", "attempted", "receiver_pids", "receipts")}
+        session["execution"] = execution_from_records(trace, "start", "end")
+        final = state(self.artifact)
+        final["contents"] = final["documents"][0]["contents"] = EDITED
+        task = dialog_evidence(session, final, self.manifest, 100, self.artifact, final["owned_windows"],
+                               record["observer"]["window_observations"], record["observer"]["auxiliary_receivers"])
+        self.assertEqual(task["execution"]["panel_services"], record["execution"]["panel_services"])
+        self.assertEqual(task["receiver_pids"], [100])
+        self.assertEqual(self.result(task)["status"], "passed")
 
 
 if __name__ == "__main__":

@@ -5,6 +5,8 @@ import re
 
 from .trace import MAX_INTERVAL_MS, number
 
+PANEL_SERVICE = "com.apple.appkit.xpc.openAndSavePanelService"
+
 
 class MissingEvidence(ValueError):
     """A required observation was not collected, rather than contradicting a goal."""
@@ -194,8 +196,37 @@ def check_window_dialog(root, evidence, observer):
     return "passed", "two owned document windows and ordered save-dialog open/close root transitions observed"
 
 
+def discovery_gap(execution, samples, pid):
+    """Explain why a service found after launch lacks coverage; None means it is covered.
+
+    A process that does not exist yet cannot be frontmost or active, so samples before its
+    kernel start need no entry. Every sample from first sight onward must have one.
+    """
+    records = execution.get("panel_services")
+    matches = [r for r in records if isinstance(r, dict) and r.get("pid") == pid] if isinstance(records, list) else []
+    if len(matches) != 1:
+        return "bound service has no single discovery record"
+    record = matches[0]
+    started, seen = record.get("start_ms"), record.get("first_seen_ms")
+    if record.get("executable") != PANEL_SERVICE or not (number(started) and number(seen)):
+        return "discovery record does not identify the save-panel service and its times"
+    if started > seen or seen > samples[-1]["ms"]:
+        return "discovery times contradict the sampled interval"
+    if started <= execution["start_ms"]:
+        if seen > samples[0]["ms"]:
+            return "service that predates the task was not covered from the first sample"
+    elif seen - started > MAX_INTERVAL_MS:
+        return "service was first seen more than 100 ms after its kernel start"
+    key = str(pid)
+    if any(key in sample["target_active"] for sample in samples if sample["ms"] < seen):
+        return "service has activation samples from before its first sight"
+    if not all(type(sample["target_active"].get(key)) is bool for sample in samples if sample["ms"] >= seen):
+        return "missing Boolean service activation sample after first sight"
+    return None
+
+
 def check_auxiliary_receiver_trace(root, evidence, observer):
-    """Require service coverage from task start, without inventing earlier state."""
+    """Require each service covered from when it could first act, without inventing earlier state."""
     try:
         records = transitions(root, evidence, observer)
     except MissingEvidence as error:
@@ -219,15 +250,17 @@ def check_auxiliary_receiver_trace(root, evidence, observer):
         return "failed", "shared save-panel service activation observed between samples"
     native = execution.get("observer")
     receivers = native.get("receiver_pids") if isinstance(native, dict) else None
-    expected = set(evidence["receiver_pids"]) | services
+    owned = set(evidence["receiver_pids"])
     if (not isinstance(native, dict) or native.get("schema") != 1 or not isinstance(receivers, list)
             or not all(positive(pid) for pid in receivers) or len(set(receivers)) != len(receivers)
-            or set(receivers) != expected):
+            or not owned <= set(receivers) <= owned | services):
         return "unverified", "native observer did not cover the owned host and bound auxiliary services"
+    # A service in the launch list has no discovery record: it needs an entry in every sample.
+    launched = services & set(receivers)
     if (not isinstance(samples, list) or len(samples) < 3
             or not all(isinstance(sample, dict) and number(sample.get("ms"))
                        and isinstance(sample.get("target_active"), dict)
-                       and all(type(sample["target_active"].get(str(pid))) is bool for pid in services)
+                       and all(type(sample["target_active"].get(str(pid))) is bool for pid in launched)
                        for sample in samples)):
         return "unverified", "missing Boolean auxiliary activation samples across the full execution interval"
     if (not isinstance(events, list) or not all(isinstance(event, dict) and number(event.get("ms"))
@@ -239,4 +272,8 @@ def check_auxiliary_receiver_trace(root, evidence, observer):
     if (any(b <= a for a, b in zip(times, times[1:])) or times[0] > execution["start_ms"]
             or times[-1] < execution["end_ms"] or max(b-a for a, b in zip(times, times[1:])) > MAX_INTERVAL_MS):
         return "unverified", "auxiliary samples do not cover the execution interval within 100 ms"
+    for pid in sorted(services - launched):
+        gap = discovery_gap(execution, samples, pid)
+        if gap:
+            return "unverified", gap
     return "passed", "bound shared service inactive throughout supplied sampled execution coverage"
