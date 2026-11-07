@@ -102,6 +102,35 @@ class PhysicalEvidenceTests(unittest.TestCase):
         state = human(); state["events"] = [e for e in state["events"] if e["type"] != 5]
         self.assertEqual(human_check(state, *args)["status"], "failed")
 
+    def test_capslock_input_method_text_is_matched_through_physical_shift(self):
+        # McBopomofo types English with CapsLock on, so every event reports an uppercase letter.
+        state = human()
+        for item in state["events"]:
+            if item["type"] in (10, 11):
+                item["characters"] = "A"
+                item["flags"] |= 1 << 16
+        args = ("START", "END", 100, 100.1)
+        self.assertTrue(human_check(state, *args)["checks"]["content_matches_key_events"])
+        state["text"] = "Aa"
+        self.assertFalse(human_check(state, *args)["checks"]["content_matches_key_events"])
+
+    def test_foreign_app_with_no_command_running_does_not_fail_the_round(self):
+        data = execution()
+        data["samples"][1]["frontmost_pid"] = 300
+        for sample in data["samples"]:
+            sample["input"] = {"physical_pointer": 0, "automated_pointer": 0, "physical_other": 0}
+        data["events"] = [{"type": "activation", "ms": 20, "pid": 300}]
+        self.assertEqual(trace_check(data, [200], 100, "9")["status"], "failed")
+        self.assertEqual(trace_check(data, [200], 100, "9", spans=[(5000, 5100)])["status"], "passed")
+        self.assertEqual(trace_check(data, [200], 100, "9", spans=[(10, 30)])["status"], "failed")
+
+    def test_receiver_activity_fails_the_round_at_any_time(self):
+        data = execution()
+        data["samples"][1]["target_active"] = {"200": True}
+        for sample in data["samples"]:
+            sample["input"] = {"physical_pointer": 0, "automated_pointer": 0, "physical_other": 0}
+        self.assertEqual(trace_check(data, [200], 100, "9", spans=[(5000, 5100)])["status"], "failed")
+
     def test_pointer_requires_shared_clock_and_observations_outside_human_window(self):
         data = execution()
         mouse = [event(5, tag=0, uptime=100 + s["ms"] / 1000,
