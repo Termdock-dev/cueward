@@ -66,7 +66,8 @@ def run_dialog_task(cli, run, socket, *, write_report, record_failure, cleanup_r
         write_json(output / "owned-scope.json", {**metadata, "pid": process.pid,
                    "window_id": initial["window_id"], "owned_windows": windows, "socket": str(socket), "goal": goal,
                    "allowed": "Owned app/window observations and freshly observed AX controls only; no menu/global/pointer actions."})
-        with DesktopObserver(observer_binary, [process.pid], output / "session.trace.jsonl", duration_ms=900_000) as observer:
+        with DesktopObserver(observer_binary, [process.pid], output / "session.trace.jsonl", duration_ms=900_000,
+                             panel_services=True) as observer:
             session = DialogSession(cli, observer, process.pid, initial["window_id"], output / "session.json", metadata,
                                     bindings=bindings, artifact=artifact)
             session.serve_socket(socket, duration=800)

@@ -54,8 +54,21 @@ final class InputAttribution: @unchecked Sendable {
     private let library: UnsafeMutableRawPointer
     private let input = InputAttribution()
     private let inputAvailable: Bool
+    private let panelServices: Bool
+    private let uptimeOrigin: Double
+    private let timebase: mach_timebase_info_data_t
+    private var listing = KernelProcessListing()
+    private var tracker = PanelServiceTracker()
+    private var serviceApps: [Int32: NSRunningApplication] = [:]
 
-    init(pids: [Int32]) throws {
+    init(pids: [Int32], panelServices: Bool, uptimeOrigin: Double) throws {
+        self.panelServices = panelServices
+        self.uptimeOrigin = uptimeOrigin
+        var timebase = mach_timebase_info_data_t()
+        guard mach_timebase_info(&timebase) == KERN_SUCCESS, timebase.denom > 0 else {
+            throw ObservationError.invalid("kernel timebase is unavailable")
+        }
+        self.timebase = timebase
         guard let library = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY),
               let connectionSymbol = dlsym(library, "SLSMainConnectionID"),
               let spacesSymbol = dlsym(library, "SLSCopyManagedDisplaySpaces") else {
@@ -101,7 +114,22 @@ final class InputAttribution: @unchecked Sendable {
         return try correlateDisplaySpaces(rows, online: online, mainUUID: displayUUID(CGMainDisplayID()))
     }
 
-    func sample(ms: Double) throws -> [String: Any] {
+    /// Before LaunchServices registers a service it has no activation state, so it cannot be active.
+    private func serviceActive(_ pid: Int32) -> Bool {
+        if serviceApps[pid] == nil { serviceApps[pid] = NSRunningApplication(processIdentifier: pid) }
+        return serviceApps[pid]?.isActive ?? false
+    }
+
+    private func serviceRecord(_ process: ListedProcess, firstSeen ms: Double) -> [String: Any] {
+        ["pid": process.pid, "executable": panelServiceExecutable, "first_seen_ms": ms,
+         "start_ms": kernelStartMS(ticks: process.startTicks, numer: timebase.numer, denom: timebase.denom,
+                                   origin: uptimeOrigin)]
+    }
+
+    func sample(now: @MainActor () -> Double) throws -> [String: Any] {
+        // Listing before the timestamp keeps a kernel start at or before its first-seen sample.
+        let services = panelServices ? try listing.processes(named: panelServiceExecutable) : []
+        let ms = now()
         guard let session = CGSessionCopyCurrentDictionary() as? [String: Any],
               let event = CGEvent(source: nil),
               let foreground = NSWorkspace.shared.frontmostApplication else {
@@ -113,10 +141,17 @@ final class InputAttribution: @unchecked Sendable {
             active[String(app.processIdentifier)] = app.isActive
         }
         let pointer = event.location
+        let spaces = try visibleSpaces()
+        // A failed sample stops above, so a service is first seen only in a sample that exists.
+        let found = tracker.update(services)
+        for process in found { serviceApps[process.pid] = nil }
+        serviceApps = serviceApps.filter { tracker.live[$0.key] != nil }
+        for process in services { active[String(process.pid)] = serviceActive(process.pid) }
         var value: [String: Any] = ["type": "sample", "ms": ms, "frontmost_pid": foreground.processIdentifier,
-                                    "pointer": [pointer.x, pointer.y], "visible_spaces": try visibleSpaces(),
+                                    "pointer": [pointer.x, pointer.y], "visible_spaces": spaces,
                                     "target_active": active,
                                     "session_locked": session["CGSSessionScreenIsLocked"] as? Bool == true]
+        if !found.isEmpty { value["panel_services"] = found.map { serviceRecord($0, firstSeen: ms) } }
         if inputAvailable {
             value["input"] = ["physical_pointer": input.physicalPointer, "automated_pointer": input.automatedPointer,
                               "physical_other": input.physicalOther]

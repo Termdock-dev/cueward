@@ -8,7 +8,7 @@ import time
 import uuid
 
 HERE = Path(__file__).resolve().parent
-SOURCES = [HERE / f"desktop-observer-{part}.swift" for part in ("model", "platform", "main")]
+SOURCES = [HERE / f"desktop-observer-{part}.swift" for part in ("model", "panels", "platform", "main")]
 
 
 def compile_observer(directory):
@@ -44,8 +44,10 @@ def execution_from_records(records, start_id, end_id):
     samples = [r for r in samples if lower <= r["ms"] <= upper]
     events = [r for r in records if type(r.get("ms")) in (int, float) and lower <= r["ms"] <= upper
               and r.get("type") in ("activation", "observation_error", "control_error")]
+    # A service found before the interval still counts, so these are not limited to its samples.
+    services = [s for r in records if r.get("type") == "sample" for s in r.get("panel_services", [])]
     return {"start_ms": start, "end_ms": end, "samples": samples, "events": events,
-            "observer": ready[0]}
+            "panel_services": services, "observer": ready[0]}
 
 
 def observation_checks(execution, pids, pointer_policy="stationary"):
@@ -81,9 +83,10 @@ def observation_checks(execution, pids, pointer_policy="stationary"):
 class DesktopObserver:
     """Own a finite helper, retain JSONL evidence, and acknowledge timestamped markers."""
 
-    def __init__(self, binary, pids, output, interval_ms=20, duration_ms=600_000):
+    def __init__(self, binary, pids, output, interval_ms=20, duration_ms=600_000, panel_services=False):
         self.binary, self.pids, self.output = Path(binary), list(pids), Path(output)
-        self.configuration = {"pids": self.pids, "interval_ms": interval_ms, "duration_ms": duration_ms}
+        self.configuration = {"pids": self.pids, "interval_ms": interval_ms, "duration_ms": duration_ms,
+                              "panel_services": panel_services}
         self.records = []
         self.condition = threading.Condition()
         self.error = None
