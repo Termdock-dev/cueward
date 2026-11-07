@@ -1,0 +1,75 @@
+{
+  "kind": "fresh_agent_acceptance",
+  "date": "2026-11-07",
+  "macos": "27.0.1",
+  "architecture": "arm64",
+  "cli": "cueward-cli 0.6.1 installed from crates.io",
+  "attempts": [
+    {
+      "run": "C",
+      "task": "existing_document",
+      "broker_requests": 13,
+      "cli_commands": 12,
+      "status": "failed",
+      "artifact": "exact",
+      "receiver_activations": 0,
+      "failed_check": "interference_trace",
+      "reason": "A separate project's test app, folio-e2e, started 26 s into the run and took the foreground with no physical input in the previous second."
+    },
+    {
+      "run": "D",
+      "task": "existing_document",
+      "broker_requests": 14,
+      "cli_commands": 13,
+      "status": "passed",
+      "artifact": "exact",
+      "receiver_activations": 0,
+      "observer_max_interval_ms": 79.1,
+      "physical_input_events": 0
+    },
+    {
+      "run": "E",
+      "task": "window_dialog",
+      "broker_requests": 6,
+      "status": "failed",
+      "receiver_activations": 0,
+      "reason": "The harness stopped at 'unbound sheet receiver' when the Save panel opened, and the broker exited. Fixed in this change."
+    },
+    {
+      "run": "F",
+      "task": "window_dialog",
+      "broker_requests": 26,
+      "cli_commands": 23,
+      "status": "failed",
+      "artifact": "exact",
+      "native_document_io": "passed",
+      "window_observations": "passed",
+      "receiver_activations": 0,
+      "observer_max_interval_ms": 286.0,
+      "failed_check": "interference_trace",
+      "unverified_check": "auxiliary_receiver_trace",
+      "foreground_changes": [
+        {
+          "ms": 191287,
+          "during_cueward_command": false
+        },
+        {
+          "ms": 200042,
+          "during_cueward_command": true,
+          "command": "read-only app inspect"
+        },
+        {
+          "ms": 210745,
+          "during_cueward_command": false
+        }
+      ],
+      "reason": "No change moved to the receiver. folio-e2e restarted about 195 s into the run, but the other process ids were gone before they could be named, so the source is not proven."
+    }
+  ],
+  "panel_structure": {
+    "sheet": "panel native window id, host process",
+    "content": "second native window id shared by host and save panel service nodes",
+    "nodes_observed": 6000
+  },
+  "totals_are_per_run": true
+}
