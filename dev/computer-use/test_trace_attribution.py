@@ -30,6 +30,11 @@ def change(record, at, field, value):
                 sample[field] = value
 
 
+def drop(record, first, last):
+    execution = record["execution"]
+    execution["samples"] = [s for s in execution["samples"] if not first <= s["ms"] <= last]
+
+
 class CommandAttributionTests(unittest.TestCase):
     def status(self, record):
         status, reason, metrics = check_trace(record)
@@ -97,6 +102,31 @@ class CommandAttributionTests(unittest.TestCase):
         del record["receipts"][0]["end_marker"]
         change(record, 500, "frontmost_pid", 300)
         self.assertEqual(self.status(record)[0], "failed")
+
+    def test_sample_gap_with_no_command_running_does_not_block_a_result(self):
+        record = evidence()
+        drop(record, 500, 800)
+        status, _, metrics = self.status(record)
+        self.assertEqual(status, "passed")
+        self.assertEqual(metrics["observer_max_interval_ms"], 350)
+        self.assertEqual(metrics["observer_max_command_interval_ms"], 50)
+
+    def test_sample_gap_during_a_command_stays_unverified(self):
+        record = evidence()
+        drop(record, 3100, 3400)
+        status, reason, _ = self.status(record)
+        self.assertEqual(status, "unverified")
+        self.assertIn("gap", reason)
+
+    def test_sample_gap_just_after_a_command_stays_unverified(self):
+        record = evidence(command=(1000, 1500))
+        drop(record, 2300, 2450)
+        self.assertEqual(self.status(record)[0], "unverified")
+
+    def test_sample_gap_without_marks_stays_unverified(self):
+        record = evidence(marks=False)
+        drop(record, 500, 800)
+        self.assertEqual(self.status(record)[0], "unverified")
 
     def test_execution_keeps_the_observer_marks(self):
         rows = [{"type": "ready", "schema": 1}]
