@@ -26,6 +26,10 @@ func boundDialogSheetReceivers(_ observations: [DialogReceiverObservation], host
     guard scoped.filter({ $0.ref == root }).count == 1 else {
         throw DialogReceiverBindingError("selected sheet receiver must be present and unique")
     }
+    // The sheet is the panel window, and macOS shows its content in a second native window.
+    // Only a window the host itself exposes inside this sheet can vouch for a service.
+    let hostedWindows = scoped.filter { $0.ref != root && $0.pid == hostPID }.compactMap(\.nativeWindowID)
+    let panelWindows = Set(hostedWindows.filter { $0 > 0 }).union([panelID])
     var references = Set<String>()
     for observation in scoped {
         guard validDialogReceiverRef(observation.ref), references.insert(observation.ref).inserted,
@@ -33,12 +37,13 @@ func boundDialogSheetReceivers(_ observations: [DialogReceiverObservation], host
             throw DialogReceiverBindingError("invalid or unavailable sheet receiver at \(observation.ref)")
         }
         // Host context is already within the retained host process scope. Every
-        // foreign descendant must bind directly to this panel, never be dropped.
-        if observation.ref == root || observation.pid != hostPID {
-            guard observation.nativeWindowID == panelID else {
-                throw DialogReceiverBindingError("unbound sheet receiver at \(observation.ref)")
-            }
+        // foreign descendant must bind to this panel, never be dropped.
+        if observation.ref == root && observation.nativeWindowID != panelID {
+            throw DialogReceiverBindingError("unbound sheet receiver at \(observation.ref)")
+        }
+        if observation.pid != hostPID, !panelWindows.contains(observation.nativeWindowID ?? 0) {
+            throw DialogReceiverBindingError("unbound sheet receiver at \(observation.ref)")
         }
     }
-    return Set(scoped.filter { $0.nativeWindowID == panelID }.map { $0.pid }).sorted()
+    return Set(scoped.filter { panelWindows.contains($0.nativeWindowID ?? 0) }.map { $0.pid }).sorted()
 }

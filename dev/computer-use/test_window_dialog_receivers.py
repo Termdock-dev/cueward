@@ -101,6 +101,10 @@ class SheetReceiverTests(unittest.TestCase):
                    observation("w1.7.0.1", 200, 32), observation("w1.6", 100, 32)]
         self.assertEqual(self.request(samples)["status"], "rejected")
 
+    def test_host_window_zero_cannot_vouch_for_a_service(self):
+        samples = [observation("w1.7", 100), observation("w1.7.0", 100, 0), observation("w1.7.1", 200, 0)]
+        self.assertEqual(self.request(samples)["status"], "rejected")
+
     def test_invalid_or_dead_service_descendants_are_rejected_not_dropped(self):
         for pid, alive in ((0, [100]), (-1, [100]), (200, [100])):
             with self.subTest(pid=pid, alive=alive):
