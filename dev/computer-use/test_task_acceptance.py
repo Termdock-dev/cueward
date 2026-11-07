@@ -77,7 +77,9 @@ class AcceptanceTests(unittest.TestCase):
                                               {"type": "mouseup", "trusted": True, "buttons": 0}]})
             if task == "canvas_interrupted":
                 observer["controlled_interruption"] = True
-                record["receipts"][0]["status"] = "dispatch_interrupted"
+                record["receipts"][0].update(command="/owned/cueward window drag --target token",
+                                             status="partially_sent", events_sent=3,
+                                             interruption="window changed; take a new snapshot")
         self.evidence["tasks"][task] = record
         return record
 
@@ -342,6 +344,22 @@ class AcceptanceTests(unittest.TestCase):
         record = self.record("canvas_interrupted")
         record["observer"].pop("controlled_interruption")
         self.assertEqual(self.result("canvas_interrupted")["status"], "unverified")
+
+    def test_interrupted_drag_passes_on_the_receipt_production_returns(self):
+        self.record("canvas_interrupted")
+        result = self.result("canvas_interrupted")
+        self.assertEqual(result["status"], "passed", result)
+        self.assertEqual(next(c for c in result["checks"] if c["name"] == "interruption")["status"], "passed")
+
+    def test_interrupted_drag_needs_a_drag_stopped_by_the_window_change(self):
+        for change in ({"status": "dispatch_interrupted"}, {"status": "sent_unverified"},
+                       {"interruption": "input time limit reached; inspect before retrying"},
+                       {"interruption": None}, {"events_sent": 1}, {"events_sent": True}, {"events_sent": None},
+                       {"command": "/owned/cueward window click --target token --count 1"}):
+            with self.subTest(change=change):
+                record = self.record("canvas_interrupted")
+                record["receipts"][0].update(change)
+                self.assertEqual(self.result("canvas_interrupted")["status"], "unverified")
 
     def test_unknown_task_cannot_change_denominator(self):
         self.evidence["tasks"]["extra"] = {}

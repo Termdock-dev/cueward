@@ -21,6 +21,15 @@ class ObservedCLITests(unittest.TestCase):
         self.assertEqual(commands.receipts[0]["end_marker"], "after")
         self.assertGreaterEqual(commands.receipts[0]["elapsed_ms"], 0)
 
+    def test_receipt_keeps_how_a_dispatch_was_stopped(self):
+        result = SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(
+            {"status": "partially_sent", "events_sent": 3, "interruption": "window changed; take a new snapshot"}))
+        commands = ObservedCLI("/owned/cueward", Mock(mark=Mock(side_effect=["before", "after"])))
+        with patch("observed_cli.subprocess.run", return_value=result):
+            commands.call("window", "drag", "--target", "token")
+        self.assertEqual(commands.receipts[0]["events_sent"], 3)
+        self.assertEqual(commands.receipts[0]["interruption"], "window changed; take a new snapshot")
+
     def test_malformed_external_envelopes_are_unknown_without_replay(self):
         outputs = ['<external source="test">',
                    '<external source="test">\n{"status":"confirmed"}',
