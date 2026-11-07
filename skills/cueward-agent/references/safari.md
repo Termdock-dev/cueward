@@ -41,6 +41,19 @@ DOM click/key events are untrusted JavaScript events, not native keyboard editin
 
 Console/network capture starts at the first diagnostic command in that page, ends on navigation/close, and keeps the latest 300 entries. It cannot recover earlier messages or browser-level traffic. Network covers fetch/XHR, with at most 16 KiB text preview for get. A missing earlier request is not proof no request occurred.
 
+## JavaScript dialogs
+
+`alert`, `confirm` and `prompt` stop the page. Safari JavaScript then times out after 15 seconds, and the error says a browser dialog may be open. Handle the dialog through Accessibility. Safari stays in the background.
+
+```bash
+cueward app list
+cueward app inspect --pid <safari-pid> --root w0 --depth 12 --limit 500
+cueward app set-value --target '<fresh prompt field target>' --value '<text>'
+cueward app press --target '<fresh dialog button target>'
+```
+
+The dialog is a node with subrole `AXDialog`, and its name is the message. Button names follow the system language. A `prompt` also has an `AXTextField`. The page receives the answer, so read the message and choose the button the user's task calls for. A dialog in a background tab of a window was not tested.
+
 ## Bookmarks
 
 ```bash

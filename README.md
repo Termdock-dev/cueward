@@ -47,6 +47,7 @@ Cueward `0.6.1` includes the changes since `0.6.0`:
 
 - `voice-memos transcribe` turns a recording into text on this Mac. See [Voice Memos](#voice-memos)
 - `safari wait --url` and `safari wait --navigation` now work across a real navigation
+- The agent skill explains how to answer JavaScript dialogs in the background
 - Background clicks, drags and the other `0.6.0` changes are in the [0.6.0 release notes](docs/releases/0.6.0.md)
 - See the [release notes](docs/releases/0.6.1.md) for support boundaries
 
@@ -238,7 +239,7 @@ cueward safari bookmarks delete --title "Claude" --url "https://claude.ai" --pro
 
 `inspect` refs remain valid until the next `inspect`, page navigation, or element removal. `batch` accepts up to 100 steps. Each action targets one `ref`, CSS `selector`, or visible `text`. Actions are `click`, `fill` (`value`), `key` (`key`, optional `ctrl`/`alt`/`meta`/`shift`), `select` (`value`), `check` (`checked`), `scroll_into_view`, and `assert` (`js` or a target). A failed step reports its index and exits with an error. Open shadow roots and same-origin iframes are searched; closed shadow roots and cross-origin iframes cannot be accessed through page JavaScript.
 
-Click and key events sent through JavaScript have `isTrusted: false`. They can reach page event handlers but cannot replace a trusted user gesture or native keyboard editing. Use a following `assert` or `wait` condition to verify the page changed as expected.
+Click and key events sent through JavaScript have `isTrusted: false`. They can reach page event handlers but cannot replace a trusted user gesture or native keyboard editing. Pages that check for a real gesture, such as sign-in, payment or anti-bot flows, may ignore them. A background `window click` produced `isTrusted: true` events in WKWebView; it has not been measured in Safari itself. Use a following `assert` or `wait` condition to verify the page changed as expected.
 
 ### Safari diagnostics
 
