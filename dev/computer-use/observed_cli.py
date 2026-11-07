@@ -46,6 +46,8 @@ class ObservedCLI:
                 raise RuntimeError(output.stderr.strip() or "CLI exited without a result")
             value = parse_cli_output(output.stdout.strip())
             receipt["status"] = value.get("status", "observed") if isinstance(value, dict) else "observed"
+            if isinstance(value, dict):
+                receipt.update({k: value[k] for k in ("events_sent", "interruption") if k in value})
             return value
         except (OSError, ValueError, subprocess.TimeoutExpired) as error:
             receipt["status"] = "unknown_outcome"

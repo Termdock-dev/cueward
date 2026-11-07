@@ -161,6 +161,14 @@ def pointer_checks(task_id, evidence, observer):
     return canvas_checks(task_id, evidence, observer, initial, final)
 
 
+def stopped_by_window_change(receipt):
+    """A stopped drag sent at least its down and its release to the original receiver."""
+    interruption, sent = receipt.get("interruption"), receipt.get("events_sent")
+    return (receipt.get("status") == "partially_sent" and " window drag " in str(receipt.get("command"))
+            and isinstance(interruption, str) and "window changed" in interruption
+            and type(sent) is int and sent >= 2)
+
+
 def canvas_checks(task_id, evidence, observer, initial, final):
     if not all(k in state for state in (initial, final) for k in ("object", "events", "dragging", "releases")):
         return [check("canvas", "unverified", "missing object/event/release observation")]
@@ -179,8 +187,8 @@ def canvas_checks(task_id, evidence, observer, initial, final):
     checks.append(check("fresh_canvas", "passed" if fresh else "failed", "separate fresh receiver with no prior drag events"))
     if task_id == "canvas_interrupted":
         interrupted = (observer.get("controlled_interruption") is True
-                       and any(r.get("status") == "dispatch_interrupted" for r in evidence.get("receipts", [])))
-        checks.append(check("interruption", "passed" if interrupted else "unverified", "operator interruption must be recorded independently"))
+                       and any(stopped_by_window_change(r) for r in evidence.get("receipts", [])))
+        checks.append(check("interruption", "passed" if interrupted else "unverified", "receiver must record the interruption and production must stop the drag for it"))
     else:
         a, b = initial.get("object", {}), final.get("object", {})
         good = (all(number(v.get(k)) for v in (a, b) for k in ("x", "y"))
