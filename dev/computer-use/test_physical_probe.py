@@ -5,8 +5,11 @@ from pathlib import Path
 import tempfile
 import subprocess
 import sys
+import time
 import unittest
 from unittest.mock import Mock, patch
+
+from task_acceptance.trace import DESKTOP_ATTRIBUTION_MS
 
 SPEC = importlib.util.spec_from_file_location("physical_probe", Path(__file__).with_name("physical-overlap-probe.py"))
 PROBE = importlib.util.module_from_spec(SPEC)
@@ -83,6 +86,18 @@ class DispatchTests(unittest.TestCase):
         with patch.object(PROBE.time, "monotonic", side_effect=[0, PROBE.ROUND_SECONDS]), self.assertRaises(RuntimeError):
             runner.main_actions()
         runner.action.assert_not_called()
+
+    def test_recording_outlasts_the_last_command(self):
+        runner = PROBE.Round("unused-cli", Mock(), {"actions": []}, {"human": Path("unused"), "background": Path("unused")})
+        times = {}
+        runner.main_actions = Mock()
+        runner.action = lambda *args: times.update(finished=time.monotonic())
+        runner.finish_recording = lambda start: times.update(closed=time.monotonic())
+        state = {"pid": 200, "started_at": 1}
+        with patch.object(PROBE, "ROUND_SECONDS", 0), patch.object(PROBE, "wait_state", return_value=state), \
+                patch.object(PROBE, "read_state", return_value={}):
+            runner.execute()
+        self.assertGreaterEqual((times["closed"] - times["finished"]) * 1000, DESKTOP_ATTRIBUTION_MS)
 
     def test_expiry_during_snapshot_is_checked_before_dispatch(self):
         with tempfile.TemporaryDirectory() as temporary:
