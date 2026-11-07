@@ -118,7 +118,25 @@ The matching dialog must supply `window_id` and `native_binding` with the same s
 
 Auxiliary PIDs must not enter the task's newly owned `receiver_pids` or satisfy fresh-receiver checks. Unknown/duplicate/mismatched services, owners or native identities fail; absent required proof remains unverified. Any supplied `native_binding` is validated, including host-only proof; contradictions cannot be ignored because there are no auxiliary entries. Legacy records without an auxiliary contract or native proof retain the same-host rules.
 
-`auxiliary_receiver_trace` requires the execution observer to cover the host and every bound service from task start through task end. Every sample needs Boolean service `target_active`, with at least three monotonically increasing samples and gaps at most 100 ms. Service foreground/activity or activation events fail; missing earlier coverage stays unverified. Only complete validated auxiliary coverage permits a temporary trace scope containing host plus services; it does not mutate ownership, drop samples or filter foreground/pointer/Space changes. The current runner discovers the service after the host-only desktop observer starts, so it cannot claim this full auxiliary coverage.
+`auxiliary_receiver_trace` requires the execution observer to cover the host from task start through task end, and every bound service from the time it could act. The trace needs at least three monotonically increasing samples with gaps at most 100 ms. The host needs a Boolean `target_active` in every sample, and so does a service in the observer's launch list.
+
+The observer takes its PID list at launch, before a save panel service exists. So it finds that service in the kernel process list and records it in `execution.panel_services`:
+
+```json
+{"pid": 204, "executable": "com.apple.appkit.xpc.openAndSavePanelService",
+ "start_ms": 1503.96, "first_seen_ms": 1514.68}
+```
+
+`start_ms` is the kernel start time on the observer clock. `first_seen_ms` is the `ms` of the first sample that reports the service. A process that does not exist yet cannot be frontmost or active, so a bound service found this way is covered when all of these hold:
+
+- It has exactly one record, with the exact executable name, and `start_ms` is not after `first_seen_ms`.
+- Samples before `first_seen_ms` have no entry for it. Every sample from `first_seen_ms` onward has a Boolean entry.
+- If it started after the task start marker, `first_seen_ms` is at most 100 ms after `start_ms`.
+- If it started at or before the task start marker, `first_seen_ms` is at or before the first sample.
+
+Anything else stays unverified. A service that exits before task end stays unverified too, because its entries stop. Service foreground or activity in any sample, or an activation event for it, fails. These failures come first, so missing coverage cannot hide them. The check reads only the bound service. Records for other clients' services change nothing.
+
+Complete validated coverage permits a temporary trace scope containing the observer's launch list. That scope does not mutate ownership, drop samples or filter foreground/pointer/Space changes. A discovered service stays out of `receiver_pids` and out of that scope, so this check alone covers it.
 
 Native runner records also include `native_io_complete`, checked separately from disk bytes. A matching artifact cannot compensate for incomplete normal target save/write or an edited/saved bystander. These producer checks do not authenticate arbitrary supplied evidence.
 

@@ -59,7 +59,7 @@ Actual Agent inspections/actions supply the `initial`, `dialog`, `resumed` phase
 
 Unlike `new_document`, the `window_dialog` goal has no exact-once save-submission condition. Its native IO check requires positive integer read/save/write counts. The fixture increments `save_requests` when `save` or `saveAs` is invoked, before the panel or write completes, so the count is not a count of successful disk saves. This does not authorize blindly replaying an uncertain action; the Agent must observe before any new decision, and actual receipts remain available for review.
 
-The shared save-panel service is an auxiliary receiver, not a newly owned process. Cleanup never terminates it. The [evaluator contract](task-acceptance.md#shared-save-panel-receivers) requires auxiliary activation coverage across the entire execution interval. The current desktop observer starts with the host alone; late discovery of a service cannot supply missing earlier samples. Such service coverage stays `unverified`, even if panel traversal and disk save eventually succeed. Standalone service-owned panels are not implemented by this runner.
+The shared save-panel service is an auxiliary receiver, not a newly owned process. Cleanup never terminates it. The desktop observer starts with the host alone, so this runner turns on [panel service discovery](desktop-observer.md#coverage-and-limits). The observer reports the service from the sample where it first sees it and records its kernel start time. Those records reach the evidence in `execution.panel_services`, and the service PID stays out of `receiver_pids`. The [evaluator contract](task-acceptance.md#shared-save-panel-receivers) decides whether that coverage holds. A late first sight or a sample hole stays `unverified`, even if panel traversal and disk save eventually succeed. Standalone service-owned panels are not implemented by this runner.
 
 ### Recorded window/dialog work: 2026-10-05
 
@@ -138,11 +138,33 @@ Run C's change came from `folio-e2e`, which started 26 seconds into the run with
 
 Run E exposed a wrong assumption in the harness. The sheet is the panel window, but its content sits in a second native window, and the Save panel service's nodes belong to that second window. The binding required the panel's own ID, so it could never hold on a real panel. A service node now binds to the panel ID or to a window that the host exposes inside the same sheet. The first attempt also failed before launch: the fixture standardized `/private/tmp` to `/tmp`, while the runner compares resolved paths. The fixture now reports the resolved path.
 
-`window_dialog` cannot pass yet even on a quiet desktop. As described above, the observer starts with the host alone, so auxiliary service coverage stays unverified.
+Run F's auxiliary service coverage stayed unverified because the observer started with the host alone. Panel service discovery removes that limit, as the [panel service check](#recorded-panel-service-check-2026-11-07) shows. No full `window_dialog` task has passed with it yet. Run F's maximum sample gap was 286.0 ms, so a full pass also needs a run with no gap over 100 ms while the panel is open.
 
 A load average near 20 did not predict sample gaps: a 10-second probe at that load had a maximum gap of 17.2 ms. Check for other apps taking the foreground instead.
 
 In run F the Agent wrote one inspection result to a file outside the workspace, against its handoff rules, then deleted it and reported it. It did not touch the artifact or the app.
+
+## Recorded panel service check: 2026-11-07
+
+This check ran the observer alone, with no Agent. A document fixture opened a Save panel through `cueward app press` and closed it through the panel's Cancel button. Each run lasted at least 25 seconds. Other work on the desktop kept the load average between 30 and 85.
+
+| Measure across 8 runs | Result |
+| --- | --- |
+| Bound service found, matching the AX receiver PID | 8 of 8 |
+| Kernel start to first sight | 9.63 to 30.19 ms, median 14.4 ms |
+| Samples missing after first sight | 0 |
+| Samples with the service frontmost or active | 0 |
+| Service still running at task end, after the panel closed | 8 of 8 |
+| Service gone 2 seconds after its client exited | 8 of 8 |
+| Service in `NSWorkspace.runningApplications` with the panel open | 8 of 8 |
+
+Each trace then went through the real `check_auxiliary_receiver_trace`, with synthetic window identities. Two traces passed that check and `interference_trace`. The other six stayed unverified on the auxiliary check because a sample gap exceeded 100 ms. So service coverage can hold on a real panel, and sample gaps are what remains. This does not count as a task pass.
+
+`KERN_PROC_ALL` took 0.33 ms at the median and 1.26 ms at p99 for 752 processes. In one timed run the service activation reads took 0.39 ms at the median and 10.99 ms at p99. The largest single read in that run was the Space catalog, at 147.5 ms. The median sample interval was 19.95 to 21.18 ms with discovery and 20.08 to 20.34 ms without it.
+
+Gaps over 100 ms did not follow discovery in a consistent way. In paired panel runs with discovery second, while the load rose, they totaled 72 against 11. With discovery first, they totaled 0 against 1. Two discovery runs had 39 and 30 such gaps, and the cause of those two is not proven.
+
+In these runs the service started 556 to 3,511 ms after the press began. In one earlier run it started 1,958 ms before the press, for an unknown reason. The evaluator handles a service that starts at any point in the task, or before it.
 
 ## Recorded attempts: 2026-11-06
 
