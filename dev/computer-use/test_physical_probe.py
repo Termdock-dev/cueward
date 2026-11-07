@@ -80,7 +80,7 @@ class DispatchTests(unittest.TestCase):
     def test_round_deadline_does_not_dispatch_remaining_input(self):
         runner = PROBE.Round("unused-cli", Mock(), {"actions": []}, {})
         runner.action = Mock()
-        with patch.object(PROBE.time, "monotonic", side_effect=[0, 29]), self.assertRaises(RuntimeError):
+        with patch.object(PROBE.time, "monotonic", side_effect=[0, PROBE.ROUND_SECONDS]), self.assertRaises(RuntimeError):
             runner.main_actions()
         runner.action.assert_not_called()
 

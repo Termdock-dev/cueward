@@ -17,6 +17,8 @@ HERE = Path(__file__).resolve().parent
 
 def read_state(path):
     return json.loads(path.read_text())
+# Commands slow down under load while a person types: a drag took 7.5 s at load 45.
+ROUND_SECONDS = 60
 
 
 def wait_state(path, predicate=lambda value: True, timeout=10):
@@ -101,9 +103,9 @@ class Round:
 
     def main_actions(self):
         started = time.monotonic()
-        self.input_deadline = started + 28
+        self.input_deadline = started + ROUND_SECONDS - 2
         for name in ("text", "shortcut", "replacement", "click", "drag", "scroll"):
-            if time.monotonic() - started > 28:
+            if time.monotonic() > self.input_deadline:
                 raise RuntimeError("round deadline; remaining actions not dispatched")
             if name in ("text", "replacement"):
                 value = self.report["first_text" if name == "text" else "last_text"]
@@ -136,7 +138,7 @@ class Round:
             self.main_actions()
             if not idle:
                 self.action("foreground_refusal", "human", lambda shot, state: self.pointer("foreground_refusal", shot, state))
-                while time.monotonic() - started < 30:
+                while time.monotonic() - started < ROUND_SECONDS:
                     time.sleep(0.05)
                 wait_state(self.paths["human"], lambda s: s["phase"] == "acknowledged", timeout=60)
         finally:
