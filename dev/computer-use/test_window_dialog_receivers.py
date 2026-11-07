@@ -90,6 +90,17 @@ class SheetReceiverTests(unittest.TestCase):
                 result = self.request([observation("w1.7", 100), observation("w1.7.0", 200, native)])
                 self.assertEqual(result["status"], "rejected", result)
 
+    def test_service_may_share_the_window_that_the_host_shows_inside_the_sheet(self):
+        # Observed on macOS 27: the sheet is the panel window, and its content is a second window.
+        samples = [observation("w1.7", 100), observation("w1.7.0", 100, 31),
+                   observation("w1.7.0.1", 200, 31)]
+        self.assertEqual(self.request(samples), {"status": "bound", "receiver_pids": [100, 200]})
+
+    def test_service_window_seen_only_outside_the_sheet_stays_rejected(self):
+        samples = [observation("w1.7", 100), observation("w1.7.0", 100, 31),
+                   observation("w1.7.0.1", 200, 32), observation("w1.6", 100, 32)]
+        self.assertEqual(self.request(samples)["status"], "rejected")
+
     def test_invalid_or_dead_service_descendants_are_rejected_not_dropped(self):
         for pid, alive in ((0, [100]), (-1, [100]), (200, [100])):
             with self.subTest(pid=pid, alive=alive):
