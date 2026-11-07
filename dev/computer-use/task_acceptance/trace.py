@@ -57,6 +57,11 @@ def cueward_could_act(spans, previous, sample):
                                 for start, end in spans)
 
 
+def command_coverage_gap(samples, spans):
+    """Return the largest sample gap in which a Cueward command could have acted."""
+    return max((b["ms"] - a["ms"] for a, b in zip(samples, samples[1:]) if cueward_could_act(spans, a, b)), default=0)
+
+
 def unexplained_changes(samples):
     """Yield each change that physical input cannot explain, with the samples around it."""
     for index in range(1, len(samples)):
@@ -161,6 +166,7 @@ def check_trace(evidence, inactive_space=False):
         return "unverified", "execution interval not covered", metrics
     gaps = [b - a for a, b in zip(times, times[1:])]
     metrics["observer_max_interval_ms"] = max(gaps)
-    if max(gaps) > MAX_INTERVAL_MS:
+    metrics["observer_max_command_interval_ms"] = command_coverage_gap(samples, spans)
+    if metrics["observer_max_command_interval_ms"] > MAX_INTERVAL_MS:
         return "unverified", "observation gap exceeds 100 ms", metrics
     return status, reason, metrics

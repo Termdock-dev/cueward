@@ -3,7 +3,7 @@
 from pathlib import Path
 import re
 
-from .trace import MAX_INTERVAL_MS, number
+from .trace import MAX_INTERVAL_MS, command_coverage_gap, command_spans, number
 
 PANEL_SERVICE = "com.apple.appkit.xpc.openAndSavePanelService"
 
@@ -270,7 +270,8 @@ def check_auxiliary_receiver_trace(root, evidence, observer):
         return "unverified", "auxiliary observer event or unlocked-session coverage is incomplete"
     times = [sample["ms"] for sample in samples]
     if (any(b <= a for a, b in zip(times, times[1:])) or times[0] > execution["start_ms"]
-            or times[-1] < execution["end_ms"] or max(b-a for a, b in zip(times, times[1:])) > MAX_INTERVAL_MS):
+            or times[-1] < execution["end_ms"]
+            or command_coverage_gap(samples, command_spans(evidence.get("receipts", []), execution.get("marks"))) > MAX_INTERVAL_MS):
         return "unverified", "auxiliary samples do not cover the execution interval within 100 ms"
     for pid in sorted(services - launched):
         gap = discovery_gap(execution, samples, pid)

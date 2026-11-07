@@ -108,7 +108,7 @@ class CommandAttributionTests(unittest.TestCase):
         drop(record, 500, 800)
         status, _, metrics = self.status(record)
         self.assertEqual(status, "passed")
-        self.assertEqual(metrics["observer_max_interval_ms"], 350)
+        self.assertEqual(metrics["observer_max_interval_ms"], 400)
         self.assertEqual(metrics["observer_max_command_interval_ms"], 50)
 
     def test_sample_gap_during_a_command_stays_unverified(self):
