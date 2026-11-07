@@ -101,7 +101,7 @@ final class Actions: NSObject {
     @objc func acknowledge(_ sender: Any?) { if phase == "finished" { phase = "acknowledged" } }
 }
 let actions = Actions()
-let button = NSButton(title: human ? "開始 30 秒測試" : "Count background click", target: actions,
+let button = NSButton(title: human ? "開始 60 秒測試" : "Count background click", target: actions,
                       action: human ? #selector(Actions.begin(_:)) : #selector(Actions.countedClick(_:)))
 button.frame = NSRect(x: 20, y: 350, width: 240, height: 32)
 button.setAccessibilityIdentifier(human ? "begin-overlap" : "count-click")
@@ -170,7 +170,7 @@ func region(_ view: NSView) -> [String: Double] {
 }
 func save() {
     if let startedAt, human {
-        let remaining = max(0, 30 - Int(ProcessInfo.processInfo.systemUptime - startedAt))
+        let remaining = max(0, 60 - Int(ProcessInfo.processInfo.systemUptime - startedAt))
         status.stringValue = remaining > 0 ? "剩 \(remaining) 秒：持續打 aAaA（Shift 大寫），移動滑鼠；勿切換 App。" : "測試結束，請放開 Shift，再按『完成並關閉』。"
         if remaining == 0 && phase == "running" { phase = "finished"; finish.isEnabled = true }
     }
@@ -192,6 +192,6 @@ func save() {
 }
 let timer = Timer(timeInterval: 0.02, repeats: true) { _ in save() }
 for mode in [RunLoop.Mode.default, .modalPanel, .eventTracking] { RunLoop.main.add(timer, forMode: mode) }
-DispatchQueue.main.asyncAfter(deadline: .now() + 600) { app.terminate(nil) }
+DispatchQueue.main.asyncAfter(deadline: .now() + Double(CommandLine.arguments[3])!) { app.terminate(nil) }
 save()
 app.run()
