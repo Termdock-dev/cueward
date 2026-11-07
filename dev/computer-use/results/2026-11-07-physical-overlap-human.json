@@ -1,0 +1,70 @@
+{
+  "kind": "physical_overlap_round",
+  "date": "2026-11-07",
+  "macos": "27.0.1",
+  "architecture": "arm64",
+  "cli": "cueward-cli 0.6.1 installed from crates.io",
+  "round_seconds": 60,
+  "load_average_near": 45,
+  "human": {
+    "key_downs": 111,
+    "shift_downs": 59,
+    "text_length": 111,
+    "text_derived_from_physical_shift_matches": true,
+    "annotated_key_events": 0,
+    "input_method": "McBopomofo with CapsLock on, so every event reports an uppercase letter",
+    "mouse_moves": 359
+  },
+  "background": {
+    "status": "passed",
+    "actions": [
+      "text",
+      "shortcut",
+      "replacement",
+      "click",
+      "drag",
+      "scroll"
+    ],
+    "object_moved_points": [
+      80,
+      40
+    ],
+    "scroll_offset": 160,
+    "clicks": 1,
+    "releases": 1
+  },
+  "checks": {
+    "background": "passed",
+    "human": "passed after the input method fix",
+    "controlled_interruption": "passed",
+    "foreground_refusal": "passed",
+    "desktop": "failed",
+    "pointer_correlation": "unverified",
+    "command_overlap": "unverified",
+    "midflight_foreground": "unverified"
+  },
+  "desktop_detail": {
+    "foreign_activation_ms": 71382,
+    "held_foreground_ms": 3984,
+    "overlapped_command": "window snapshot, read-only, 68135 to 72810 ms",
+    "outlived_that_command_ms": 2556,
+    "process_named": false,
+    "note": "The process ended before it could be named. Production window code does not create an NSApplication. folio-e2e was restarting in this period, which is not proof."
+  },
+  "command_overlap_detail": {
+    "key_downs_during_each_action": {
+      "text": 4,
+      "shortcut": 5,
+      "replacement": 4,
+      "click": 6,
+      "drag": 7,
+      "scroll": 10
+    },
+    "mouse_moves_during_each_action": 0,
+    "note": "Typing used both hands, so the mouse did not move during those commands."
+  },
+  "first_attempt": {
+    "status": "diagnostic_error",
+    "reason": "The 28-second budget ran out after 10 commands took 28.0 s at high load. A drag took 7.5 s, against 2.6 s when idle."
+  }
+}

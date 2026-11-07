@@ -68,6 +68,26 @@ The first evaluation of this run reported the interruption as failed. The check 
 
 Still not covered: physical typing during the run, a target that becomes foreground during dispatch, physical WebView overlap and installed third-party apps.
 
+## Human round: 2026-11-07
+
+A person typed for 60 seconds with Cueward 0.6.1 at a load average near 45. The [aggregate](results/2026-11-07-physical-overlap-human.json) keeps the counts.
+
+| Check | Observed result | Status |
+| --- | --- | --- |
+| Background | Text, Cmd+A, replacement, click, drag and scroll in one run, with the person typing. Object moved 80 by 40 points. | Passed |
+| Human input | 111 key presses and 111 characters. No background annotation in the human receiver. Modifiers released. | Passed |
+| Controlled interruption and foreground refusal | Both as expected. | Passed |
+| Desktop | Another process held the foreground for 3,984 ms and overlapped a read-only `window snapshot`. | Failed |
+| Command overlap | Key presses overlapped all six actions. The mouse did not move during them, because typing used both hands. | Unverified |
+| Pointer correlation | 38 of 136 changes had no matching observation. | Unverified |
+| Target becoming foreground during dispatch | Not exercised. | Unverified |
+
+The process that took the foreground outlived the snapshot by 2.6 seconds, and production window code does not create an application object, so it was not a Cueward helper. It ended before it could be named. `folio-e2e` was restarting in this period, which is not proof. The desktop check stays failed, because it counts any change during a command.
+
+The first attempt ran out of time: ten commands took 28.0 seconds at high load, and a drag took 7.5 seconds against 2.6 when idle. The round is now 60 seconds.
+
+The human check first failed on `content_matches_key_events`. McBopomofo types English with CapsLock on, so every key event reports an uppercase letter, while the text follows Shift. The check now accepts the case that physical Shift gives. A wrong letter or a wrong case still fails. The desktop check now uses the [command-scoped rule](task-acceptance.md#evidence-contract) when receipts and markers are complete.
+
 The initial scrollable NSTextView was resized to its viewport after attachment/layout. Minimum-size-only attempts before and after attachment also failed. A separate ordinary fixed-height scroll document now preserves the scroll challenge independently of short-text replacement. The corrected idle result does **not** retroactively pass the initial human round.
 
 In a separate local diagnostic source copy, changing only the canvas first-mouse policy to accept produced one down, 50 drags, one up and the expected 80-by-40-point displacement. The matched ordinary receiver produced zero view callbacks. This supports the first-mouse gate explanation for this receiver; it is not a production fix, ordinary-app acceptance, or a WebView root cause. The patch is not shipped. Apple's [NSView first-mouse documentation](https://developer.apple.com/documentation/appkit/nsview/acceptsfirstmouse%28for%3A%29) describes its default refusal and native controls that accept first mouse.
