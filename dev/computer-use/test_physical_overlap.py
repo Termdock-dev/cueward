@@ -20,6 +20,17 @@ def execution():
                          "session_locked": False} for ms in (0, 20, 40, 60)]}
 
 
+def timed(end=1700):
+    """Samples that reach past a command, with a person typing throughout."""
+    data = execution()
+    data["end_ms"] = end - 1
+    template = {**data["samples"][0], "pointer": [20, 20]}
+    data["samples"] = [{**template, "ms": ms,
+                        "input": {"physical_pointer": 0, "automated_pointer": 0, "physical_other": index}}
+                       for index, ms in enumerate(range(0, end + 1, 20))]
+    return data
+
+
 def background():
     initial = {"events": [], "text": "", "select_alls": 0, "clicks": 0,
                "object": {"x": 70, "y": 60}, "releases": 0, "scroll_y": 0}
@@ -101,6 +112,54 @@ class PhysicalEvidenceTests(unittest.TestCase):
         self.assertEqual(human_check(state, *args)["status"], "unverified")
         state = human(); state["events"] = [e for e in state["events"] if e["type"] != 5]
         self.assertEqual(human_check(state, *args)["status"], "failed")
+
+    def test_capslock_input_method_text_is_matched_through_physical_shift(self):
+        # McBopomofo types English with CapsLock on, so every event reports an uppercase letter.
+        state = human()
+        for item in state["events"]:
+            if item["type"] in (10, 11):
+                item["characters"] = "A"
+                item["flags"] |= 1 << 16
+        args = ("START", "END", 100, 100.1)
+        self.assertTrue(human_check(state, *args)["checks"]["content_matches_key_events"])
+        state["text"] = "Aa"
+        self.assertFalse(human_check(state, *args)["checks"]["content_matches_key_events"])
+
+    def test_foreign_app_with_no_command_running_does_not_fail_the_round(self):
+        data = timed()
+        data["samples"][1]["frontmost_pid"] = 300
+        for sample in data["samples"]:
+            sample["input"] = {"physical_pointer": 0, "automated_pointer": 0, "physical_other": 0}
+        data["events"] = [{"type": "activation", "ms": 20, "pid": 300}]
+        self.assertEqual(trace_check(data, [200], 100, "9")["status"], "failed")
+        self.assertEqual(trace_check(data, [200], 100, "9", spans=[(500, 600)])["status"], "passed")
+        self.assertEqual(trace_check(data, [200], 100, "9", spans=[(10, 30)])["status"], "failed")
+
+    def test_desktop_must_outlast_the_last_command(self):
+        self.assertEqual(trace_check(timed(), [200], 100, "9", spans=[(500, 600)])["status"], "passed")
+        for spans in ([(500, 1650)], [(5000, 5100)]):
+            with self.subTest(spans=spans):
+                self.assertEqual(trace_check(timed(), [200], 100, "9", spans=spans)["status"], "unverified")
+
+    def test_typing_does_not_excuse_a_desktop_change_during_a_command(self):
+        for field, value in (("frontmost_pid", 300), ("visible_spaces", {"1": "7"})):
+            with self.subTest(field=field):
+                data = timed()
+                data["samples"][30][field] = value
+                self.assertEqual(trace_check(data, [200], 100, "9", spans=[(500, 700)])["status"], "failed")
+
+    def test_command_under_a_foreign_foreground_proves_nothing_about_the_human_window(self):
+        data = timed()
+        for sample in data["samples"][10:85]:
+            sample["frontmost_pid"] = 300
+        self.assertEqual(trace_check(data, [200], 100, "9", spans=[(500, 600)])["status"], "unverified")
+
+    def test_receiver_activity_fails_the_round_at_any_time(self):
+        data = execution()
+        data["samples"][1]["target_active"] = {"200": True}
+        for sample in data["samples"]:
+            sample["input"] = {"physical_pointer": 0, "automated_pointer": 0, "physical_other": 0}
+        self.assertEqual(trace_check(data, [200], 100, "9", spans=[(5000, 5100)])["status"], "failed")
 
     def test_pointer_requires_shared_clock_and_observations_outside_human_window(self):
         data = execution()

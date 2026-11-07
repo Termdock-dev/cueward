@@ -5,8 +5,11 @@ from pathlib import Path
 import tempfile
 import subprocess
 import sys
+import time
 import unittest
 from unittest.mock import Mock, patch
+
+from task_acceptance.trace import DESKTOP_ATTRIBUTION_MS
 
 SPEC = importlib.util.spec_from_file_location("physical_probe", Path(__file__).with_name("physical-overlap-probe.py"))
 PROBE = importlib.util.module_from_spec(SPEC)
@@ -80,9 +83,49 @@ class DispatchTests(unittest.TestCase):
     def test_round_deadline_does_not_dispatch_remaining_input(self):
         runner = PROBE.Round("unused-cli", Mock(), {"actions": []}, {})
         runner.action = Mock()
-        with patch.object(PROBE.time, "monotonic", side_effect=[0, 29]), self.assertRaises(RuntimeError):
+        with patch.object(PROBE.time, "monotonic", side_effect=[0, PROBE.ROUND_SECONDS]), self.assertRaises(RuntimeError):
             runner.main_actions()
         runner.action.assert_not_called()
+
+    def test_recording_outlasts_the_last_command(self):
+        runner = PROBE.Round("unused-cli", Mock(), {"actions": []}, {"human": Path("unused"), "background": Path("unused")})
+        times = {}
+        runner.main_actions = Mock()
+        runner.action = lambda *args: times.update(finished=time.monotonic())
+        runner.finish_recording = lambda start: times.update(closed=time.monotonic())
+        state = {"pid": 200, "started_at": 1}
+        with patch.object(PROBE, "ROUND_SECONDS", 0), patch.object(PROBE, "wait_state", return_value=state), \
+                patch.object(PROBE, "read_state", return_value={}):
+            runner.execute()
+        self.assertGreaterEqual((times["closed"] - times["finished"]) * 1000, DESKTOP_ATTRIBUTION_MS)
+
+    def test_observer_outlives_every_permitted_wait(self):
+        runner = PROBE.Round("unused-cli", Mock(), {"actions": []}, {"human": Path("unused"), "background": Path("unused")})
+        runner.main_actions, runner.action, runner.finish_recording = Mock(), Mock(), Mock()
+        permitted = PROBE.ROUND_SECONDS
+        with patch.object(PROBE, "wait_state", return_value={"pid": 200, "started_at": 1}) as waits, \
+                patch.object(PROBE, "read_state", return_value={}), patch.object(PROBE, "ROUND_SECONDS", 0), \
+                patch.object(PROBE.time, "sleep"):
+            runner.execute()
+        permitted += sum(call.kwargs["timeout"] for call in waits.call_args_list)
+        with tempfile.TemporaryDirectory() as temporary, patch.object(PROBE.subprocess, "run"), \
+                patch.object(PROBE.subprocess, "Popen", return_value=Mock(pid=200)), patch.object(PROBE, "wait_state"), \
+                patch.object(PROBE, "read_state", return_value={"window_id": 1}), patch.object(PROBE, "compile_observer"), \
+                patch.object(PROBE, "DesktopObserver", side_effect=RuntimeError("stop")) as observer:
+            PROBE.probe("unused-cli", Path(temporary))
+        self.assertGreater(observer.call_args.kwargs["duration_ms"], permitted * 1000)
+
+    def test_receivers_outlive_the_observer(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(PROBE.subprocess, "run"), \
+                patch.object(PROBE.subprocess, "Popen", return_value=Mock(pid=200)) as receivers, \
+                patch.object(PROBE, "wait_state"), patch.object(PROBE, "read_state", return_value={"window_id": 1}), \
+                patch.object(PROBE, "compile_observer"), \
+                patch.object(PROBE, "DesktopObserver", side_effect=RuntimeError("stop")) as observer:
+            PROBE.probe("unused-cli", Path(temporary))
+        lifetimes = [float(value) for call in receivers.call_args_list for value in call.args[0][3:]]
+        self.assertEqual(len(lifetimes), 2)
+        for seconds in lifetimes:
+            self.assertGreater(seconds * 1000, observer.call_args.kwargs["duration_ms"])
 
     def test_expiry_during_snapshot_is_checked_before_dispatch(self):
         with tempfile.TemporaryDirectory() as temporary:

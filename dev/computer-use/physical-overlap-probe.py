@@ -7,6 +7,7 @@ import subprocess
 import time
 import uuid
 
+from agent_session import POST_COMMAND_SECONDS
 from desktop_observer import DesktopObserver, compile_observer, observation_checks
 from observed_cli import ObservedCLI
 from physical_overlap import background_check, evaluate, interruption_check
@@ -17,6 +18,17 @@ HERE = Path(__file__).resolve().parent
 
 def read_state(path):
     return json.loads(path.read_text())
+# Commands slow down under load while a person types: a drag took 7.5 s at load 45.
+ROUND_SECONDS = 60
+OBSERVER_MS = 900_000
+# A receiver only exits by itself if this probe dies, so it must not end a live round.
+RECEIVER_SECONDS = OBSERVER_MS // 1000 + 60
+
+
+def start_receiver(fixture, directory, path, mode):
+    with (directory / (mode + ".log")).open("x") as log:
+        return subprocess.Popen([str(fixture), str(path), mode, str(RECEIVER_SECONDS)],
+                                stdout=log, stderr=log, start_new_session=True)
 
 
 def wait_state(path, predicate=lambda value: True, timeout=10):
@@ -101,9 +113,9 @@ class Round:
 
     def main_actions(self):
         started = time.monotonic()
-        self.input_deadline = started + 28
+        self.input_deadline = started + ROUND_SECONDS - 2
         for name in ("text", "shortcut", "replacement", "click", "drag", "scroll"):
-            if time.monotonic() - started > 28:
+            if time.monotonic() > self.input_deadline:
                 raise RuntimeError("round deadline; remaining actions not dispatched")
             if name in ("text", "replacement"):
                 value = self.report["first_text" if name == "text" else "last_text"]
@@ -136,7 +148,8 @@ class Round:
             self.main_actions()
             if not idle:
                 self.action("foreground_refusal", "human", lambda shot, state: self.pointer("foreground_refusal", shot, state))
-                while time.monotonic() - started < 30:
+                time.sleep(POST_COMMAND_SECONDS)
+                while time.monotonic() - started < ROUND_SECONDS:
                     time.sleep(0.05)
                 wait_state(self.paths["human"], lambda s: s["phase"] == "acknowledged", timeout=60)
         finally:
@@ -186,11 +199,10 @@ def probe(cli, directory, idle=False):
         binary = compile_observer(directory)
         for mode in ("background", "interrupt"):
             paths[mode] = directory / (mode + ".json")
-            with (directory / (mode + ".log")).open("x") as log:
-                processes.append(subprocess.Popen([str(fixture), str(paths[mode]), mode], stdout=log, stderr=log, start_new_session=True))
+            processes.append(start_receiver(fixture, directory, paths[mode], mode))
             wait_state(paths[mode])
         report["receiver_pids"] = [p.pid for p in processes]
-        with DesktopObserver(binary, report["receiver_pids"], directory / "trace.jsonl", duration_ms=300_000) as observer:
+        with DesktopObserver(binary, report["receiver_pids"], directory / "trace.jsonl", duration_ms=OBSERVER_MS) as observer:
             setup = ObservedCLI(cli, observer)
             report["setup_receipts"] = setup.receipts
             for mode in paths:
@@ -201,8 +213,7 @@ def probe(cli, directory, idle=False):
                 report["target_space"] = space
             if not idle:
                 paths["human"] = directory / "human.json"
-                with (directory / "human.log").open("x") as log:
-                    processes.append(subprocess.Popen([str(fixture), str(paths["human"]), "human"], stdout=log, stderr=log, start_new_session=True))
+                processes.append(start_receiver(fixture, directory, paths["human"], "human"))
                 wait_state(paths["human"])
                 report["status"] = "waiting_for_human"
                 write_json(output, report)

@@ -64,6 +64,11 @@ def command_coverage_gap(samples, spans):
     return max((b["ms"] - a["ms"] for a, b in zip(samples, samples[1:]) if cueward_could_act(spans, a, b)), default=0)
 
 
+def outlasts_commands(samples, spans):
+    """A command's effect can land after it returns, so sampling must reach past the last one."""
+    return samples[-1]["ms"] >= max(end for _, end in spans) + DESKTOP_ATTRIBUTION_MS
+
+
 def unexplained_changes(samples):
     """Yield each change that physical input cannot explain, with the samples around it."""
     for index in range(1, len(samples)):
@@ -166,7 +171,7 @@ def check_trace(evidence, inactive_space=False):
         return "unverified", "nonmonotonic observation times", metrics
     if times[0] > start or times[-1] < end:
         return "unverified", "execution interval not covered", metrics
-    if spans and times[-1] < max(end for _, end in spans) + DESKTOP_ATTRIBUTION_MS:
+    if spans and not outlasts_commands(samples, spans):
         return "unverified", "execution did not cover the second after the last command", metrics
     gaps = [b - a for a, b in zip(times, times[1:])]
     metrics["observer_max_interval_ms"] = max(gaps)
