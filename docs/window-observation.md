@@ -22,7 +22,7 @@ The commands require macOS, `swift` on PATH, and permission to read window metad
 
 The catalog includes titled, nontransparent application windows with positive dimensions at the normal window layer. System overlays and untitled windows are excluded. Results are sorted by the frontmost owning app, then app name, title, and window ID.
 
-With Stage Manager on, a window outside the current stage can appear in the catalog at thumbnail size while Accessibility reports its real frame. Observed on macOS 27.0.1: 94 by 104 points in the catalog, 673 by 439 through Accessibility. Turning Stage Manager off removed the difference. Coordinates and clicks on such a window are unverified. `app inspect --pid` still reads it.
+With Stage Manager on, a window outside the current stage can appear in the catalog at thumbnail size while Accessibility reports its real frame. Observed on macOS 27.0.1: 94 by 104 points in the catalog, 673 by 439 through Accessibility. Turning Stage Manager off removed the difference. Its snapshot is a tilted thumbnail, and events still land in the full window, so a point read from that picture would hit a different control. `window click`, `drag` and `scroll` refuse such a window, and `input-status` reports the pointer route as not ready. `app inspect --pid` and `app press` still work on it.
 
 `--all-spaces` includes non-visible candidates reported by the system. `is_onscreen: false` may mean another Space, a hidden app, or a minimized window. It does not identify a particular Space or guarantee the window can be captured. `is_frontmost` describes the owning app, not whether this exact window is foremost.
 

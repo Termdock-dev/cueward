@@ -46,6 +46,8 @@ Scroll coordinates are snapshot pixels. Negative deltas scroll down/right. Reobs
 
 Clicks and drags use the same image coordinates and background guard. Before each one, Cueward tells only the target app it is active and clicks the title bar once, then restores the app after about a quarter of a second; the user's keyboard, pointer and foreground stay where they are. `pointer_preparation` reports `title_bar_click`, `no_safe_point` or `unavailable`; with the last two the first click may be ignored, so check the effect. `click` supports `--button left|right` and `--count 1|2`. Double-click is a different action; do not substitute it automatically for an unsuccessful single click. `drag` holds the left button for a straight path within the window, with `--duration-ms 50..2000` (default 500). It releases at the last delivered point after a detected interruption. System or cross-app drag-and-drop is not established.
 
+With Stage Manager on, a window outside the current stage has a tilted thumbnail as its snapshot. Pointer input refuses it with an error that names the thumbnail; read and act on it with `app inspect` and `app press`, which work without changing the stage.
+
 Use `input-status` to check current dispatch prerequisites without sending events. A route's `dispatch_ready` value does not establish that a control will accept input; `application_acceptance` is explicitly unverified. On a no-effect result, reobserve and choose the next operation from the task and current UI.
 
 If `input_busy` is true, another Cueward input helper owns the app lock and both routes report not ready. Status releases an idle probe lock immediately; it does not reserve input. Reobserve after the current action finishes before choosing the next action.
