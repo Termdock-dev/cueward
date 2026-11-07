@@ -119,7 +119,7 @@ Only `canvas_interrupted` launches the fixture with its `interrupt` argument. Th
 
 The evidence keeps the fixture's `active` and `activations` values, and the evaluator does not check them for these tasks. Click preparation tells the target process it is active, so the fixture's own counter can grow with each dispatch. The desktop observer's `target_active` samples and activation events still apply.
 
-No fresh Agent has run these tasks. Offline tests manufacture evidence. A smoke reached `ready` for each task and finished without sending input. A separate in-process check confirmed the title trigger with synthetic events: the title-bar pair, a real down and an untagged drag did not fire it, and a tagged drag did. Delivery through the production `window drag` route in this fixture is unverified until an operator run.
+Fresh Agents ran all three tasks on 2026-11-07. See [recorded attempts](#recorded-attempts-2026-11-07). Offline tests manufacture evidence and do not replace those runs.
 
 ## Recorded attempts: 2026-11-07
 
@@ -131,8 +131,17 @@ Each row used a separate fresh Agent and receiver with Cueward 0.6.1. Another pr
 | D / existing document | 14 | Exact artifact; zero activations; maximum sample gap 79.1 ms | **Passed** |
 | E / window dialog | 6 | Stopped by the harness when the Save panel opened | Failed: harness rejected the panel |
 | F / window dialog | 26 | Exact artifact; native save and bystander checks passed; zero activations | Failed: foreground changed without physical input |
+| G / WebView first click | 10 | Counter rose exactly once; trusted down, up and click | Failed: foreground changed without physical input |
+| H / canvas drag | 6 | Released once; object did not move; 25 moves with `buttons` 0 | Failed: displacement, as documented |
+| I / canvas interrupted | 7 | `partially_sent` with 3 events; released once; interruption passed | Failed: foreground changed without physical input |
+| J / new document | 17 | Save disabled in the first panel; no artifact | Failed: missing artifact, as #33 records |
+| K / window dialog | 16 | Stopped when the desktop locked itself at 164.6 s | Failed: says nothing about the task |
 
 Each run reports its own totals, and they are not combined.
+
+`cross_app` has no attempt: it needs a passed `new_document` in the same run, and #33 blocks that.
+
+Runs G and I reached every effect check. `folio-e2e` took the foreground after the actions had finished, with no Cueward command running. Run K's service record shows the observer found the panel service 11 ms after it started.
 
 Run C's change came from `folio-e2e`, which started 26 seconds into the run with no physical input in the second before. In run F no change moved to the receiver, and two of the three changes happened while no Cueward command ran. The third overlapped a read-only inspection. `folio-e2e` restarted during that window, but the other process IDs were gone before they could be named, so the source is not proven. Both runs stay failed: the check does not excuse a change, whoever made it.
 

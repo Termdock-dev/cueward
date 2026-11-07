@@ -39,6 +39,8 @@ Click preparation raised one more possible cause: the Save control might stay di
 
 On an inactive Space, the unchanged fixture opened its first Save panel with Save disabled. Cueward's target-only activation record was then sent, first for the document window and then for the attached panel window. The panel window belongs to the document process. Both times the app reported itself active, and Save was still disabled after 200 ms and after 1,200 ms. No artifact was created.
 
+Setting the filename field through `app set-value`, with the same name and with a changed name, was confirmed and also left Save disabled after 600 ms. New Folder is disabled at the same time, while Cancel stays enabled.
+
 Activation of the target alone does not explain the disabled control, so the click preparation route does not solve #33. Foreground activation and forced panel input remain outside this work.
 
 One `app inspect` call returns at most 500 nodes, and this panel exposed 1,952. The unmodified [first-save probe](first-save-probe.py) now stops before Save and reports `save_control_unavailable` with `panel_traversal_truncated: true`. Walking subtrees with `--root` reaches the control. An agent has to do the same.

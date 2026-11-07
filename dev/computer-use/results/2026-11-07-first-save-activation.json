@@ -26,5 +26,11 @@
   "artifact_created": false,
   "panel_nodes_observed": 1952,
   "read_limit": "One app inspect call returns at most 500 nodes, and the unmodified first-save probe now stops before Save and reports save_control_unavailable with panel_traversal_truncated true. Walking subtrees with --root reaches Save.",
-  "conclusion": "A target-only activation record makes the app report active and does not enable the Save control."
+  "conclusion": "A target-only activation record makes the app report active and does not enable the Save control. Setting the filename field does not enable it either.",
+  "filename_field": {
+    "action": "app set-value on saveAsNameTextField, with the same name and with a changed name",
+    "set_value_status": "confirmed",
+    "save_enabled_after_600_ms": false,
+    "foreground_changed": false
+  }
 }
