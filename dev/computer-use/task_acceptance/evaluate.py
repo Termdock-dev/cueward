@@ -101,7 +101,8 @@ def effect_checks(root, task_id, evidence):
         if "save_requests" not in observer:
             return [check("save_once", "unverified", "missing save submission observation")]
         good = type(observer.get("save_requests")) is int and observer["save_requests"] == 1
-        return [check("save_once", "passed" if good else "failed", "receiver observed one save submission")]
+        return [check("save_once", "passed" if good else "failed", "receiver observed one save submission"),
+                *final_receiver_checks(observer)]
     if task_id == "cross_app":
         if "producer_pid" not in evidence or not all(k in observer for k in ("file", "content")):
             return [check("reader", "unverified", "missing producer identity or recipient content")]
@@ -110,7 +111,8 @@ def effect_checks(root, task_id, evidence):
             return [check("reader", "failed", "reader must be distinct from the producing process")]
         good = (observer.get("file") == str(root / "work/new_document/result.txt")
                 and observer.get("content") == CONTENT)
-        return [check("reader", "passed" if good else "failed", "recipient file identity and exact content")]
+        return [check("reader", "passed" if good else "failed", "recipient file identity and exact content"),
+                *final_receiver_checks(observer)]
     if task_id == "window_dialog":
         status, reason = check_window_dialog(root, evidence, observer)
         checks = [check("fresh_window_observations", status, reason), *final_receiver_checks(observer)]

@@ -127,7 +127,7 @@ def unregister_fixture(binary):
     binary = Path(binary)
     bundle = binary.parents[2]
     name = binary.name
-    if name not in ("ExistingDocument", "WindowDialog") or bundle.name != name + ".app" or binary.relative_to(bundle).parts != ("Contents", "MacOS", name):
+    if name not in ("ExistingDocument", "WindowDialog", "DocumentReader") or bundle.name != name + ".app" or binary.relative_to(bundle).parts != ("Contents", "MacOS", name):
         raise ValueError("not an owned native-task fixture bundle")
     registry = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
     result = subprocess.run([registry, "-u", str(bundle)], capture_output=True, text=True, timeout=20)

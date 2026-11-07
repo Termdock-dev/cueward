@@ -47,13 +47,16 @@ NSDocumentController.shared.addDocument(document)
 document.makeWindowControllers()
 var activations = 0
 var foregroundChanges = 0
+var observationSequence = 0
 var lastFront = NSWorkspace.shared.frontmostApplication?.processIdentifier
 let observer = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
     object: app, queue: .main) { _ in activations += 1 }
 func saveState() {
     let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
     if front != lastFront { foregroundChanges += 1; lastFront = front }
-    let state: [String: Any] = ["pid": getpid(), "window_id": document.windowControllers[0].window?.windowNumber ?? 0,
+    observationSequence += 1
+    let state: [String: Any] = ["pid": getpid(), "observation_sequence": observationSequence,
+        "window_id": document.windowControllers[0].window?.windowNumber ?? 0,
         "active": app.isActive, "activations": activations, "foreground_changes": foregroundChanges,
         "save_requests": document.saveRequests, "contents": document.editor?.string ?? "",
         "file_created": FileManager.default.fileExists(atPath: destination.appendingPathComponent(artifactName).path),
