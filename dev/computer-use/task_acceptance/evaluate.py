@@ -282,13 +282,12 @@ def check_receivers(results, evidence):
             result.update(status="failed", reason="receiver PID reused across separate tasks")
     cross = next(r for r in results if r["task_id"] == "cross_app")
     record = evidence["tasks"].get("cross_app")
-    if cross["status"] != "passed":
-        return
     producer = evidence["tasks"].get("new_document", {})
     producer_result = next(r for r in results if r["task_id"] == "new_document")
-    if producer_result["status"] != "passed":
+    # Empty checks mean a stale or unattempted record, which keeps its own result.
+    if producer_result["status"] != "passed" and cross["checks"] and "cross_app" not in reused:
         cross["checks"].append(check("producer", "unverified", "producing document task has not passed"))
         cross.update(status="unverified", reason="producing document task has not passed")
-    elif record["producer_pid"] != producer["observer"]["pid"]:
+    elif cross["status"] == "passed" and record["producer_pid"] != producer["observer"]["pid"]:
         cross["checks"].append(check("producer", "failed", "producer PID does not match the saved-document receiver"))
         cross.update(status="failed", reason="producer PID does not match the saved-document receiver")
