@@ -50,7 +50,7 @@ def command_spans(receipts, marks):
                        and isinstance(r.get("end_marker"), str) for r in receipts)):
         return None
     spans = [(marks.get(r["start_marker"]), marks.get(r["end_marker"])) for r in receipts]
-    return spans if all(number(start) and number(end) for start, end in spans) else None
+    return spans if all(number(start) and number(end) and end >= start for start, end in spans) else None
 
 
 def cueward_could_act(spans, previous, sample):
@@ -166,6 +166,8 @@ def check_trace(evidence, inactive_space=False):
         return "unverified", "nonmonotonic observation times", metrics
     if times[0] > start or times[-1] < end:
         return "unverified", "execution interval not covered", metrics
+    if spans and times[-1] < max(end for _, end in spans) + DESKTOP_ATTRIBUTION_MS:
+        return "unverified", "execution did not cover the second after the last command", metrics
     gaps = [b - a for a, b in zip(times, times[1:])]
     metrics["observer_max_interval_ms"] = max(gaps)
     metrics["observer_max_command_interval_ms"] = command_coverage_gap(samples, spans)

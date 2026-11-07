@@ -11,6 +11,10 @@ import time
 
 from observed_cli import ObservedCLI, external_for_agent
 from task_acceptance.setup import write_json
+from task_acceptance.trace import DESKTOP_ATTRIBUTION_MS
+
+# A command's effect can land after it returns, so the trace must outlast the last command.
+POST_COMMAND_SECONDS = DESKTOP_ATTRIBUTION_MS / 1000 + 0.1
 
 
 class ScopeError(ValueError):
@@ -82,6 +86,7 @@ class AgentSession:
         self.recording_started = False
         self.termination_reason = "not_started"
         self.request_count = 0
+        self.last_command_end = None
 
     def invoke(self, arguments):
         arguments = validate_command(arguments, self.pid, self.window_ids)
@@ -99,6 +104,7 @@ class AgentSession:
             record["error"] = str(error)
             return {"error": external_for_agent(str(error)), "do_not_replay": True}
         finally:
+            self.last_command_end = time.monotonic()
             if self.recording_started:
                 write_json(self.output, {**self.metadata, "status": "observing", "receiver_pids": [self.pid],
                                         "receipts": self.commands.receipts, "records": self.records,
@@ -121,6 +127,8 @@ class AgentSession:
                       "records": self.records, "dispatches": self.dispatches,
                       "termination_reason": self.termination_reason, "request_count": self.request_count}
             try:
+                if self.last_command_end is not None:
+                    time.sleep(max(0, self.last_command_end + POST_COMMAND_SECONDS - time.monotonic()))
                 end = self.observer.mark("agent-task-end")
                 report["execution"] = self.observer.execution(start, end)
             except (OSError, RuntimeError, ValueError) as error:
