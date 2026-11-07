@@ -1,6 +1,6 @@
 # Fresh native document task execution
 
-This continues [#36](https://github.com/Termdock-dev/cueward/issues/36) with runnable owned `existing_document`, `calculation`, `window_dialog` and [WebView pointer](#webview-pointer-tasks) tasks. The [document/calculation aggregate](results/2026-10-04-native-agent.json) records successful post-fix disk results, but **zero full task passes** because foreground and pointer observations changed. The [2026-11-06 aggregate](results/2026-11-06-native-agent.json) records the first full task pass, `calculation`, after the observer gained [input attribution](desktop-observer.md). The [window/dialog aggregate](results/2026-10-05-window-dialog-agent.json) retains a failed initial attempt and a locked-session prerequisite check. #36 remains incomplete; #33 is not repaired by this change.
+This continues [#36](https://github.com/Termdock-dev/cueward/issues/36) with runnable owned `new_document`, `existing_document`, `cross_app`, `calculation`, `window_dialog` and [WebView pointer](#webview-pointer-tasks) tasks. The [document/calculation aggregate](results/2026-10-04-native-agent.json) records successful post-fix disk results, but **zero full task passes** because foreground and pointer observations changed. The [2026-11-06 aggregate](results/2026-11-06-native-agent.json) records the first full task pass, `calculation`, after the observer gained [input attribution](desktop-observer.md). The [window/dialog aggregate](results/2026-10-05-window-dialog-agent.json) retains a failed initial attempt and a locked-session prerequisite check. #36 remains incomplete; #33 is not repaired by this change.
 
 ## Product defect found during execution
 
@@ -68,6 +68,36 @@ The initial fresh Agent dispatched five CLI commands. It edited and read back th
 Separate operator diagnostics established the native sheet association and remote receiver behavior, leading to the fail-closed binding implementation above. They did not run the task to completion and do not count as fresh-agent passes. A newly prepared second run stopped at preflight because the desktop was locked while AX/Screen Recording permission remained available. No fixture or fresh Agent launched; its separate report is **0 passed, 0 failed, 1 blocked, 7 unverified**. The original failed attempt is not upgraded by the correction or prerequisite record.
 
 An offline regression also reproduced a dev-broker output escape through `window snapshot --output=...`. Test-only commit `6938815` failed two subcases; fix `9109ac5` rejects both attached and separate output options before dispatch. The affected scope/transport suite then passed 17 tests. Production Cueward input and Rust sources are unchanged in this work.
+
+## New document and cross-app tasks
+
+Both tasks use the same entry point, and their logic is in `document_agent_task.py`. They share one prepared run, and `new_document` must run first. Use a fresh Agent and socket directory for each:
+
+```sh
+python3 -B dev/computer-use/native-agent-task.py \
+  --cli "$PWD/target/release/cueward" --run "$run" \
+  --task new_document --socket "$socketdir/a.sock"
+```
+
+### `new_document`
+
+The destination must not exist yet. The runner launches the [NSDocument fixture](document-fixture.swift) and moves only that window to an existing inactive Space, the way [first-save-probe.py](first-save-probe.py) does. Setup never creates or switches a Space. It stops if no inactive Space exists, if the move reports a foreground or visible-Space change, or if the window did not land on the chosen Space. A stopped setup serves no Agent and records `attempted: false` with `fixture_unavailable`. The Agent does all editing and saving.
+
+The fixture takes its destination as positional arguments, so it runs as a bare executable. Inside a bundle, AppKit treats those paths as open requests ([initialization contrasts](first-save-initialization.md)). A bare executable has no bundle to unregister. The only change to the fixture is the read-only `observation_sequence` field.
+
+Evidence holds `target_space`, `save_requests`, `contents`, `file_created`, `panel_window_id` and the fresh final receiver fields. The evaluator reads the artifact itself. A run with no artifact still records a complete attempt, with `failure_category: missing_artifact`.
+
+While [#33](https://github.com/Termdock-dev/cueward/issues/33) stays open, expect Save to be disabled in the first panel, so the task ends failed with no artifact. That is the correct result. Do not move the window to a visible Space, activate anything or force the control. One `app inspect` call returns at most 500 nodes and this panel exposes more, so an Agent has to walk subtrees with `--root`, inside the 64-request budget.
+
+The broker checks a target's `app.pid`, which is the app that was inspected. A panel control may report another `receiver_pid`, but its target still names the owned app, so it passes. A target issued for any other app is rejected. The 2026-11-07 run F reached a real panel through the same token check.
+
+### `cross_app`
+
+`cross_app` depends on a passed `new_document` in the same run. Before it reserves or launches anything, the runner evaluates `native-agent-evidence.json`. Without a passed `new_document` it prints why and exits 1. It writes no record, so `cross_app` stays `unverified` with reason `not run`. It can still run later in that run if `new_document` passes. A failed `new_document` cannot be repeated in the same run, so that needs a new prepared run.
+
+`producer_pid` comes only from the `new_document` observer in that evidence. The evaluator also leaves an attempted `cross_app` `unverified` when `new_document` did not pass, for evidence that did not come from this runner.
+
+The [reader](document-reader-fixture.swift) is a separate owned bundle. It starts with nothing open and shows the file only after the Agent presses Open. It has no document class, no editable view and no save path, so its only output is its private state file. Evidence holds `file`, `content`, `read_requests`, `error`, `producer_pid` and the fresh final receiver fields. The evaluator still compares the disk bytes.
 
 ## WebView pointer tasks
 
@@ -152,4 +182,4 @@ PR #71 review follow-up reproduced false passing when final activation occurred 
 
 All three receivers stayed inactive with zero owned activation events; visible Space maps stayed stable across three observed displays. Maximum sampling gaps were 42.4, 43.8 and 64.2 ms. Foreground and pointer changes were retained without attribution or filtering. Transport intervals include Agent/start waiting, not just inference time. Sampling cannot exclude shorter transients, and disk success does not override isolation failure. All owned receiver/observer executable paths were absent after cleanup; no user windows or files were selected.
 
-Cross-app artifact consumption, completed window/dialog acceptance, accepted canvas drag/interruption, unintegrated real apps and controlled physical-input/lock coverage remain outstanding. These synthetic native tasks do not satisfy the whole issue.
+Accepted first save, cross-app artifact consumption, completed window/dialog acceptance, accepted canvas drag/interruption, unintegrated real apps and controlled physical-input/lock coverage remain outstanding. These synthetic native tasks do not satisfy the whole issue.
