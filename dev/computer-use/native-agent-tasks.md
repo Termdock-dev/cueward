@@ -136,8 +136,12 @@ Each row used a separate fresh Agent and receiver with Cueward 0.6.1. Another pr
 | I / canvas interrupted | 7 | `partially_sent` with 3 events; released once; interruption passed | Failed: foreground changed without physical input |
 | J / new document | 17 | Save disabled in the first panel; no artifact | Failed: missing artifact, as #33 records |
 | K / window dialog | 16 | Stopped when the desktop locked itself at 164.6 s | Failed: says nothing about the task |
+| L / WebView first click | 7 | Counter rose exactly once; trusted down, up and click | **Passed** |
+| M / canvas interrupted | 7 | `partially_sent`; released once | Failed: Termdock came forward during a command |
+| N / window dialog | 19 | Exact artifact; native save, windows and bystander checks passed; zero activations | Unverified: 213.7 ms sample gap during a command |
+| O / canvas interrupted | 7 | `partially_sent` with 3 events; released once; interruption passed | **Passed** |
 
-Each run reports its own totals, and they are not combined.
+Runs L to O used the command-scoped trace rule described below. A person used the computer during them: run L saw 1,155 physical pointer events and run O saw 2,219, and both passed. Each run reports its own totals, and they are not combined.
 
 `cross_app` has no attempt: it needs a passed `new_document` in the same run, and #33 blocks that.
 
@@ -162,6 +166,8 @@ These runs showed that the trace check measured the whole desktop rather than Cu
 | H | Failed | Failed | Displacement; a 104 ms gap fell inside a command |
 | I | Failed | Passed | The change came after the drag |
 | J | Failed | Failed | Missing artifact; the pointer moved during a command |
+
+Run N is the first `window_dialog` attempt in which no check failed. The observer found its panel service 20.6 ms after it started. Twelve foreground changes came from other work and did not affect the result. The remaining limit is sample gaps during commands while the panel is open.
 
 Replayed values are a check of the rule. The recorded results above do not change, and new runs carry the marks directly.
 

@@ -144,6 +144,74 @@
         "start_to_first_sight_ms": 11.0
       },
       "reason": "The desktop locked itself 164.6 s into the run with no physical input, and the broker stopped. This run says nothing about the task."
+    },
+    {
+      "run": "L",
+      "task": "webview_first_click",
+      "rule": "command-scoped trace",
+      "broker_requests": 7,
+      "status": "passed",
+      "counter": {
+        "initial": 0,
+        "final": 1
+      },
+      "dom_trusted": {
+        "mousedown": true,
+        "mouseup": true,
+        "click": true
+      },
+      "physical_pointer_events": 1155,
+      "external_desktop_changes": 0,
+      "observer_max_interval_ms": 61.2
+    },
+    {
+      "run": "M",
+      "task": "canvas_interrupted",
+      "rule": "command-scoped trace",
+      "broker_requests": 7,
+      "status": "failed",
+      "cli_status": "partially_sent",
+      "events_sent": 3,
+      "interruption": "passed",
+      "release": "passed",
+      "failed_check": "interference_trace",
+      "external_desktop_changes": 1,
+      "reason": "Termdock came to the foreground during a command window with no physical input. Its process id changed several times in this period, so it was restarting. Neither change moved to the receiver."
+    },
+    {
+      "run": "N",
+      "task": "window_dialog",
+      "rule": "command-scoped trace",
+      "broker_requests": 19,
+      "cli_commands": 17,
+      "status": "unverified",
+      "artifact": "exact",
+      "native_document_io": "passed",
+      "window_observations": "passed",
+      "receiver_activations": 0,
+      "service_start_to_first_sight_ms": 20.6,
+      "unverified_checks": [
+        "auxiliary_receiver_trace",
+        "interference_trace"
+      ],
+      "observer_max_command_interval_ms": 213.7,
+      "physical_pointer_events": 4048,
+      "external_desktop_changes": 2,
+      "reason": "No check failed. A sample gap of 213.7 ms fell inside a command, while the Save panel was open and a person used the computer."
+    },
+    {
+      "run": "O",
+      "task": "canvas_interrupted",
+      "rule": "command-scoped trace",
+      "broker_requests": 7,
+      "status": "passed",
+      "cli_status": "partially_sent",
+      "events_sent": 3,
+      "interruption": "passed",
+      "release": "passed",
+      "physical_pointer_events": 2219,
+      "physical_key_events": 72,
+      "external_desktop_changes": 1
     }
   ],
   "panel_structure": {
@@ -154,5 +222,16 @@
   "totals_are_per_run": true,
   "not_runnable_yet": {
     "cross_app": "Needs a passed new_document in the same run, and #33 blocks that."
-  }
+  },
+  "best_result_per_task": {
+    "calculation": "passed (2026-11-06)",
+    "existing_document": "passed (run D)",
+    "webview_first_click": "passed (run L)",
+    "canvas_interrupted": "passed (run O)",
+    "window_dialog": "unverified (run N)",
+    "canvas_drag": "failed (run H, unsupported)",
+    "new_document": "failed (run J, #33)",
+    "cross_app": "not run; needs a passed new_document"
+  },
+  "best_results_are_from_separate_runs": true
 }
