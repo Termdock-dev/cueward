@@ -223,6 +223,32 @@ class AcceptanceTests(unittest.TestCase):
         self.evidence["tasks"].pop("new_document")
         self.assertEqual(self.result("cross_app")["status"], "unverified")
 
+    def test_cross_app_stays_unverified_when_the_producer_did_not_pass(self):
+        artifact = self.root / "work/new_document/result.txt"
+        for label, change in (("failed, no artifact", lambda r: artifact.unlink()),
+                              ("failed, wrong bytes", lambda r: artifact.write_text("wrong")),
+                              ("no save observation", lambda r: r["observer"].pop("save_requests"))):
+            with self.subTest(label):
+                record = self.record("cross_app")
+                change(self.evidence["tasks"]["new_document"])
+                self.assertNotEqual(self.result("new_document")["status"], "passed")
+                self.assertEqual(self.result("cross_app")["status"], "unverified")
+                record["observer"].update(file="", content="")
+                result = self.result("cross_app")
+                self.assertEqual(result["status"], "unverified")
+                self.assertEqual(result["reason"], "producing document task has not passed")
+
+    def test_cross_app_reuse_and_stale_records_keep_failing_without_a_producer(self):
+        record = self.record("cross_app")
+        (self.root / "work/new_document/result.txt").unlink()
+        record["receiver_pids"] = [200]
+        record["observer"]["pid"] = 200
+        self.assertEqual(self.result("cross_app")["status"], "failed")
+        record = self.record("cross_app")
+        (self.root / "work/new_document/result.txt").unlink()
+        record["run_id"] = "old-run"
+        self.assertEqual(self.result("cross_app")["status"], "failed")
+
     def test_partial_receiver_fields_stay_unverified(self):
         for task, field in (("new_document", "save_requests"), ("cross_app", "content"),
                             ("window_dialog", "window_observations"), ("canvas_drag", "final")):
