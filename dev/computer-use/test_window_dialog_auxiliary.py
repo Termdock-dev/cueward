@@ -342,6 +342,14 @@ class DialogAuxiliaryTests(unittest.TestCase):
                 self.assertEqual(self.auxiliary_trace(record) if expected == "passed"
                                  else check_auxiliary_receiver_trace(self.run, record, record["observer"])[0], expected)
 
+    def test_marks_without_receipts_keep_the_service_gap_strict(self):
+        for receipts in ([], None):
+            with self.subTest(receipts=receipts):
+                record = self.discovered(times=(0, 50, 100, 400, 450, 500))
+                record["receipts"] = receipts
+                record["execution"]["marks"] = {"a": 450, "b": 460}
+                self.assertEqual(check_auxiliary_receiver_trace(self.run, record, record["observer"])[0], "unverified")
+
     def test_first_sight_gap_limit_is_100_ms(self):
         times = (0, 50, 100, 150, 200)
         self.assertEqual(self.auxiliary_trace(self.discovered(started=50, seen=150, times=times)), "passed")

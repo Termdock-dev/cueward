@@ -2,7 +2,7 @@
 import unittest
 
 from desktop_observer import execution_from_records
-from task_acceptance.trace import check_trace
+from task_acceptance.trace import check_trace, command_coverage_gap, command_spans
 
 STEP_MS, END_MS = 50, 4000
 
@@ -127,6 +127,18 @@ class CommandAttributionTests(unittest.TestCase):
         record = evidence(marks=False)
         drop(record, 500, 800)
         self.assertEqual(self.status(record)[0], "unverified")
+
+    def test_incomplete_receipts_never_mean_no_command_ran(self):
+        marks = {"begin": 10, "finish": 20}
+        for receipts in ([], None, "receipts", [None], ["bad"], [{}]):
+            with self.subTest(receipts=receipts):
+                self.assertIsNone(command_spans(receipts, marks))
+
+    def test_a_gap_stays_visible_when_receipts_are_missing(self):
+        record = evidence()
+        drop(record, 500, 800)
+        spans = command_spans([], record["execution"]["marks"])
+        self.assertEqual(command_coverage_gap(record["execution"]["samples"], spans), 400)
 
     def test_execution_keeps_the_observer_marks(self):
         rows = [{"type": "ready", "schema": 1}]
