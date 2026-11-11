@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::MacosError;
 
-use super::attachments::{attachment_placeholder_count, enrich_cues_with_attachments};
+use super::attachments::enrich_cues_with_attachments;
 use super::db::{
     load_audio_notes, load_drawing_notes, load_file_backed_notes, load_map_notes, load_media_notes,
     load_web_preview_notes,
@@ -28,16 +28,21 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
     let mut cues = parse_capture_output(&super::scripting::run_jxa(&script)?)?;
 
     let has_attachment_placeholders = cues.iter().any(|cue| {
-        matches!(cue.source, CueSource::Notes) && attachment_placeholder_count(&cue.content) > 0
+        matches!(cue.source, CueSource::Notes) && cue.content.contains(ATTACHMENT_PLACEHOLDER)
     });
 
+    for cue in &mut cues {
+        cue.content = normalize_plaintext(&cue.content).0;
+    }
+
     if has_attachment_placeholders {
-        let media_notes = load_media_notes(since).unwrap_or_default();
-        let web_preview_notes = load_web_preview_notes(since).unwrap_or_default();
-        let map_notes = load_map_notes(since).unwrap_or_default();
-        let file_backed_notes = load_file_backed_notes(since).unwrap_or_default();
-        let audio_notes = load_audio_notes(since).unwrap_or_default();
-        let drawing_notes = load_drawing_notes(since).unwrap_or_default();
+        // Never report this source complete after an enrichment read error: incremental capture must retry it.
+        let media_notes = load_media_notes(since)?;
+        let web_preview_notes = load_web_preview_notes(since)?;
+        let map_notes = load_map_notes(since)?;
+        let file_backed_notes = load_file_backed_notes(since)?;
+        let audio_notes = load_audio_notes(since)?;
+        let drawing_notes = load_drawing_notes(since)?;
         enrich_cues_with_attachments(
             &mut cues,
             &media_notes,
@@ -73,7 +78,7 @@ fn parse_capture_output(raw: &str) -> Result<Vec<Cue>, MacosError> {
             Ok(Cue {
                 source: CueSource::Notes,
                 timestamp: note.timestamp,
-                content: normalize_plaintext(&note.content).0,
+                content: note.content,
                 title: Some(note.title),
                 url: None,
                 tags: Vec::new(),

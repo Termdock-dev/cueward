@@ -47,6 +47,7 @@ cueward reddit search "async rust" --subreddit r/rust --limit 25
 These changes are not yet merged/published; check installed `capture --help` for `--incremental` before relying on them.
 
 - Capture persists inbox/state even when only reading a source. Source failures and inbox/state save failures exit 1. Partial source successes remain available in the wrapped array and, if persistence succeeded, the inbox. Empty data with exit 1 is not an empty source.
+- Notes attachment database read failures fail the entire Notes source and keep its watermark unchanged. Resolve the database/permission error and retry; do not describe the missing metadata as a complete capture. Text-only Notes do not need the attachment database.
 - Inbox data is saved before advancing watermarks. Failed checkpoint writes can leave a saved batch; rerun is safe to index but inspect diagnostics first.
 - Without `--incremental`, `--since` retains its time-window meaning. With it, each existing watermark takes precedence over `--since`; sources without a watermark bootstrap from that window. The boundary second is replayed to retain same-second records.
 - Triage upserts repeated versions. Different native source IDs remain different records even if text and timestamps match. Tags do not define record identity. Legacy captures without IDs use their available contents/metadata, so indistinguishable old records cannot be separated retroactively.

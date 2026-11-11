@@ -258,3 +258,27 @@ fn notes_attachment_read_failure_preserves_checkpoint_for_incremental_retry() {
     );
     assert!(!home.path(".cueward/inbox").exists());
 }
+
+#[test]
+fn literal_attachment_label_in_plain_text_does_not_require_notestore() {
+    let home = Home::new();
+    let output = home
+        .command()
+        .env(
+            "CUEWARD_TEST_SCRIPT_OUTPUT",
+            notes_output(&[("plain", "[Attachment] is only quoted text")]),
+        )
+        .args(["capture", "--source", "notes", "--incremental"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !home
+            .path("Library/Group Containers/group.com.apple.notes/NoteStore.sqlite")
+            .exists()
+    );
+}
