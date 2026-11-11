@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from observed_cli import ObservedCLI, panel_controls
+from ax_exploration import explore_windows
 
 SPEC = importlib.util.spec_from_file_location("first_save_exploration", Path(__file__).with_name("first-save-probe.py"))
 BASELINE = importlib.util.module_from_spec(SPEC)
@@ -16,11 +17,12 @@ SPEC.loader.exec_module(BASELINE)
 
 
 class NativeTree:
-    """A fixed 501-node AX tree; no application, process or desktop is created."""
+    """Finite synthetic AX trees; no application, process or desktop is created."""
 
-    def __init__(self, *, enabled=True, save_first=False, change_app_at=None):
+    def __init__(self, *, enabled=True, save_first=False, change_app_at=None, change_root_at=None):
         self.calls = []
         self.change_app_at = change_app_at
+        self.change_root_at = change_root_at
         save_index, group_index = (0, 1) if save_first else (1, 0)
         self.nodes = {}
         self.add("w0", "AXWindow", 3 if save_first else 2)
@@ -65,10 +67,15 @@ class NativeTree:
             result = [copy.deepcopy(self.nodes["w0"])]
         else:
             visit(root, 0)
+        if len(self.calls) == self.change_root_at:
+            result[0]["name"] = "different window"
         app = dict(pid=123, start_seconds=2 if len(self.calls) == self.change_app_at else 1,
                    start_micros=0, executable="/mock/owned-receiver")
         payload = json.dumps(dict(nodes=result, truncated=truncated, app=app, root_ref=root))
         return SimpleNamespace(returncode=0, stdout=payload if kwargs.get("text") else payload.encode(), stderr="")
+
+    def call(self, *arguments):
+        return json.loads(self.run(["/mock/cueward", *map(str, arguments)], text=True).stdout)
 
 
 class ExplorationTests(unittest.TestCase):
@@ -106,6 +113,82 @@ class ExplorationTests(unittest.TestCase):
                 self.assertEqual(len(controls), 1)
                 self.assertFalse(controls[0]["enabled"])
                 self.assertNotIn("target", controls[0])
+
+    def test_changed_visible_root_stops_during_continuation_or_final_validation(self):
+        for route in ("baseline", "observed"):
+            for change_at in (3, 4):
+                with self.subTest(route=route, change_at=change_at):
+                    with self.assertRaisesRegex(RuntimeError, "changed"):
+                        self.explore(route, NativeTree(change_root_at=change_at))
+
+    def test_equal_save_labels_remain_two_distinct_controls(self):
+        tree = NativeTree(save_first=True)
+        tree.add("w0.2", "AXButton", 0, name="Save", enabled=True)
+        nodes, incomplete = self.explore("observed", tree)
+        self.assertEqual(len(panel_controls(nodes)), 2)
+        self.assertFalse(incomplete)
+
+    def test_continuation_reaches_but_never_exceeds_the_native_path_limit(self):
+        for save_depth in (12, 13):
+            with self.subTest(save_depth=save_depth):
+                tree = NativeTree()
+                tree.nodes = {}
+                for depth in range(save_depth):
+                    tree.add("w0" + ".0" * depth, "AXGroup", 1)
+                tree.add("w0" + ".0" * save_depth, "AXButton", 0, name="Save", enabled=True)
+                nodes, incomplete = self.explore("observed", tree)
+                self.assertEqual(len(panel_controls(nodes)), 1 if save_depth == 12 else 0)
+                self.assertEqual(incomplete, save_depth > 12)
+                self.assertTrue(all(node["ref"].count(".") <= 12 for node in nodes))
+
+
+class ExplorationBudgetTests(unittest.TestCase):
+    def test_final_root_truncation_cannot_report_complete_coverage(self):
+        tree = NativeTree()
+        def call(*args):
+            result = tree.call(*args)
+            if "--root" not in args and len(tree.calls) > 1:
+                result["truncated"] = True
+            return result
+        nodes, incomplete = explore_windows(call, 123)
+        self.assertTrue(incomplete)
+        self.assertEqual(len(panel_controls(nodes)), 1)
+
+    def test_call_limit_keeps_partial_coverage_without_guessing_hidden_refs(self):
+        tree = NativeTree()
+        nodes, incomplete = explore_windows(tree.call, 123, max_calls=3)
+        self.assertTrue(incomplete)
+        self.assertEqual(len(tree.calls), 3)
+        self.assertEqual(panel_controls(nodes), [])
+
+    def test_node_limit_bounds_retained_observations(self):
+        tree = NativeTree()
+        nodes, incomplete = explore_windows(tree.call, 123, max_nodes=8)
+        self.assertTrue(incomplete)
+        self.assertEqual(len(nodes), 8)
+        self.assertLessEqual(len(tree.calls), 3)
+
+    def test_expired_budget_removes_targets_when_final_root_check_cannot_run(self):
+        tree, clock = NativeTree(save_first=True), [0]
+        def call(*args):
+            result = tree.call(*args)
+            clock[0] += 1
+            return result
+        nodes, incomplete = explore_windows(call, 123, max_seconds=1.5, clock=lambda: clock[0])
+        self.assertTrue(incomplete)
+        self.assertEqual(len(tree.calls), 2)
+        self.assertEqual(len(panel_controls(nodes)), 1)
+        self.assertFalse(any(node.get("target") for node in nodes))
+
+    def test_transport_failure_is_not_replayed(self):
+        tree = NativeTree()
+        def call(*args):
+            if len(tree.calls) == 2:
+                raise RuntimeError("native read failed")
+            return tree.call(*args)
+        with self.assertRaisesRegex(RuntimeError, "native read failed"):
+            explore_windows(call, 123)
+        self.assertEqual(len(tree.calls), 2)
 
 
 if __name__ == "__main__":

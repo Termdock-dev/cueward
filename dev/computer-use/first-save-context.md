@@ -44,3 +44,21 @@ Setting the filename field through `app set-value`, with the same name and with 
 Activation of the target alone does not explain the disabled control, so the click preparation route does not solve #33. Foreground activation and forced panel input remain outside this work.
 
 One `app inspect` call returns at most 500 nodes, and this panel exposed 1,952. The unmodified [first-save probe](first-save-probe.py) now stops before Save and reports `save_control_unavailable` with `panel_traversal_truncated: true`. Walking subtrees with `--root` reaches the control. An agent has to do the same.
+
+## Diagnostic continuation: 2026-11-12
+
+The unreleased [bounded subtree continuation](first-save.md#bounded-subtree-continuation) now replaces the two independent one-read-per-window implementations. The context comparison still records every actual CLI receipt through `ObservedCLI`. Continuation only reads observed refs, retains coverage limits and refuses changed public app/root/node observations. It does not enable, press or replay a disabled Save control, change the observer's sampling threshold or introduce a product fallback.
+
+Both Python entry points recover Save beyond 500 nodes in offline native-boundary regressions. The initial live preflight was locked. After the operator unlocked the desktop, one new run on macOS 27.0.1 arm64 produced the [sanitized aggregate](results/2026-11-12-first-save-traversal.json):
+
+| Observation | Result |
+| --- | --- |
+| Retained panel nodes | 1,028; traversal still incomplete |
+| Panel Save | One observed control, disabled, no action target |
+| Save requests | One document request, zero panel Save dispatches |
+| Artifact | Not created |
+| Owned receiver | Inactive, zero recorded activations |
+| Stationary desktop observation | Passed at sampled resolution; maximum gap 41.95 ms within the 100 ms bound |
+| Cleanup | Receiver and owned observer processes absent; context temporary directory absent |
+
+The marked execution lasted 15.27 seconds; compilation/preparation and cleanup are outside it. Raw targets, paths, process IDs and desktop records remain private. Source hashes in the aggregate identify the diagnostic code used. This confirms useful control discovery without forcing Save, not full panel traversal, a repair of disabled Save, fresh-agent/real-app acceptance or completion of #33. No action was replayed, and #33 remains open.

@@ -6,6 +6,8 @@ import shlex
 import subprocess
 import time
 
+from ax_exploration import explore_windows
+
 
 def parse_cli_output(text):
     """Parse operator data only after validating an external-content envelope."""
@@ -66,14 +68,7 @@ class ObservedCLI:
 
     def explore(self, pid):
         """Discover fresh app roots and read each current window subtree."""
-        roots = self.call("app", "inspect", "--pid", pid)
-        nodes, incomplete = [], roots.get("truncated", True)
-        for root in roots["nodes"]:
-            if root["ref"].startswith("w"):
-                tree = self.call("app", "inspect", "--pid", pid, "--root", root["ref"], "--depth", 10, "--limit", 500)
-                nodes.extend(tree["nodes"])
-                incomplete |= tree.get("truncated", True)
-        return nodes, incomplete
+        return explore_windows(self.call, pid)
 
 
 def panel_controls(nodes):

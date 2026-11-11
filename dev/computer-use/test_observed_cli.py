@@ -74,14 +74,21 @@ class ObservedCLITests(unittest.TestCase):
 
     def test_exploration_uses_all_fresh_windows_and_retains_partial_tree(self):
         commands = ObservedCLI("/owned/cueward", None)
-        commands.call = Mock(side_effect=[{"nodes": [{"ref": "w0"}, {"ref": "menu"}, {"ref": "w2"}], "truncated": False},
-                                         {"nodes": [{"identifier": "one"}], "truncated": False},
-                                         {"nodes": [{"identifier": "two"}], "truncated": True}])
+        one = {"ref": "w0", "identifier": "one", "child_count": 0}
+        two = {"ref": "w2", "identifier": "two", "child_count": 500}
+        # One parent's 500 children cannot all fit beside the parent in one 500-node read.
+        children = [{"ref": f"w2.{i}", "parent_ref": "w2", "child_count": 0} for i in range(499)]
+        def read(*args):
+            root = args[args.index("--root") + 1] if "--root" in args else None
+            nodes = [one, {"ref": "menu"}, two] if root is None else [one] if root == "w0" else [two, *children]
+            return {"app": {"pid": 123}, "nodes": nodes, "root_ref": root, "truncated": root == "w2"}
+        commands.call = Mock(side_effect=read)
         nodes, incomplete = commands.explore(123)
-        self.assertEqual([n["identifier"] for n in nodes], ["one", "two"])
+        self.assertEqual([n["identifier"] for n in nodes if "identifier" in n], ["one", "two"])
         self.assertTrue(incomplete)
-        self.assertEqual(commands.call.call_args_list[-1].args,
-                         ("app", "inspect", "--pid", 123, "--root", "w2", "--depth", 10, "--limit", 500))
+        observed_roots = {call.args[call.args.index("--root") + 1] for call in commands.call.call_args_list if "--root" in call.args}
+        self.assertEqual(observed_roots, {"w0", "w2"})
+        self.assertLessEqual(commands.call.call_count, 32)
 
     def test_text_without_enabled_attribute_uses_issued_target(self):
         self.assertEqual(sole_target([{"identifier": "editor", "target": "fresh"}], "editor"), "fresh")

@@ -26,3 +26,21 @@ python3 -B -m unittest discover -s dev/computer-use -p test_document_observer.py
 ```
 
 The orchestration tests use disposable JSON/files and mocked CLI/process responses to check interference rejection, required evidence, delayed/disabled/ambiguous controls, observation deadlines, missing move targets and missing-artifact report persistence through the real entry point. The observer regression compiles the same Swift observer used by the document fixture and runs real Foundation run loops in default, modal-panel and event-tracking modes, without opening a GUI. It checks that callbacks continue in all three modes. These checks do not validate an actual unlocked Save panel, macOS input delivery or first-save compatibility.
+
+## Bounded subtree continuation
+
+The 2026-11-12 source change is an unreleased diagnostic improvement for #33, not a fix for disabled Save controls or a completed desktop acceptance run. Both this runner and the [context comparison](first-save-context.md) use [shared AX exploration](ax_exploration.py). No production Rust command, native target or input guard changes.
+
+Each exploration starts with fresh app roots and the existing deep window reads. When a returned node has unobserved children, shallow reads of that observed ref expose siblings that a large earlier descendant hid. The runner never invents child paths from a count. Nodes merge by ref, not label, so equal Save labels stay ambiguous and repeated observations do not become duplicate controls.
+
+The default budget is 32 CLI reads including initial/final root discovery, 4,096 retained nodes and eight seconds checked between reads. Each native subtree request still has the 500-node bound and the product's 12-level path limit. An in-flight call retains its transport timeout; eight seconds is not a hard cancellation deadline. A parent with more children than one shallow request can expose may remain incomplete. Budget exhaustion and unavailable branches remain incomplete, not an empty or fully inspected panel.
+
+The public app instance, repeated node observations and final root list must remain consistent. Opaque targets are excluded from comparisons and never decoded or rewritten. A visible change or transport error stops the exploration without replay. If the time budget prevents the final root check, observations are retained without action targets. Public previews cannot authenticate identical replacement nodes or make a multi-call observation atomic; native action-target revalidation remains required.
+
+Offline regressions exercise both real Python entry points against the mocked native CLI boundary, including Save beyond 500 nodes, changed app/root observations, distinct equal labels, disabled controls, deduplication and read/node/time limits:
+
+```sh
+python3 -B -m unittest discover -s dev/computer-use -p test_ax_exploration.py -v
+```
+
+After the operator unlocked the desktop, one new inactive-first context diagnostic [retained 1,028 nodes and observed disabled Save](results/2026-11-12-first-save-traversal.json). Traversal stayed incomplete. The document received one Save request, but its disabled panel Save received none and no artifact was created. Owned receiver/observer processes and the temporary directory were absent after cleanup. This is a new diagnostic result, not a completed first-save task; historical results are unchanged.
