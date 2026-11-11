@@ -132,7 +132,7 @@ pub(crate) fn print_external(source: &str, json: &str) {
     print!("{}", external_envelope(source, json));
 }
 
-fn external_envelope(source: &str, json: &str) -> String {
+pub(crate) fn external_envelope(source: &str, json: &str) -> String {
     // JSON escapes preserve the decoded source text, unlike HTML entity replacement.
     let safe = json.replace('<', "\\u003c").replace('>', "\\u003e");
     format!("<external source=\"cueward/{source}\">\n{safe}\n</external>\n")
