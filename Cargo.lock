@@ -373,11 +373,13 @@ version = "0.6.2"
 dependencies = [
  "aho-corasick",
  "chrono",
+ "fs4",
  "serde",
  "serde_json",
  "serde_yaml",
  "sha2",
  "tantivy",
+ "tempfile",
  "toml",
 ]
 

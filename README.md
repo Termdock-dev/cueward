@@ -49,6 +49,17 @@ Cueward `0.6.2` includes the changes since `0.6.1`:
 - Voice Memos transcription and the other `0.6.1` changes are in the [0.6.1 release notes](docs/releases/0.6.1.md)
 - See the [release notes](docs/releases/0.6.2.md) for support boundaries
 
+### Unreleased reliability changes
+
+The following source-branch changes are not yet merged or published. Check installed command help before using them. Notes targeting is covered by isolated fixtures, not a new live Notes write acceptance run.
+
+- Notes mutations accept native IDs and refuse ambiguous title matches.
+- Capture reports source/persistence failure with exit 1, preserves partial successful data, and saves the inbox before advancing checkpoints.
+- `capture --incremental` resumes each source with a one-second boundary overlap. `--since` remains the bootstrap window, or the complete time window without `--incremental`.
+- Triage upserts cue versions so retrying a committed batch cannot append another copy.
+- Search supports Han-character substrings and returns a JSON array inside an external envelope, including `[]` for no results. Other external JSON responses use the same envelope, with JSON escapes preserving embedded delimiters.
+- A verified copy of legacy stored rows is built in `~/.cueward/index-v2`; the original `index` is retained. See [knowledge persistence and compatibility](docs/knowledge-persistence.md).
+
 ### macOS Permissions
 
 Cueward reads local databases that require Full Disk Access:
@@ -121,6 +132,9 @@ cueward capture --source safari --since 7d
 
 # Apple Notes, last 3 hours
 cueward capture --source notes --since 3h
+
+# Resume from saved checkpoints; first run bootstraps from the last 7 days
+cueward capture --source all --incremental --since 7d
 ```
 
 Capture commands output JSON inside an `<external>` envelope:
@@ -140,7 +154,9 @@ Capture commands output JSON inside an `<external>` envelope:
     "content": "Meeting notes from product sync...",
     "title": "Product Sync 2026-04-07",
     "metadata": {
-      "folder": "Work"
+      "folder": "Work",
+      "note_id": "x-coredata://.../ICNote/p123",
+      "source_id": "x-coredata://.../ICNote/p123"
     }
   }
 ]
@@ -321,7 +337,7 @@ Auto-tag and index captured cues:
 cueward triage
 ```
 
-Reads from `~/.cueward/inbox/`, applies keyword-based auto-tagging, and writes to a local BM25 index.
+Reads from `~/.cueward/inbox/`, applies keyword-based auto-tagging, and upserts cue versions into a local BM25 index. If archiving fails after the index commit, the batch stays pending and can be retried without duplicate indexing.
 
 Configure auto-tagging in `~/.cueward/tags.toml`:
 
@@ -342,7 +358,10 @@ Query the local index:
 
 ```bash
 cueward search "rust concurrency" --limit 5
+cueward search "客戶回饋" --limit 5
 ```
+
+Search outputs a JSON result array inside `<external source="cueward/search">`. Han characters have individual index positions, so adjacent Chinese query characters match a phrase within longer text. English words and explicit Tantivy queries remain supported. `--limit` must be positive.
 
 ### Send
 
@@ -424,7 +443,14 @@ cueward notes delete --title "Note Title" --folder Cueward
 
 # Move between folders
 cueward notes move --title "Note Title" --from Cueward --to Archive
+
+# Use metadata.note_id from a fresh Notes capture
+cueward notes update --id "x-coredata://.../ICNote/p123" --body "New content"
+cueward notes delete --id "x-coredata://.../ICNote/p123"
+cueward notes move --id "x-coredata://.../ICNote/p123" --to Archive
 ```
+
+Title-based mutations require one match across accounts in folders with that name. Zero or multiple matches fail before writing or creating a destination folder. `--id` conflicts with `--title` and source-folder options. Native IDs are observed targets, not authorization to modify a note.
 
 ### Calendar
 
@@ -791,7 +817,8 @@ crates/
 ~/.cueward/
 ├── inbox/            Captured cues awaiting triage
 ├── processed/        Triaged cues moved out of inbox
-├── index/            Tantivy BM25 search index and lock files
+├── index/            Retained legacy Tantivy index
+├── index-v2/         Verified legacy copy and retry-safe mixed-language index
 ├── cache/
 │   ├── ocr/          OCR result cache keyed by SHA256
 │   ├── screenshots/  Screenshot captures
@@ -807,3 +834,9 @@ Additional app- or tool-specific scratch directories may appear under `~/.cuewar
 ## License
 
 MIT
+
+## Automated checks
+
+The macOS workflow pins Rust 1.88.0 and installs Node.js 24 for the Safari JS behavior tests. It runs `cargo build --release --locked` and `cargo test --workspace --locked -- --test-threads=1`, without `--ignored`. Tests run serially because existing fixtures mutate the process-wide HOME; parallel execution produced receipt-path failures locally. Serial execution avoids that observed failure but does not fix fixture isolation. Desktop and real-App opt-in tests are not acceptance evidence from CI.
+
+Formatting is checked on changed Rust files with `python3 scripts/check-rust-format.py --base origin/main`. The existing repository-wide formatting backlog is not rewritten by this change. CI uses read-only repository permissions and does not release, merge, or change branch protection.

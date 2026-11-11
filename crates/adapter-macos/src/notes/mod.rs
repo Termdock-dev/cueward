@@ -4,11 +4,13 @@ use cueward_core::AttachmentKind;
 
 use crate::MacosError;
 
-pub mod crud;
-pub mod notify;
 mod attachments;
 mod capture;
+pub mod crud;
 mod db;
+pub mod notify;
+mod scripting;
+mod selection;
 
 pub use capture::capture;
 #[cfg(test)]

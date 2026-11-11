@@ -11,7 +11,7 @@ pub(crate) fn dispatch(action: SafariAction) {
         SafariAction::Tabs { profile } => {
             match cueward_adapter_macos::safari::tabs(profile.as_deref()) {
                 Ok(tabs) => {
-                    println!("{}", serde_json::to_string_pretty(&tabs).unwrap());
+                    print_external("safari", &serde_json::to_string_pretty(&tabs).unwrap());
                     eprintln!("{} tab(s)", tabs.len());
                 }
                 Err(e) => {
@@ -23,7 +23,7 @@ pub(crate) fn dispatch(action: SafariAction) {
         SafariAction::Active { profile } => {
             match cueward_adapter_macos::safari::active(profile.as_deref()) {
                 Ok(tab) => {
-                    println!("{}", serde_json::to_string_pretty(&tab).unwrap());
+                    print_external("safari", &serde_json::to_string_pretty(&tab).unwrap());
                     if tab.is_some() {
                         eprintln!("active tab");
                     } else {
@@ -39,7 +39,7 @@ pub(crate) fn dispatch(action: SafariAction) {
         SafariAction::Open { url, profile } => {
             match cueward_adapter_macos::safari::open(&url, profile.as_deref()) {
                 Ok(tab) => {
-                    println!("{}", serde_json::to_string_pretty(&tab).unwrap());
+                    print_external("safari", &serde_json::to_string_pretty(&tab).unwrap());
                     if tab.is_some() {
                         eprintln!("opened tab");
                     } else {
@@ -54,7 +54,7 @@ pub(crate) fn dispatch(action: SafariAction) {
         }
         SafariAction::Close { index } => match cueward_adapter_macos::safari::close(index) {
             Ok(result) => {
-                println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                print_external("safari", &serde_json::to_string_pretty(&result).unwrap());
                 if result.closed {
                     eprintln!("tab closed");
                 } else {
@@ -79,7 +79,7 @@ pub(crate) fn dispatch(action: SafariAction) {
                 tab.as_deref(),
             ) {
                 Ok(result) => {
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    print_external("safari", &serde_json::to_string_pretty(&result).unwrap());
                     eprintln!("scrolled {direction}");
                 }
                 Err(e) => {
@@ -118,10 +118,10 @@ pub(crate) fn dispatch(action: SafariAction) {
         SafariAction::CloseTabs { profile, url } => {
             match cueward_adapter_macos::safari::close_tabs(profile.as_deref(), url.as_deref()) {
                 Ok(count) => {
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&serde_json::json!({ "closed": count }))
-                            .unwrap()
+                    print_external(
+                        "safari",
+                        &serde_json::to_string_pretty(&serde_json::json!({ "closed": count }))
+                            .unwrap(),
                     );
                     eprintln!("{count} tab(s) closed");
                 }
@@ -207,7 +207,7 @@ pub(crate) fn dispatch(action: SafariAction) {
                 tab.as_deref(),
             ) {
                 Ok(result) => {
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    print_external("safari", &serde_json::to_string_pretty(&result).unwrap());
                     eprintln!("clicked element");
                 }
                 Err(e) => {
@@ -229,7 +229,7 @@ pub(crate) fn dispatch(action: SafariAction) {
                 tab.as_deref(),
             ) {
                 Ok(result) => {
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    print_external("safari", &serde_json::to_string_pretty(&result).unwrap());
                     eprintln!("filled element");
                 }
                 Err(e) => {
@@ -264,7 +264,7 @@ pub(crate) fn dispatch(action: SafariAction) {
                 tab.as_deref(),
             ) {
                 Ok(result) => {
-                    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+                    print_external("safari", &serde_json::to_string_pretty(&result).unwrap());
                     eprintln!("wait condition matched");
                 }
                 Err(e) => {
@@ -320,21 +320,48 @@ pub(crate) fn dispatch(action: SafariAction) {
                 }
             }
         }
-        SafariAction::Console { level, profile, tab } => {
+        SafariAction::Console {
+            level,
+            profile,
+            tab,
+        } => {
             match cueward_adapter_macos::safari::console_messages(
-                level.as_deref(), profile.as_deref(), tab.as_deref(),
+                level.as_deref(),
+                profile.as_deref(),
+                tab.as_deref(),
             ) {
-                Ok(result) => print_external("safari/console", &serde_json::to_string_pretty(&result).unwrap()),
-                Err(error) => { eprintln!("error: {error}"); process::exit(1); }
+                Ok(result) => print_external(
+                    "safari/console",
+                    &serde_json::to_string_pretty(&result).unwrap(),
+                ),
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    process::exit(1);
+                }
             }
         }
-        SafariAction::Network { profile, tab, action } => {
-            let id = match action { Some(SafariNetworkAction::Get { id }) => Some(id), None => None };
+        SafariAction::Network {
+            profile,
+            tab,
+            action,
+        } => {
+            let id = match action {
+                Some(SafariNetworkAction::Get { id }) => Some(id),
+                None => None,
+            };
             match cueward_adapter_macos::safari::network_requests(
-                id, profile.as_deref(), tab.as_deref(),
+                id,
+                profile.as_deref(),
+                tab.as_deref(),
             ) {
-                Ok(result) => print_external("safari/network", &serde_json::to_string_pretty(&result).unwrap()),
-                Err(error) => { eprintln!("error: {error}"); process::exit(1); }
+                Ok(result) => print_external(
+                    "safari/network",
+                    &serde_json::to_string_pretty(&result).unwrap(),
+                ),
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    process::exit(1);
+                }
             }
         }
         SafariAction::Bookmarks { action } => dispatch_bookmarks(action),

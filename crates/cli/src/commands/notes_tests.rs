@@ -57,9 +57,10 @@ fn cli_parses_notes_update() {
                     title,
                     body,
                     folder,
+                    ..
                 },
         } => {
-            assert_eq!(title, "Draft");
+            assert_eq!(title.as_deref(), Some("Draft"));
             assert_eq!(body, "Updated body");
             assert_eq!(folder, "Cueward");
         }
@@ -89,6 +90,7 @@ fn cli_parses_notes_create() {
                     title,
                     body,
                     folder,
+                    ..
                 },
         } => {
             assert_eq!(title, "會議筆記");
@@ -102,21 +104,15 @@ fn cli_parses_notes_create() {
 #[test]
 fn cli_parses_notes_delete() {
     let cli = Cli::try_parse_from([
-        "cueward",
-        "notes",
-        "delete",
-        "--title",
-        "Draft",
-        "--folder",
-        "Cueward",
+        "cueward", "notes", "delete", "--title", "Draft", "--folder", "Cueward",
     ])
     .expect("parse notes delete");
 
     match cli.command {
         Command::Notes {
-            action: NotesAction::Delete { title, folder },
+            action: NotesAction::Delete { title, folder, .. },
         } => {
-            assert_eq!(title, "Draft");
+            assert_eq!(title.as_deref(), Some("Draft"));
             assert_eq!(folder, "Cueward");
         }
         _ => panic!("unexpected command"),
@@ -126,29 +122,18 @@ fn cli_parses_notes_delete() {
 #[test]
 fn cli_parses_notes_move() {
     let cli = Cli::try_parse_from([
-        "cueward",
-        "notes",
-        "move",
-        "--title",
-        "Draft",
-        "--from",
-        "Cueward",
-        "--to",
-        "Archive",
+        "cueward", "notes", "move", "--title", "Draft", "--from", "Cueward", "--to", "Archive",
     ])
     .expect("parse notes move");
 
     match cli.command {
         Command::Notes {
-            action:
-                NotesAction::Move {
-                    title,
-                    from,
-                    to,
-                },
+            action: NotesAction::Move {
+                title, from, to, ..
+            },
         } => {
-            assert_eq!(title, "Draft");
-            assert_eq!(from, "Cueward");
+            assert_eq!(title.as_deref(), Some("Draft"));
+            assert_eq!(from.as_deref(), Some("Cueward"));
             assert_eq!(to, "Archive");
         }
         _ => panic!("unexpected command"),
@@ -157,8 +142,8 @@ fn cli_parses_notes_move() {
 
 #[test]
 fn cli_parses_quick_notes_list() {
-    let cli = Cli::try_parse_from(["cueward", "quick-notes", "list"])
-        .expect("parse quick-notes list");
+    let cli =
+        Cli::try_parse_from(["cueward", "quick-notes", "list"]).expect("parse quick-notes list");
 
     match cli.command {
         Command::QuickNotes {
@@ -214,4 +199,25 @@ fn cli_parses_quick_notes_archive() {
         }
         _ => panic!("unexpected command"),
     }
+}
+
+#[test]
+fn cli_parses_notes_id_and_rejects_conflicting_selectors() {
+    for args in [
+        vec!["notes", "delete", "--id", "note-id"],
+        vec!["notes", "update", "--id", "note-id", "--body", "body"],
+        vec!["notes", "move", "--id", "note-id", "--to", "Archive"],
+    ] {
+        assert!(Cli::try_parse_from(std::iter::once("cueward").chain(args)).is_ok());
+    }
+    assert!(
+        Cli::try_parse_from(["cueward", "notes", "delete", "--id", "a", "--title", "b"]).is_err()
+    );
+    assert!(
+        Cli::try_parse_from([
+            "cueward", "notes", "move", "--id", "a", "--from", "F", "--to", "T"
+        ])
+        .is_err()
+    );
+    assert!(Cli::try_parse_from(["cueward", "notes", "delete"]).is_err());
 }

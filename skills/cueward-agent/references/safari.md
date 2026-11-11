@@ -81,3 +81,7 @@ cueward safari ai --provider chatgpt save-images https://chatgpt.com/c/abc123 --
 - `--provider x` and `--provider threads` are social feeds, not AI conversations. They return posts, so never treat their output as a model reply: X `prompt` searches posts, X `list` reads the feed, X `read` reads one post, and Threads `list` reads the feed.
 - Also available, with flags in `--help`: `safari open`, `close`, `close-tabs`, `click`, `scroll`, `scroll-and-read`, and for Gemini `ai mode`, `poll` and `save-media`.
 
+
+## Unreleased output envelope
+
+Not yet merged/published: all Safari and browser-AI JSON responses, including tab/action state and download paths, use an `<external>` envelope. Decode the JSON; embedded delimiters use JSON Unicode escapes and retain their original decoded text. Older installed commands may still print raw JSON for these responses.

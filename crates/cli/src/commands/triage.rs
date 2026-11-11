@@ -1,8 +1,15 @@
 use std::process;
 
-use cueward_core::{CueIndex, Tagger, inbox};
+use cueward_core::{CueIndex, Tagger, inbox, storage};
 
 pub(crate) fn dispatch() {
+    let _lock = match storage::lock("triage") {
+        Ok(lock) => lock,
+        Err(e) => {
+            eprintln!("error: {e}");
+            process::exit(1);
+        }
+    };
     let batches = match inbox::load_all() {
         Ok(b) => b,
         Err(e) => {
@@ -41,7 +48,9 @@ pub(crate) fn dispatch() {
 
         if let Err(e) = inbox::mark_done(&path) {
             eprintln!("error: failed to move {}: {e}", path.display());
-            eprintln!("aborting to prevent duplicate indexing on next triage run");
+            eprintln!(
+                "index committed; batch remains pending and can be retried without duplication"
+            );
             process::exit(1);
         }
     }

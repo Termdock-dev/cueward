@@ -2,59 +2,59 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 pub(crate) mod app;
 pub(crate) mod calendar;
+#[cfg(test)]
+mod calendar_tests;
 pub(crate) mod capture;
 pub(crate) mod clipboard;
 pub(crate) mod doctor;
+#[cfg(test)]
+mod doctor_tests;
 pub(crate) mod files;
-pub(crate) mod helpers;
 #[cfg(test)]
 mod help_tests;
+pub(crate) mod helpers;
 pub(crate) mod notes;
+#[cfg(test)]
+mod notes_tests;
 pub(crate) mod ocr;
 pub(crate) mod quick_notes;
 pub(crate) mod reddit;
-pub(crate) mod reminders;
-pub(crate) mod safari;
-pub(crate) mod safari_ai;
-pub(crate) mod safari_bookmarks;
-pub(crate) mod screenshot;
-pub(crate) mod search;
-pub(crate) mod send;
-pub(crate) mod shortcuts;
-pub(crate) mod space;
-pub(crate) mod stickies;
-pub(crate) mod triage;
-pub(crate) mod voice_memos;
-pub(crate) mod window;
-pub(crate) mod window_wait;
-#[cfg(test)]
-mod calendar_tests;
-#[cfg(test)]
-mod doctor_tests;
-#[cfg(test)]
-mod notes_tests;
 #[cfg(test)]
 mod reddit_tests;
+pub(crate) mod reminders;
 #[cfg(test)]
 mod reminders_tests;
+pub(crate) mod safari;
+pub(crate) mod safari_ai;
 #[cfg(test)]
 mod safari_ai_chatgpt_tests;
 #[cfg(test)]
 mod safari_ai_tests;
+pub(crate) mod safari_bookmarks;
 #[cfg(test)]
 mod safari_bookmarks_tests;
 #[cfg(test)]
 mod safari_tests;
+pub(crate) mod screenshot;
 #[cfg(test)]
 mod screenshot_tests;
+pub(crate) mod search;
+pub(crate) mod send;
+pub(crate) mod shortcuts;
 #[cfg(test)]
 mod shortcuts_tests;
+pub(crate) mod space;
+pub(crate) mod stickies;
 #[cfg(test)]
 mod stickies_tests;
+pub(crate) mod triage;
+pub(crate) mod voice_memos;
 #[cfg(test)]
 mod voice_memos_tests;
+pub(crate) mod window;
 #[cfg(test)]
 mod window_tests;
+pub(crate) mod window_wait;
 
 pub(crate) use app::AppAction;
 pub(crate) use calendar::CalendarAction;
@@ -139,7 +139,10 @@ pub(crate) enum Command {
         /// Data source to capture from
         #[arg(long, default_value = "all")]
         source: Source,
-        /// Time window (e.g. "24h", "7d")
+        /// Continue each source from its saved watermark (overlapping the boundary second)
+        #[arg(long)]
+        incremental: bool,
+        /// Time window; in incremental mode, used only before a source has a watermark
         #[arg(long, default_value = "24h")]
         since: String,
     },
@@ -295,7 +298,11 @@ pub(crate) fn dispatch(command: Command) {
         Command::FilesTagsReadWorker => files::tags_read_worker(),
         Command::App { action } => app::dispatch(action),
         Command::Space { action } => space::dispatch(action),
-        Command::Capture { source, since } => capture::dispatch(source, since),
+        Command::Capture {
+            source,
+            since,
+            incremental,
+        } => capture::dispatch(source, since, incremental),
         Command::Triage => triage::dispatch(),
         Command::Search { query, limit } => search::dispatch(query, limit),
         Command::Send {

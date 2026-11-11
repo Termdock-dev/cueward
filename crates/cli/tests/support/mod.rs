@@ -63,3 +63,9 @@ pub fn search_results(output: &Output) -> Vec<Value> {
             .collect()
     }
 }
+
+pub fn notes_output(records: &[(&str, &str)]) -> String {
+    Value::Array(records.iter().map(|(id, content)| json!({
+        "timestamp":"2026-11-11T12:00:00Z", "note_id":id, "folder":"Cueward", "title":"fixture", "content":content
+    })).collect()).to_string()
+}

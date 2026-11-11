@@ -1,3 +1,4 @@
+use super::helpers::print_external;
 use std::process;
 
 use chrono::{DateTime, Duration, Local, TimeZone};
@@ -220,7 +221,10 @@ pub(crate) fn dispatch(action: RemindersAction) {
                     } else {
                         filter_reminders(reminders, due_before_dt, tomorrow_bounds)
                     };
-                    println!("{}", serde_json::to_string_pretty(&reminders).unwrap());
+                    print_external(
+                        "reminders",
+                        &serde_json::to_string_pretty(&reminders).unwrap(),
+                    );
                     eprintln!("{} reminder(s)", reminders.len());
                 }
                 Err(e) => {
@@ -231,7 +235,10 @@ pub(crate) fn dispatch(action: RemindersAction) {
         }
         RemindersAction::Today => match cueward_adapter_macos::reminders::today() {
             Ok(reminders) => {
-                println!("{}", serde_json::to_string_pretty(&reminders).unwrap());
+                print_external(
+                    "reminders",
+                    &serde_json::to_string_pretty(&reminders).unwrap(),
+                );
                 eprintln!("{} reminder(s) due today", reminders.len());
             }
             Err(e) => {
@@ -271,7 +278,8 @@ pub(crate) fn dispatch(action: RemindersAction) {
             }
         }
         RemindersAction::Complete { title, id } => {
-            match cueward_adapter_macos::reminders::complete_reminder(reminder_selector(title, id)) {
+            match cueward_adapter_macos::reminders::complete_reminder(reminder_selector(title, id))
+            {
                 Ok(()) => eprintln!("reminder completed"),
                 Err(e) => {
                     eprintln!("error: {e}");
