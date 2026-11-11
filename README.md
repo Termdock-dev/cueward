@@ -522,6 +522,8 @@ cueward shortcuts run --name "Clean URL Share v2"
 
 Selector-based commands generally accept either `--name` or `--id`.
 
+`export-spec` returns YAML inside `<external source="cueward/shortcuts/export-spec">`, not a JSON result. Remove the envelope before saving a spec for `apply` or `validate-spec`. On the unreleased reliability branch, the body uses flow-style YAML with quoted string scalars and retains YAML enum tags such as `!folder`; angle brackets and literal escape sequences survive export/import unchanged.
+
 ### Screenshot
 
 Capture a screenshot, optionally with OCR:
@@ -837,6 +839,6 @@ MIT
 
 ## Automated checks
 
-The macOS workflow pins Rust 1.88.0 and installs Node.js 24 for the Safari JS behavior tests. It runs `cargo build --release --locked` and `cargo test --workspace --locked -- --test-threads=1`, without `--ignored`. Tests run serially because existing fixtures mutate the process-wide HOME; parallel execution produced receipt-path failures locally. Serial execution avoids that observed failure but does not fix fixture isolation. Desktop and real-App opt-in tests are not acceptance evidence from CI.
+The macOS workflow runs on `macos-26` for the guarded-rename kernel capability, pins Rust 1.88.0 and installs Node.js 24 for the Safari JS behavior tests. It runs `cargo build --release --locked` and `cargo test --workspace --locked -- --test-threads=1`, without `--ignored`. Tests run serially because existing fixtures mutate the process-wide HOME; parallel execution produced receipt-path failures locally. Serial execution avoids that observed failure but does not fix fixture isolation. Desktop and real-App opt-in tests are not acceptance evidence from CI.
 
 Formatting is checked on changed Rust files with `python3 scripts/check-rust-format.py --base origin/main`. The existing repository-wide formatting backlog is not rewritten by this change. CI uses read-only repository permissions and does not release, merge, or change branch protection.

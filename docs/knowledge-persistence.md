@@ -28,10 +28,12 @@ The first import takes extra disk space and time proportional to the existing st
 
 ## External JSON
 
-External responses use `print_external()`. Search now returns an array inside `cueward/search`, including an empty array. Calendar, Reminders, Quick Notes lists, Safari action state and browser-AI download results are wrapped as well. `<` and `>` inside the JSON are represented with JSON Unicode escapes, so JSON decoding restores original content rather than substituting HTML entities. Doctor output remains internal diagnostics.
+External responses use `print_external()`. Search now returns an array inside `cueward/search`, including an empty array. Calendar, Reminders, Quick Notes lists, Safari action state and browser-AI download results are wrapped as well. `<` and `>` inside the JSON are represented with JSON Unicode escapes, so JSON decoding restores original content rather than substituting HTML entities. Doctor output remains internal diagnostics. Shortcuts `export-spec` is a YAML exception: its flow-style body quotes string scalars before format-aware angle escaping and retains YAML enum tags. Extract the envelope body and load it as YAML, not JSON; the apply loader recovers the original string values.
 
 ## Verification boundary
 
 The regression fixture runs the actual CLI with an owned temporary HOME and a fake `osascript` boundary. It never reaches user Notes or other applications. Pure index tests use RAM indexes; the legacy import test creates only owned temporary indexes. Live Notes targeting and write behavior still need a separately authorized disposable-note acceptance run. Do not install this source branch's skill over a released CLI without checking command help and output compatibility.
 
 Full-suite validation uses `cargo test --workspace --locked -- --test-threads=1`. Existing Notes DB and doctor fixtures mutate process-wide HOME, with separate local mutexes rather than isolation from every other test. Parallel execution had six receipt-path failures; the serial full suite passed. CI therefore runs serially. Fixing the existing fixture isolation remains a recorded limitation, not a product fix in this change.
+
+The CI runner is `macos-26`, not macOS 15: the newer kernel exposes `RENAME_RESOLVE_BENEATH`, required by the guarded-rename capability probe. The standard full test suite is retained; kernel-dependent tests are not skipped or weakened. See Apple's [macOS 26 XNU header](https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.121.6/bsd/sys/stdio.h) and GitHub's [macOS 26 arm64 image](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md).
