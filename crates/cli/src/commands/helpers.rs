@@ -1,3 +1,6 @@
+mod yaml;
+pub(crate) use yaml::external_yaml_envelope;
+
 use chrono::{DateTime, Local, TimeZone};
 
 use super::Source;
@@ -132,10 +135,16 @@ pub(crate) fn print_external(source: &str, json: &str) {
     print!("{}", external_envelope(source, json));
 }
 
-pub(crate) fn external_envelope(source: &str, json: &str) -> String {
-    // JSON escapes preserve the decoded source text, unlike HTML entity replacement.
-    let safe = json.replace('<', "\\u003c").replace('>', "\\u003e");
-    format!("<external source=\"cueward/{source}\">\n{safe}\n</external>\n")
+fn external_envelope(source: &str, json: &str) -> String {
+    external_frame(source, &escape_json_angles(json))
+}
+
+fn escape_json_angles(json: &str) -> String {
+    json.replace('<', "\\u003c").replace('>', "\\u003e")
+}
+
+fn external_frame(source: &str, payload: &str) -> String {
+    format!("<external source=\"cueward/{source}\">\n{payload}\n</external>\n")
 }
 
 pub(crate) fn bookmarks_target_folder(
