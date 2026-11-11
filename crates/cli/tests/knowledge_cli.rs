@@ -228,3 +228,33 @@ fn triage_never_overwrites_a_different_archived_batch() {
     );
     assert!(home.path(".cueward/inbox/batch.json").exists());
 }
+
+#[test]
+fn notes_attachment_read_failure_preserves_checkpoint_for_incremental_retry() {
+    let home = Home::new();
+    fs::create_dir(home.path(".cueward")).unwrap();
+    let previous =
+        json!({"watermarks":{"notes":"2026-11-10T12:00:00Z"}, "scan_targets":{}}).to_string();
+    fs::write(home.path(".cueward/state.json"), &previous).unwrap();
+    let records = json!([
+        {"timestamp":"2026-11-11T12:00:00Z", "note_id":"older-attachment", "folder":"Cueward", "title":"fixture", "content":"older \u{fffc}"},
+        {"timestamp":"2026-11-11T18:00:00Z", "note_id":"newer-note", "folder":"Cueward", "title":"fixture", "content":"newer plain text"}
+    ]);
+    // The owned HOME intentionally has no NoteStore. Native Notes/JXA is the shared fake boundary.
+    let output = home
+        .command()
+        .env("CUEWARD_TEST_SCRIPT_OUTPUT", records.to_string())
+        .args(["capture", "--source", "notes", "--incremental"])
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "attachment read failure must not be reported as a complete Notes source"
+    );
+    assert!(String::from_utf8_lossy(&output.stderr).contains("NoteStore.sqlite"));
+    assert_eq!(
+        fs::read_to_string(home.path(".cueward/state.json")).unwrap(),
+        previous
+    );
+    assert!(!home.path(".cueward/inbox").exists());
+}
