@@ -5,6 +5,7 @@ pub mod inbox;
 pub mod index;
 mod shortcuts;
 mod state;
+pub mod storage;
 pub mod tagger;
 
 pub use adapter::PlatformAdapter;

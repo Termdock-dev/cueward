@@ -98,7 +98,10 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
             }
             match cueward_adapter_macos::safari::chatgpt_save_images(&url, &output, profile) {
                 Ok(paths) => {
-                    println!("{}", serde_json::to_string_pretty(&paths).unwrap());
+                    print_external(
+                        "safari/ai/chatgpt",
+                        &serde_json::to_string_pretty(&paths).unwrap(),
+                    );
                     eprintln!("{} image(s) saved", paths.len());
                 }
                 Err(e) => {

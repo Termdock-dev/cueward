@@ -3,7 +3,7 @@ use std::process;
 use cueward_core::ShortcutAction;
 
 use super::args::{ShortcutsAction, parse_reference};
-use super::io::{load_actions_file, load_shortcut_spec};
+use super::io::{export_spec_envelope, load_actions_file, load_shortcut_spec};
 use crate::commands::helpers::print_external;
 
 pub(crate) fn dispatch(action: ShortcutsAction) {
@@ -20,7 +20,9 @@ pub(crate) fn dispatch(action: ShortcutsAction) {
         }
         ShortcutsAction::Show { selector } => {
             let selector = selector.into_selector();
-            let spec = or_exit(cueward_adapter_macos::shortcuts::export_shortcut_spec(&selector));
+            let spec = or_exit(cueward_adapter_macos::shortcuts::export_shortcut_spec(
+                &selector,
+            ));
             print_json("shortcuts/show", &spec);
         }
         ShortcutsAction::Run { selector } => {
@@ -41,40 +43,53 @@ pub(crate) fn dispatch(action: ShortcutsAction) {
         }
         ShortcutsAction::ExportSpec { selector } => {
             let selector = selector.into_selector();
-            let spec = or_exit(cueward_adapter_macos::shortcuts::export_shortcut_spec(&selector));
-            let yaml = or_exit(
-                serde_yaml::to_string(&spec)
-                    .map_err(|e| format!("failed to serialize shortcut spec: {e}")),
-            );
-            print_external("shortcuts/export-spec", &yaml);
+            let spec = or_exit(cueward_adapter_macos::shortcuts::export_shortcut_spec(
+                &selector,
+            ));
+            print!("{}", or_exit(export_spec_envelope(&spec)));
         }
         ShortcutsAction::Rename { selector, new_name } => {
             let selector = selector.into_selector();
-            let shortcut = or_exit(cueward_adapter_macos::shortcuts::rename_shortcut(&selector, &new_name));
+            let shortcut = or_exit(cueward_adapter_macos::shortcuts::rename_shortcut(
+                &selector, &new_name,
+            ));
             print_json("shortcuts/rename", &shortcut);
             eprintln!("shortcut renamed: {}", shortcut.workflow_id);
         }
         ShortcutsAction::Move { selector, folder } => {
             let selector = selector.into_selector();
-            let shortcut = or_exit(cueward_adapter_macos::shortcuts::move_shortcut(&selector, &folder));
+            let shortcut = or_exit(cueward_adapter_macos::shortcuts::move_shortcut(
+                &selector, &folder,
+            ));
             print_json("shortcuts/move", &shortcut);
             eprintln!("shortcut moved: {}", shortcut.workflow_id);
         }
         ShortcutsAction::Surface { selector, surface } => {
             let selector = selector.into_selector();
-            let shortcut =
-                or_exit(cueward_adapter_macos::shortcuts::attach_surface(&selector, &surface.into()));
+            let shortcut = or_exit(cueward_adapter_macos::shortcuts::attach_surface(
+                &selector,
+                &surface.into(),
+            ));
             print_json("shortcuts/surface", &shortcut);
             eprintln!("shortcut surface updated: {}", shortcut.workflow_id);
         }
-        ShortcutsAction::InputType { selector, input_type } => {
+        ShortcutsAction::InputType {
+            selector,
+            input_type,
+        } => {
             let selector = selector.into_selector();
-            let shortcut =
-                or_exit(cueward_adapter_macos::shortcuts::set_input_type(&selector, &input_type.into()));
+            let shortcut = or_exit(cueward_adapter_macos::shortcuts::set_input_type(
+                &selector,
+                &input_type.into(),
+            ));
             print_json("shortcuts/input-type", &shortcut);
             eprintln!("shortcut input type updated: {}", shortcut.workflow_id);
         }
-        ShortcutsAction::AddText { selector, value, output } => {
+        ShortcutsAction::AddText {
+            selector,
+            value,
+            output,
+        } => {
             let selector = selector.into_selector();
             append_action(
                 selector,
@@ -82,7 +97,11 @@ pub(crate) fn dispatch(action: ShortcutsAction) {
                 "shortcuts/add-text",
             );
         }
-        ShortcutsAction::AddGetText { selector, from, output } => {
+        ShortcutsAction::AddGetText {
+            selector,
+            from,
+            output,
+        } => {
             let selector = selector.into_selector();
             append_action(
                 selector,
@@ -93,7 +112,11 @@ pub(crate) fn dispatch(action: ShortcutsAction) {
                 "shortcuts/add-get-text",
             );
         }
-        ShortcutsAction::AddGetUrls { selector, from, output } => {
+        ShortcutsAction::AddGetUrls {
+            selector,
+            from,
+            output,
+        } => {
             let selector = selector.into_selector();
             append_action(
                 selector,

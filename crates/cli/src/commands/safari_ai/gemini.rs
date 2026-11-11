@@ -91,7 +91,10 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
                 profile,
             ) {
                 Ok(r) => {
-                    println!("{}", serde_json::to_string_pretty(&r).unwrap());
+                    print_external(
+                        "safari/ai/gemini",
+                        &serde_json::to_string_pretty(&r).unwrap(),
+                    );
                     eprintln!("gemini mode ready");
                 }
                 Err(e) => {
@@ -152,7 +155,10 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
             }
             match cueward_adapter_macos::safari::gemini_save_images(&url, &output, profile) {
                 Ok(paths) => {
-                    println!("{}", serde_json::to_string_pretty(&paths).unwrap());
+                    print_external(
+                        "safari/ai/gemini",
+                        &serde_json::to_string_pretty(&paths).unwrap(),
+                    );
                     eprintln!("{} image(s) saved", paths.len());
                 }
                 Err(e) => {
@@ -164,7 +170,10 @@ pub(crate) fn dispatch(action: SafariAiAction, profile: Option<&str>) {
         SafariAiAction::SaveMedia { url } => {
             match cueward_adapter_macos::safari::gemini_save_media(&url, profile) {
                 Ok(r) => {
-                    println!("{}", serde_json::to_string_pretty(&r).unwrap());
+                    print_external(
+                        "safari/ai/gemini",
+                        &serde_json::to_string_pretty(&r).unwrap(),
+                    );
                     eprintln!("media download triggered");
                 }
                 Err(e) => {

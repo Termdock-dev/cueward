@@ -1,3 +1,4 @@
+use super::helpers::print_external;
 use std::process;
 
 use clap::Subcommand;
@@ -45,13 +46,11 @@ pub(crate) fn dispatch(action: QuickNotesAction) {
     match action {
         QuickNotesAction::List => match cueward_adapter_macos::quick_notes::list() {
             Ok(notes) => {
-                if notes.is_empty() {
-                    eprintln!("no quick notes found");
-                } else {
-                    let count = notes.len();
-                    println!("{}", serde_json::to_string_pretty(&notes).unwrap());
-                    eprintln!("{count} quick note(s)");
-                }
+                print_external(
+                    "quick-notes/list",
+                    &serde_json::to_string_pretty(&notes).unwrap(),
+                );
+                eprintln!("{} quick note(s)", notes.len());
             }
             Err(e) => {
                 eprintln!("error: {e}");

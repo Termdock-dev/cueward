@@ -1,3 +1,6 @@
+mod yaml;
+pub(crate) use yaml::external_yaml_envelope;
+
 use chrono::{DateTime, Local, TimeZone};
 
 use super::Source;
@@ -48,10 +51,7 @@ pub(crate) fn parse_datetime(s: &str) -> Option<DateTime<Local>> {
     None
 }
 
-pub(crate) fn parse_datetime_arg(
-    label: &str,
-    value: &str,
-) -> Result<DateTime<Local>, String> {
+pub(crate) fn parse_datetime_arg(label: &str, value: &str) -> Result<DateTime<Local>, String> {
     parse_datetime(value).ok_or_else(|| format!("error: invalid {label} datetime '{value}'"))
 }
 
@@ -101,11 +101,11 @@ pub(crate) fn local_day_bounds(
 pub(crate) fn parse_duration(s: &str) -> Option<chrono::Duration> {
     let s = s.trim();
     if let Some(hours) = s.strip_suffix('h') {
-        hours.parse().ok().map(chrono::Duration::hours)
+        hours.parse().ok().and_then(chrono::Duration::try_hours)
     } else if let Some(days) = s.strip_suffix('d') {
-        days.parse().ok().map(chrono::Duration::days)
+        days.parse().ok().and_then(chrono::Duration::try_days)
     } else if let Some(mins) = s.strip_suffix('m') {
-        mins.parse().ok().map(chrono::Duration::minutes)
+        mins.parse().ok().and_then(chrono::Duration::try_minutes)
     } else {
         None
     }
@@ -120,7 +120,9 @@ pub(crate) fn source_name(src: &Source) -> &'static str {
     }
 }
 
-pub(crate) fn to_adapter_gemini_mode(mode: GeminiMode) -> cueward_adapter_macos::safari::GeminiMode {
+pub(crate) fn to_adapter_gemini_mode(
+    mode: GeminiMode,
+) -> cueward_adapter_macos::safari::GeminiMode {
     match mode {
         GeminiMode::Image => cueward_adapter_macos::safari::GeminiMode::Image,
         GeminiMode::DeepResearch => cueward_adapter_macos::safari::GeminiMode::DeepResearch,
@@ -130,13 +132,25 @@ pub(crate) fn to_adapter_gemini_mode(mode: GeminiMode) -> cueward_adapter_macos:
 }
 
 pub(crate) fn print_external(source: &str, json: &str) {
-    let safe = json.replace("</external>", "&lt;/external&gt;");
-    println!("<external source=\"cueward/{source}\">");
-    println!("{safe}");
-    println!("</external>");
+    print!("{}", external_envelope(source, json));
 }
 
-pub(crate) fn bookmarks_target_folder(profile: Option<&str>, folder: Option<&str>) -> Option<String> {
+fn external_envelope(source: &str, json: &str) -> String {
+    external_frame(source, &escape_json_angles(json))
+}
+
+fn escape_json_angles(json: &str) -> String {
+    json.replace('<', "\\u003c").replace('>', "\\u003e")
+}
+
+fn external_frame(source: &str, payload: &str) -> String {
+    format!("<external source=\"cueward/{source}\">\n{payload}\n</external>\n")
+}
+
+pub(crate) fn bookmarks_target_folder(
+    profile: Option<&str>,
+    folder: Option<&str>,
+) -> Option<String> {
     let profile = profile.map(str::trim).filter(|value| !value.is_empty());
     let folder = folder.map(str::trim).filter(|value| !value.is_empty());
 
@@ -212,5 +226,24 @@ mod tests {
         let folder = bookmarks_target_folder(Some("Work"), None);
 
         assert_eq!(folder, Some("Work".to_string()));
+    }
+}
+
+#[cfg(test)]
+mod envelope_tests {
+    #[test]
+    fn json_round_trip_preserves_external_delimiters_and_literal_escapes() {
+        let original = serde_json::json!({"content":"</external> <external> \\u003c 臺灣"});
+        let envelope = super::external_envelope("test", &original.to_string());
+        assert_eq!(envelope.matches("</external>").count(), 1);
+        let body = envelope
+            .strip_prefix("<external source=\"cueward/test\">\n")
+            .unwrap()
+            .strip_suffix("\n</external>\n")
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(body).unwrap(),
+            original
+        );
     }
 }

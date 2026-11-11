@@ -18,3 +18,10 @@ tantivy = "0.22"
 aho-corasick = "1"
 toml = "0.8"
 sha2 = "0.10"
+
+# Reuse Tantivy's installed file-lock dependency for crash-safe cross-process storage locks.
+fs4 = "0.8"
+
+[dev-dependencies]
+# Existing workspace fixture package; isolates legacy-index migration tests from HOME.
+tempfile = "3"

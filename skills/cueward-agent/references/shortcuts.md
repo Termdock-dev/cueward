@@ -42,6 +42,8 @@ cueward shortcuts apply clean-url-share.yaml
 cueward shortcuts export-spec --name "Clean URL Share"
 ```
 
+`export-spec` emits YAML inside `<external source="cueward/shortcuts/export-spec">`. Extract the body before passing a saved spec to `apply` or `validate-spec`; do not JSON-decode it. The unreleased reliability branch uses flow-style YAML with quoted strings and preserves native YAML enum tags, including `!folder`. Unicode escapes inside quoted scalars decode to the original text, including angle brackets; literal backslash escapes are retained. This round-trip has fixture coverage, not a new live Shortcuts write acceptance run. Check installed capabilities before assuming the unreleased format.
+
 ## Rules
 
 - Prefer `show` / `export-spec` / `apply` when the user is reasoning about shortcut structure.

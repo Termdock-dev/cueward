@@ -20,12 +20,17 @@ fn chat_db_path() -> PathBuf {
 }
 
 fn to_chat_timestamp(dt: DateTime<Utc>) -> i64 {
-    (dt.timestamp() - CORE_DATA_EPOCH) * NANOS_PER_SEC
+    dt.timestamp()
+        .saturating_sub(CORE_DATA_EPOCH)
+        .saturating_mul(NANOS_PER_SEC)
+        .saturating_add(i64::from(dt.timestamp_subsec_nanos()))
 }
 
 fn from_chat_timestamp(ns: i64) -> DateTime<Utc> {
-    let secs = ns / NANOS_PER_SEC + CORE_DATA_EPOCH;
-    Utc.timestamp_opt(secs, 0).single().unwrap_or_default()
+    let secs = ns.div_euclid(NANOS_PER_SEC) + CORE_DATA_EPOCH;
+    Utc.timestamp_opt(secs, ns.rem_euclid(NANOS_PER_SEC) as u32)
+        .single()
+        .unwrap_or_default()
 }
 
 pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
@@ -52,7 +57,7 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
     let since_ts = to_chat_timestamp(since);
 
     let mut stmt = conn.prepare(
-        "SELECT m.date, m.text, m.is_from_me, h.id \
+        "SELECT m.ROWID, m.date, m.text, m.is_from_me, h.id \
          FROM message m \
          LEFT JOIN handle h ON m.handle_id = h.ROWID \
          WHERE m.text IS NOT NULL AND m.date > ?1 \
@@ -61,15 +66,17 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
 
     let cues = stmt
         .query_map([since_ts], |row| {
-            let date: i64 = row.get(0)?;
-            let text: String = row.get(1)?;
-            let is_from_me: bool = row.get(2)?;
-            let sender: Option<String> = row.get(3)?;
-            Ok((date, text, is_from_me, sender))
+            let id: i64 = row.get(0)?;
+            let date: i64 = row.get(1)?;
+            let text: String = row.get(2)?;
+            let is_from_me: bool = row.get(3)?;
+            let sender: Option<String> = row.get(4)?;
+            Ok((id, date, text, is_from_me, sender))
         })?
-        .filter_map(|r| r.ok())
-        .map(|(date, text, is_from_me, sender)| {
-            let mut metadata = HashMap::new();
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .map(|(id, date, text, is_from_me, sender)| {
+            let mut metadata = HashMap::from([("source_id".into(), id.to_string())]);
             if is_from_me {
                 metadata.insert("direction".into(), "sent".into());
             } else {
@@ -93,4 +100,14 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
         .collect();
 
     Ok(cues)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn message_timestamp_retains_same_second_ordering() {
+        let timestamp = 812345678_123456789;
+        assert_eq!(to_chat_timestamp(from_chat_timestamp(timestamp)), timestamp);
+    }
 }

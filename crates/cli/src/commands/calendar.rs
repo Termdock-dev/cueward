@@ -1,7 +1,8 @@
+use super::helpers::print_external;
 use std::process;
 
-use clap::Subcommand;
 use chrono::Local;
+use clap::Subcommand;
 
 use super::helpers::{local_day_bounds, parse_datetime_arg, parse_required_datetime_arg};
 
@@ -97,7 +98,7 @@ pub(crate) fn dispatch(action: CalendarAction) {
             };
             match cueward_adapter_macos::calendar::list_events(from, to, calendar.as_deref()) {
                 Ok(events) => {
-                    println!("{}", serde_json::to_string_pretty(&events).unwrap());
+                    print_external("calendar", &serde_json::to_string_pretty(&events).unwrap());
                     eprintln!("{} event(s)", events.len());
                 }
                 Err(e) => {
@@ -128,9 +129,10 @@ pub(crate) fn dispatch(action: CalendarAction) {
                 },
                 None => from_dt + chrono::Duration::hours(24),
             };
-            match cueward_adapter_macos::calendar::list_events(from_dt, to_dt, calendar.as_deref()) {
+            match cueward_adapter_macos::calendar::list_events(from_dt, to_dt, calendar.as_deref())
+            {
                 Ok(events) => {
-                    println!("{}", serde_json::to_string_pretty(&events).unwrap());
+                    print_external("calendar", &serde_json::to_string_pretty(&events).unwrap());
                     eprintln!("{} event(s)", events.len());
                 }
                 Err(e) => {

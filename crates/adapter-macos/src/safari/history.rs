@@ -17,13 +17,17 @@ fn history_db_path() -> PathBuf {
 }
 
 fn to_core_data_timestamp(dt: DateTime<Utc>) -> f64 {
-    (dt.timestamp() - CORE_DATA_EPOCH) as f64
+    (dt.timestamp() - CORE_DATA_EPOCH) as f64 + dt.timestamp_subsec_nanos() as f64 / 1_000_000_000.0
 }
 
 fn from_core_data_timestamp(ts: f64) -> DateTime<Utc> {
-    Utc.timestamp_opt(ts as i64 + CORE_DATA_EPOCH, 0)
-        .single()
-        .unwrap_or_default()
+    let nanos = ((ts - ts.floor()) * 1_000_000_000.0).round() as u32;
+    Utc.timestamp_opt(
+        ts.floor() as i64 + CORE_DATA_EPOCH + i64::from(nanos / 1_000_000_000),
+        nanos % 1_000_000_000,
+    )
+    .single()
+    .unwrap_or_default()
 }
 
 pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
@@ -50,7 +54,7 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
     let since_ts = to_core_data_timestamp(since);
 
     let mut stmt = conn.prepare(
-        "SELECT v.visit_time, v.title, i.url \
+        "SELECT v.id, v.visit_time, v.title, i.url \
          FROM history_visits v \
          JOIN history_items i ON v.history_item = i.id \
          WHERE v.visit_time > ?1 \
@@ -59,13 +63,15 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
 
     let cues = stmt
         .query_map([since_ts], |row| {
-            let visit_time: f64 = row.get(0)?;
-            let title: Option<String> = row.get(1)?;
-            let url: String = row.get(2)?;
-            Ok((visit_time, title, url))
+            let id: i64 = row.get(0)?;
+            let visit_time: f64 = row.get(1)?;
+            let title: Option<String> = row.get(2)?;
+            let url: String = row.get(3)?;
+            Ok((id, visit_time, title, url))
         })?
-        .filter_map(|r| r.ok())
-        .map(|(visit_time, title, url)| Cue {
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .map(|(id, visit_time, title, url)| Cue {
             source: CueSource::Safari,
             timestamp: from_core_data_timestamp(visit_time),
             content: title.clone().unwrap_or_default(),
@@ -73,9 +79,21 @@ pub fn capture(since: DateTime<Utc>) -> Result<Vec<Cue>, MacosError> {
             title,
             tags: Vec::new(),
             attachment_segments: Vec::new(),
-            metadata: HashMap::new(),
+            metadata: HashMap::from([("source_id".into(), id.to_string())]),
         })
         .collect();
 
     Ok(cues)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn safari_timestamp_retains_fractional_boundary_records() {
+        let timestamp = 812345678.625;
+        let date = from_core_data_timestamp(timestamp);
+        assert_eq!(date.timestamp_subsec_millis(), 625);
+        assert_eq!(to_core_data_timestamp(date), timestamp);
+    }
 }

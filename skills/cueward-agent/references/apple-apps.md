@@ -1,6 +1,6 @@
 # Apple Apps
 
-Use this reference for Apple Notes, Quick Notes, Reminders, Calendar, OCR, screenshots, clipboard, Voice Memos, and Stickies.
+Use this reference for Apple Notes, Quick Notes, Reminders, Calendar, OCR, screenshots, clipboard, Voice Memos, and Stickies. External data responses on the unreleased reliability branch are JSON inside an `<external>` envelope, including Calendar, Reminders and Quick Notes list responses. Decode the JSON before reading values; embedded angle brackets are JSON escaped.
 
 ## Notes
 
@@ -11,7 +11,12 @@ cueward notes create --title "Title" --body "Body" --folder Cueward
 cueward notes update --title "Title" --body "New content" --folder Cueward
 cueward notes delete --title "Title" --folder Cueward
 cueward notes move --title "Title" --from Cueward --to Archive
+cueward notes update --id "x-coredata://.../ICNote/p123" --body "New content"
+cueward notes delete --id "x-coredata://.../ICNote/p123"
+cueward notes move --id "x-coredata://.../ICNote/p123" --to Archive
 ```
+
+Unreleased source change, not yet merged/published or live-write accepted: capture exposes `metadata.note_id` and `metadata.source_id`; Notes mutations accept `--id`. Title mode must match exactly one note across accounts in folders with that name. Zero/multiple matches fail without writing. ID mode conflicts with `--title` and source-folder flags. Prefer a fresh native ID when names repeat. Check installed help; an ID does not authorize a mutation.
 
 ## Quick Notes
 

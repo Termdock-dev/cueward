@@ -30,25 +30,41 @@ pub struct State {
 }
 
 impl State {
-    fn path() -> PathBuf {
-        let home = std::env::var("HOME").unwrap_or_default();
-        PathBuf::from(home).join(".cueward/state.json")
+    fn path() -> std::io::Result<PathBuf> {
+        Ok(crate::storage::data_dir()?.join("state.json"))
     }
 
+    /// Load existing state, retaining the legacy best-effort API for scan callers.
     pub fn load() -> Self {
-        fs::read_to_string(Self::path())
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+        Self::try_load().unwrap_or_default()
     }
 
-    pub fn save(&self) -> std::io::Result<()> {
-        let path = Self::path();
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+    /// Load state without treating malformed or unreadable data as an empty watermark.
+    pub fn try_load() -> std::io::Result<Self> {
+        match fs::read(Self::path()?) {
+            Ok(bytes) => serde_json::from_slice(&bytes).map_err(std::io::Error::other),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
+            Err(e) => Err(e),
         }
-        let json = serde_json::to_string_pretty(self)?;
-        fs::write(path, json)
+    }
+
+    /// Merge monotonic checkpoints and atomically replace state under a process lock.
+    pub fn save(&self) -> std::io::Result<()> {
+        let _lock = crate::storage::lock("state")?;
+        let mut merged = Self::try_load()?;
+        for (source, timestamp) in &self.watermarks {
+            merged.set_watermark(source, *timestamp);
+        }
+        for (key, value) in &self.scan_targets {
+            if merged
+                .scan_targets
+                .get(key)
+                .is_none_or(|old| old.last_checked_at <= value.last_checked_at)
+            {
+                merged.scan_targets.insert(key.clone(), value.clone());
+            }
+        }
+        crate::storage::write_atomic(&Self::path()?, &serde_json::to_vec_pretty(&merged)?, true)
     }
 
     pub fn watermark(&self, source: &str) -> Option<DateTime<Utc>> {

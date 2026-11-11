@@ -24,63 +24,72 @@ pub fn create_note(title: &str, body: &str, folder: &str) -> Result<(), MacosErr
     run(&script, "failed to create note")
 }
 
-/// Update an existing note's body by title.
+/// Update a uniquely titled note, refusing ambiguous matches across accounts.
 pub fn update_note(title: &str, body: &str, folder: &str) -> Result<(), MacosError> {
-    let escaped_title = escape(title);
-    let escaped_folder = escape(folder);
-    let body_expr = escape_body(body);
-
-    let script = format!(
-        r#"
-        tell application "Notes"
-            set theNote to (first note of folder "{escaped_folder}" whose name is "{escaped_title}")
-            set body of theNote to {body_expr}
-            set name of theNote to "{escaped_title}"
-        end tell
-        "#
-    );
-
-    run(&script, "failed to update note")
+    let id = super::selection::resolve_title(title, folder)?;
+    update_selected(&id, body, Some((title, folder)))
 }
 
-/// Delete a note by title from a specific folder.
+/// Update one note by its native Notes ID, preserving its current title.
+pub fn update_note_by_id(id: &str, body: &str) -> Result<(), MacosError> {
+    update_selected(id, body, None)
+}
+
+fn update_selected(id: &str, body: &str, guard: Option<(&str, &str)>) -> Result<(), MacosError> {
+    let action = format!(
+        "set originalName to name of targetNote\nset body of targetNote to {}\nset name of targetNote to originalName",
+        escape_body(body)
+    );
+    run(
+        &super::selection::action_script(id, guard, &action),
+        "failed to update note",
+    )
+}
+
+/// Delete a uniquely titled note, refusing ambiguous matches across accounts.
 pub fn delete_note(title: &str, folder: &str) -> Result<(), MacosError> {
-    let escaped_title = escape(title);
-    let escaped_folder = escape(folder);
-
-    let script = format!(
-        r#"
-        tell application "Notes"
-            delete (first note of folder "{escaped_folder}" whose name is "{escaped_title}")
-        end tell
-        "#
-    );
-
-    run(&script, "failed to delete note")
+    let id = super::selection::resolve_title(title, folder)?;
+    run(
+        &super::selection::action_script(&id, Some((title, folder)), "delete targetNote"),
+        "failed to delete note",
+    )
 }
 
-/// Move a note to a different folder.
+/// Delete one note by its native Notes ID.
+pub fn delete_note_by_id(id: &str) -> Result<(), MacosError> {
+    run(
+        &super::selection::action_script(id, None, "delete targetNote"),
+        "failed to delete note",
+    )
+}
+
+/// Move a uniquely titled note; resolve the source before creating a destination.
 pub fn move_note(title: &str, from_folder: &str, to_folder: &str) -> Result<(), MacosError> {
-    let escaped_title = escape(title);
-    let escaped_from = escape(from_folder);
-    let escaped_to = escape(to_folder);
+    let id = super::selection::resolve_title(title, from_folder)?;
+    move_selected(&id, to_folder, Some((title, from_folder)))
+}
 
-    let script = format!(
+/// Move one note by its native Notes ID.
+pub fn move_note_by_id(id: &str, to_folder: &str) -> Result<(), MacosError> {
+    move_selected(id, to_folder, None)
+}
+
+fn move_selected(id: &str, to: &str, guard: Option<(&str, &str)>) -> Result<(), MacosError> {
+    let destination = escape(to);
+    let action = format!(
         r#"
-        tell application "Notes"
-            try
-                set destFolder to folder "{escaped_to}"
-            on error
-                make new folder with properties {{name:"{escaped_to}"}}
-                set destFolder to folder "{escaped_to}"
-            end try
-            set theNote to (first note of folder "{escaped_from}" whose name is "{escaped_title}")
-            move theNote to destFolder
-        end tell
-        "#
+        try
+            set destFolder to folder "{destination}"
+        on error
+            make new folder with properties {{name:"{destination}"}}
+            set destFolder to folder "{destination}"
+        end try
+        move targetNote to destFolder"#
     );
-
-    run(&script, "failed to move note")
+    run(
+        &super::selection::action_script(id, guard, &action),
+        "failed to move note",
+    )
 }
 
 #[cfg(test)]
