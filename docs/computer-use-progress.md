@@ -1,6 +1,6 @@
 # Computer-use progress
 
-Updated 2026-10-05, Asia/Taipei. Repository history, open issues and the linked aggregate diagnostics are the sources for this handoff. Raw desktop evidence remains local.
+Updated 2026-11-12, Asia/Taipei. Repository history, open issues and the linked aggregate diagnostics are the sources for this handoff. Raw desktop evidence remains local.
 
 ## Merged foundation
 
@@ -34,3 +34,7 @@ Later desktop preparation found the session locked while Screen Recording access
 The ordinary WebView AX contrast continues #32 without a product routing change. Four fresh receiver cases, two read-only and two action cases, preserve the seven-to-twelve-node transition, exact single-click effects and every failed stationary desktop check. This establishes a scoped existing semantic-button route and a bounded reobservation workflow, not a generic canvas repair or a new fresh-agent pass. The next functional gate remains an unmodified accepted drag/release route with the existing target and interruption protections intact.
 
 The [window/dialog continuation](../dev/computer-use/results/2026-10-05-window-dialog-agent.json) adds a scoped fresh-Agent runner for two existing disposable documents and a normal Save As sheet. Native IDs and owner equality replace the invalid assumption that the panel's configured UUID appears in remote AX. Separate broker/evaluator regressions preserve fail-closed output and activation handling. No product input path or #33 first-save behavior changed. The recorded failed attempt and later prelaunch lock prerequisite stay separate, with no new full task pass or issue closure.
+
+## 2026-11-12 first-save diagnostic continuation
+
+The unreleased [shared subtree exploration](../dev/computer-use/first-save.md#bounded-subtree-continuation) recovers controls omitted by the first 500-node read in offline native-boundary tests. It bounds reads, retained nodes and between-call time, keeps public observation consistency checks and leaves native input/disabled-control guards unchanged. Initial and final roots are compared; a budget that prevents final validation returns observations without action targets. After an initially locked preflight and operator unlock, [one owned inactive-first diagnostic](../dev/computer-use/first-save-context.md#diagnostic-continuation-2026-11-12) retained 1,028 nodes and observed Save disabled, with zero panel Save dispatches and no artifact. Traversal remained incomplete. Sampled stationary observation passed with a 41.95 ms maximum gap; owned processes and the temporary directory were cleaned up. This is not inactive-first acceptance, and #33 and its dependent #36 tasks remain open.

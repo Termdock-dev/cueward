@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "date": "2026-11-12",
+  "timezone": "Asia/Taipei",
+  "kind": "owned_inactive_first_save_diagnostic",
+  "platform": {
+    "macos": "27.0.1",
+    "architecture": "arm64"
+  },
+  "base_sha": "799d7d3b29295570a77eb30409819e59a0b72b29",
+  "source_sha256": {
+    "dev/computer-use/ax_exploration.py": "00494161075cbf2d97d5510e3d7cac8a090f274a26f664a742f009cf637ae2a5",
+    "dev/computer-use/first-save-probe.py": "59c1afc25a6aa9b00c3200df03e1bd369ba3581c0979bd56e9d72f684772c395",
+    "dev/computer-use/observed_cli.py": "97f5c2790b44aff61d53b04960f68e806e87cc8a136a4701cd9e44f283c40639",
+    "dev/computer-use/first-save-context-probe.py": "0af93a4374578607bfeb669c02b43731687e02c073d88c5fe7b9ef4e2bf52f65",
+    "dev/computer-use/document-fixture.swift": "6b5bd5f2ca64c0105255dbe5fe6dbc122ef08241645cfe21383a678930fe5e56"
+  },
+  "result": {
+    "context": "inactive",
+    "status": "save_control_disabled_or_unavailable",
+    "edit_confirmed": true,
+    "panel_save_dispatch_count": 0,
+    "panel_traversal_incomplete": true,
+    "panel_node_count": 1028,
+    "controls": [
+      {
+        "role": "AXButton",
+        "enabled": false,
+        "has_target": false
+      }
+    ],
+    "file_created": false,
+    "file_content_matches": false,
+    "command_counts": {
+      "space list": 1,
+      "space window": 1,
+      "space move-window": 1,
+      "app inspect": 12,
+      "app set-value": 1,
+      "app press": 1
+    },
+    "receiver_active": false,
+    "receiver_activations": 0,
+    "document_save_requests": 1
+  },
+  "desktop_observation": {
+    "status": "passed",
+    "coverage_bound_ms": 100,
+    "max_sample_gap_ms": 41.94916668348014,
+    "execution_ms": 15268.062291666865,
+    "limitation": "Sampled stationary observation; shorter transients remain outside its resolution."
+  },
+  "cleanup": {
+    "receiver_process_absent": true,
+    "owned_observer_process_absent": true,
+    "context_temporary_directory_absent": true
+  },
+  "scope": "One unmodified owned NSDocument receiver and an existing inactive Space. No disabled-panel Save was dispatched, no Space switched, no existing user document used. Not fresh-agent/real-app/cross-app acceptance; issue33 remains open. Raw paths, PIDs, targets and desktop observations remain private."
+}

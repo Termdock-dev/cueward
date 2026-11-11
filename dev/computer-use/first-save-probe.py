@@ -11,6 +11,8 @@ import subprocess
 import tempfile
 import time
 
+from ax_exploration import explore_windows
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 CONTENT = "Cueward first-save artifact αβγ\n拋棄式文件驗收\n"
@@ -27,14 +29,7 @@ def run(command):
 
 
 def explore(cli, pid):
-    roots = run([str(cli), "app", "inspect", "--pid", str(pid)])
-    nodes, truncated = [], False
-    for root in roots["nodes"]:
-        if root["ref"].startswith("w"):
-            tree = run([str(cli), "app", "inspect", "--pid", str(pid), "--root", root["ref"], "--depth", "10", "--limit", "500"])
-            nodes.extend(tree["nodes"])
-            truncated |= tree["truncated"]
-    return nodes, truncated
+    return explore_windows(lambda *args: run([str(cli), *map(str, args)]), pid)
 
 
 def wait_file(path, timeout=5):
