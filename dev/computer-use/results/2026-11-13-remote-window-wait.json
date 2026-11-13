@@ -1,0 +1,142 @@
+{
+  "schema": 1,
+  "date": "2026-11-13",
+  "timezone": "Asia/Taipei",
+  "kind": "owned_remote_window_wait_review_followup",
+  "base_sha": "a916fa2584558727d13b11745fa287d338677243",
+  "red_test_commit": "00bb517",
+  "finding": {
+    "reviewer": "ryugu-reviewer[bot]",
+    "severity": "BLOCKING",
+    "review_id": 5884416395,
+    "scope": "Existing lifecycle consumer of the same remote-window catalog omission; now included in PR105. No new GUI/input/lock feature."
+  },
+  "platform": {
+    "macos": "27.0.1",
+    "build": "26A434",
+    "architecture": "arm64"
+  },
+  "source_sha256": {
+    "crates/adapter-macos/src/window/ax_common.swift": "a907d913846309d0169c80bca1091cdc2886c9f0beb2933d7cefe0c202fd823e",
+    "crates/adapter-macos/src/window/ax_wait.swift": "f667db3440f576f5273b23604516f16f1acb813b9c38df91bc12d84437d62b6e",
+    "crates/adapter-macos/src/window/wait.rs": "b7290c19f220c6c91a4e88a4f688ef2e953b83640dd061334f257bf825450714",
+    "crates/adapter-macos/src/window/bridge.rs": "5d210667b0cbffa8ef0b7f50e84e9a75bb29fc96634f62c84943abc0fefb772f",
+    "crates/adapter-macos/src/window/wait_catalog_fixture.swift": "a29c8fbb40d87d7f9849c810440fa198361597fad5130048b83045c275ccd056",
+    "crates/adapter-macos/src/window/wait_tests.rs": "34d503e54d86163e4fbcdef6b42e194f8f0af3896fb1313fa0a37451285597f1",
+    "dev/computer-use/window-catalog-contrast.swift": "b99812556d1ce8860bf8d5db0b0463dfd6953831a65b0f99c65b9724983888d3"
+  },
+  "cli_sha256": {
+    "legacy": "db6df2071970d8226125b9a873ea67fbc809d0bf09a3d29e3302f871b405c230",
+    "fixed": "eebc4f129cfc3caebeb4bdd3a381761aa001e8dc64764941c42886c9afc3bea9"
+  },
+  "offline_regression": {
+    "red": "Remote window present in full catalog falsely matched window-gone; expected timed_out. Exit 101.",
+    "green": "Passed; sixteen fixed lifecycle scenarios, including real absence, metadata conflicts, duplicate rows and unavailable complete catalog.",
+    "fixture": "Existing native helper fixture compiled once. Only OS catalog, permission and clock boundaries replaced; actual wait loop executed."
+  },
+  "live_pair": {
+    "status": "paired_wait_verified",
+    "context": "visible",
+    "legacy_wait": {
+      "condition": "window-gone",
+      "status": "matched",
+      "polls": 1,
+      "elapsed_ms": 44,
+      "match_count": 0,
+      "complete": false,
+      "matched_ref": null
+    },
+    "fixed_wait": {
+      "condition": "window-gone",
+      "status": "timed_out",
+      "polls": 3,
+      "elapsed_ms": 201,
+      "match_count": 0,
+      "complete": false,
+      "matched_ref": null
+    },
+    "catalog_presence_observations": [
+      {
+        "phase": "catalog_before_waits",
+        "full_matches": 1,
+        "including_matches": 0,
+        "including_excluding_desktop_matches": 0
+      },
+      {
+        "phase": "catalog_between_waits",
+        "full_matches": 1,
+        "including_matches": 0,
+        "including_excluding_desktop_matches": 0
+      },
+      {
+        "phase": "catalog_after_waits",
+        "full_matches": 1,
+        "including_matches": 0,
+        "including_excluding_desktop_matches": 0
+      }
+    ],
+    "native_binding_stable": true,
+    "content_present_at_each_observation": true,
+    "document_save_requests": 1,
+    "panel_save_dispatches": 0,
+    "native_input_dispatches": 0,
+    "artifact_created": false,
+    "receiver_active_at_end": false,
+    "receiver_activations": 0,
+    "cli_command_counts": {
+      "app inspect": 6,
+      "app set-value": 1,
+      "app press": 1,
+      "window snapshot": 2,
+      "window wait": 2
+    },
+    "snapshot_policy": "Fresh opaque snapshot target before each read-only wait; no token decoding or rewriting.",
+    "scope": "One instrumented owned NSDocument, attached sheet and independently bound remote content. Semantic wait comparison, not a latency benchmark or all-app acceptance."
+  },
+  "desktop_observation": {
+    "status": "unverified",
+    "reason": "observation gap exceeds 100 ms",
+    "max_gap_ms": 1195.258624968119,
+    "coverage_bound_ms": 100,
+    "scope": "Document receiver and desktop scene; complete remote-service activation coverage is not claimed."
+  },
+  "preliminary_attempt": {
+    "status": "diagnostic_error",
+    "error": "CLI returned but trailing observation failed; do not replay",
+    "wait_dispatches": 0,
+    "document_save_requests": 1,
+    "panel_save_dispatches": 0,
+    "desktop_check_status": "failed",
+    "desktop_check_reason": "pointer moved without physical input",
+    "scope": "Aborted on trailing observer acknowledgement failure before any wait. Not a live regression pass; retained without replay."
+  },
+  "verification": {
+    "rust_1_88_0_locked_release_build": "passed",
+    "rust_1_88_0_changed_file_format": "passed",
+    "rust_1_88_0_locked_workspace_tests": {
+      "passed": 963,
+      "failed": 0,
+      "ignored": 38
+    },
+    "shared_catalog_guard_regression": "passed"
+  },
+  "cleanup": {
+    "owned_receiver_processes_absent": true,
+    "owned_observer_processes_absent": true,
+    "owned_context_directories_absent": true,
+    "system_panel_services_not_terminated_by_operator": true
+  },
+  "limitations": [
+    "Sampling gap remains unverified; the 100 ms bound was not relaxed. No continuous interference or complete service-activation pass.",
+    "Native IDs and app attachment were reobserved at discrete points, not atomically authenticated.",
+    "Instrumented synthetic receiver, not unchanged third-party application acceptance.",
+    "No panel Save or native keyboard/pointer input was dispatched. Issues 33, 34 and 36 remain open."
+  ],
+  "private_raw_sha256": {
+    "pre-wait-visible.json": "8b8f9976f2d238fada5628e2203614a57a6ed7b2a9353cdcea219f9d5fef5deb",
+    "paired-wait-visible.json": "4d822b8564ba4359732c86a813b2d405e0341ab2914f17bbba7791dc305cbb82",
+    "red-wait.log": "a440c6309a79cbff40bb06edd6adeddcdc22ef56a97ea20ba89a8515a7325ba6",
+    "green-wait.log": "360e0ac8340f3c9e2b752c28e8a02e939a78de9c2c5b19221eb3b08f8421e2c0",
+    "test.log": "80ffc0561363b52fe8cabfdeed6051b90439a8a4e222eee7bc5f606bfd672c07"
+  }
+}

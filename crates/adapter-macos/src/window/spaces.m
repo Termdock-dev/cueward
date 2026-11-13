@@ -35,12 +35,21 @@ static NSArray *displays(void) {
 static NSArray *membership(uint32_t windowID) {
     return CFBridgingRelease(windowSpaces(connection, 7, (__bridge CFArrayRef)@[@(windowID)])) ?: @[];
 }
-static NSDictionary *windowRow(uint32_t windowID) {
-    NSArray *rows = CFBridgingRelease(CGWindowListCopyWindowInfo(kCGWindowListOptionIncludingWindow, windowID));
+static NSArray *matchingWindowRows(CGWindowListOption options, CGWindowID relative, uint32_t windowID) {
+    NSArray *rows = CFBridgingRelease(CGWindowListCopyWindowInfo(options, relative));
+    NSMutableArray *matches = [NSMutableArray array];
     for (NSDictionary *row in rows) {
-        if ([row[(id)kCGWindowNumber] unsignedIntValue] == windowID) return row;
+        if ([row[(id)kCGWindowNumber] unsignedIntValue] == windowID) [matches addObject:row];
     }
-    return nil;
+    return matches;
+}
+static NSDictionary *windowRow(uint32_t windowID) {
+    NSArray *rows = matchingWindowRows(kCGWindowListOptionIncludingWindow, windowID, windowID);
+    // Remote panel content may exist only in the complete catalog. Keep the
+    // identity guard unchanged, and do not replace an observed conflicting row.
+    if (rows.count == 0) rows = matchingWindowRows(kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements,
+                                                 kCGNullWindowID, windowID);
+    return rows.count == 1 ? rows[0] : nil;
 }
 static Class moveClass(void) {
     Class cls = NSClassFromString(@"SLSBridgedMoveWindowsToManagedSpaceOperation");

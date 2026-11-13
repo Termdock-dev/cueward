@@ -37,13 +37,23 @@ func sameBounds(_ left: CGRect, _ right: CGRect) -> Bool {
         && abs(left.height - right.height) <= tolerance
 }
 
+// Preserve unavailable, absent and duplicate observations for callers that classify lifecycle.
+func catalogWindowRows() -> [[String: Any]]? {
+    func rows(_ options: CGWindowListOption, relative: CGWindowID) -> [[String: Any]]? {
+        guard let windows = CGWindowListCopyWindowInfo(options, relative) as? [[String: Any]] else { return nil }
+        return windows.filter { ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID }
+    }
+    // Remote panel content can be absent from a single-window lookup but present
+    // in the same complete catalog that issued the target. Re-read, never reuse it.
+    if let matches = rows([.optionIncludingWindow, .excludeDesktopElements], relative: windowID), !matches.isEmpty {
+        return matches
+    }
+    return rows([.optionAll, .excludeDesktopElements], relative: kCGNullWindowID)
+}
+
 func catalogWindowMatches(allowOffscreen: Bool = false, exactBounds: Bool = false) -> Bool {
-    let options: CGWindowListOption = [.optionIncludingWindow, .excludeDesktopElements]
-    let windows = CGWindowListCopyWindowInfo(options, windowID) as? [[String: Any]] ?? []
-    guard let window = windows.first(where: {
-        ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID
-    }) else { return false }
-    return catalogWindowMatches(window, allowOffscreen: allowOffscreen, exactBounds: exactBounds)
+    guard let matches = catalogWindowRows(), matches.count == 1 else { return false }
+    return catalogWindowMatches(matches[0], allowOffscreen: allowOffscreen, exactBounds: exactBounds)
 }
 
 func catalogWindowMatches(_ window: [String: Any], allowOffscreen: Bool = false, exactBounds: Bool = false) -> Bool {

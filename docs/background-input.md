@@ -20,6 +20,8 @@ These commands require Accessibility and Screen Recording permissions and the Sw
 
 Window frames use the catalog's integer-point precision, truncating fractional coordinates toward zero. Identity checks use that same precision; a sub-point movement that preserves those integer values is not detected.
 
+Some remote Save-panel content windows appear in the complete system catalog but not in a single-window query. If that query has no row for the requested ID, identity revalidation reads the complete live catalog and requires exactly one matching ID. An existing conflicting row is never replaced by this fallback. PID, title, bounds, visibility and keyboard-window checks still apply. This does not redirect a sheet's input to its remote content or prove control acceptance. See the [catalog diagnostic](../dev/computer-use/remote-window-catalog.md).
+
 ## Keyboard routing
 
 Process-directed keyboard events go to the app's current keyboard window. Cueward reads `AXFocusedWindow`, verifies its owning process and bounds, and uses an optional native AX window-ID lookup to match the requested capture window. This permits dialogs whose AX title is absent or differs from their system-catalog title. A failed lookup or conflicting ID is rejected. When the native lookup entry point is unavailable, Cueward requires the previous unique title-and-bounds match in the system catalog. Snapshot identity checks still require the catalog PID, title, and bounds to remain unchanged.

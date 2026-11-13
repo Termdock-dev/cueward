@@ -116,8 +116,7 @@ print("matched")
     }
 }
 
-#[test]
-fn wait_classifies_window_lifecycle_from_consistent_catalog_observations() {
+fn compile_wait_catalog() -> (tempfile::TempDir, std::path::PathBuf) {
     let directory = tempfile::tempdir().expect("wait catalog fixture");
     let path = directory.path().join("wait.swift");
     fs::write(
@@ -133,6 +132,24 @@ fn wait_classifies_window_lifecycle_from_consistent_catalog_observations() {
         .join("\n"),
     )
     .expect("write catalog fixture");
+    let binary = directory.path().join("wait");
+    let compiled = Command::new("swiftc")
+        .arg(&path)
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .expect("compile shared catalog fixture");
+    assert!(
+        compiled.status.success(),
+        "{}",
+        String::from_utf8_lossy(&compiled.stderr)
+    );
+    (directory, binary)
+}
+
+#[test]
+fn wait_classifies_window_lifecycle_from_consistent_catalog_observations() {
+    let (_fixture, binary) = compile_wait_catalog();
     let request = serde_json::to_vec(&json!({
         "caller_pid": std::process::id(),
         "options": { "condition": "window-gone", "timeout_ms": 200, "interval_ms": 50 }
@@ -147,10 +164,17 @@ fn wait_classifies_window_lifecycle_from_consistent_catalog_observations() {
         ("bounds", "window_changed"),
         ("fractional", "timed_out"),
         ("unavailable", "error"),
+        ("remote", "timed_out"),
+        ("remote-rename", "window_changed"),
+        ("remote-owner", "window_changed"),
+        ("remote-bounds", "window_changed"),
+        ("primary-conflict", "window_changed"),
+        ("duplicate", "error"),
+        ("remote-duplicate", "error"),
+        ("remote-unavailable", "error"),
     ] {
         let output = crate::window::process::run_with_timeout(
-            Command::new("swift")
-                .arg(&path)
+            Command::new(&binary)
                 .args(["123", "7", "Fixture", "-100", "200", "640", "480", scenario]),
             &request,
             std::time::Duration::from_secs(40),
@@ -158,7 +182,7 @@ fn wait_classifies_window_lifecycle_from_consistent_catalog_observations() {
         .expect("run production wait loop");
         let stderr = String::from_utf8_lossy(&output.stderr);
         if expected == "error" {
-            assert!(!output.status.success());
+            assert!(!output.status.success(), "{scenario}: {stderr}");
             assert!(stderr.contains("absence is unproven"), "{stderr}");
         } else {
             assert!(output.status.success(), "{scenario}: {stderr}");

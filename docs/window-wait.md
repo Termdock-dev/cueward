@@ -20,11 +20,13 @@ Name selectors compare the same first 512 Swift characters displayed by `window 
 | `element-absent` | A complete traversal found no match. |
 | `value-equals` | A complete traversal found exactly one match with the full expected AX value. |
 | `enabled` | A complete traversal found exactly one match with AXEnabled equal to true. |
-| `window-gone` | The observed window ID is no longer present in the available window catalog. |
+| `window-gone` | The observed window ID is absent from a successfully read complete window catalog. |
 
 Secure text values are not read. Duplicate matches for a value or enabled check return `ambiguous`. Traversal is bounded to 500 nodes and 12 levels; an incomplete tree cannot establish absence or uniqueness. AX read failures return an error rather than a successful absence result.
 
 A node without a readable AX role also returns an error. This preserves the observation failure for the caller; it is not interpreted as absence or a normal timeout. Rediscover before continuing after an AX error.
+
+The pending #105 catalog repair shares the AX/input lookup with waits. If the single-window query has no row for the requested ID, it reads the complete live catalog before classifying disappearance. A remote panel still present there cannot match `window-gone`. A conflicting single-window row remains `window_changed`; it is not replaced by another catalog. An unavailable complete catalog or duplicate requested IDs returns an error, never a disappearance match. This development change is not yet released; it does not establish remote-panel input or locked-session support.
 
 Waiting reads name and identifier attributes only when the selector requires them, and only on nodes with the selected role. A nonempty AXTitle supplies the displayed name; AXDescription is read as its fallback. Enabled state and security/value attributes are read only for their corresponding conditions. An irrelevant optional attribute failure does not stop a role-only query; a required attribute read failure still returns an error.
 

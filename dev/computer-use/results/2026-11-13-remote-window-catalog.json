@@ -1,0 +1,361 @@
+{
+  "schema": 1,
+  "date": "2026-11-13",
+  "timezone": "Asia/Taipei",
+  "kind": "instrumented_owned_save_panel_catalog_diagnostic",
+  "platform": {
+    "macos": "27.0.1",
+    "build": "26A434",
+    "architecture": "arm64"
+  },
+  "base_sha": "6c6914ddbeea6d211d37f5d45b080fc1a9166bfe",
+  "red_test_commit": "12c040d",
+  "source_sha256": {
+    "crates/adapter-macos/src/window/ax_common.swift": "091bab715f37ddf9bf327ad2156aa070279be38528e29b005304f357c429f1a6",
+    "crates/adapter-macos/src/window/spaces.m": "64f9815e25437d6badcd2a4e265aa4f8799f6a0b6f866740e4aae9aadf563d2e",
+    "crates/adapter-macos/src/window/space_guards.m": "fc35aedcd33f788ce8a672d2369d7b87c80c26c1b2ae94cd00ea923b9d38821b",
+    "crates/adapter-macos/src/screenshot/window_catalog.swift": "05c52016369dbb0fc5dd68a6fb144afed2455442c96b0d0f20edd7191e281d42",
+    "dev/computer-use/document-fixture.swift": "6b5bd5f2ca64c0105255dbe5fe6dbc122ef08241645cfe21383a678930fe5e56",
+    "dev/computer-use/first-save-context-probe.py": "0af93a4374578607bfeb669c02b43731687e02c073d88c5fe7b9ef4e2bf52f65",
+    "dev/computer-use/window-catalog-contrast.swift": "b99812556d1ce8860bf8d5db0b0463dfd6953831a65b0f99c65b9724983888d3"
+  },
+  "private_instrumentation_sha256": {
+    "assembled_fixture": "cbcb129495f43dc59a37dacbcf6b714a7b181876733985df2230539ece1637a2",
+    "native_ax_mapper": "9b7108f917e810d422a659a6fb4873fcddf78a7d9746cf256f119fe5411a849a"
+  },
+  "cli_sha256": {
+    "pre_fix": "e41d80e60e2963e8cdbc629f0de8d2d7697517b7bf8f92589dcaea993da22668",
+    "post_fix": "db6df2071970d8226125b9a873ea67fbc809d0bf09a3d29e3302f871b405c230"
+  },
+  "passive_pair": [
+    {
+      "case": "passive-pair2-inactive",
+      "context": "inactive",
+      "status": "panel_state_observed",
+      "save_enabled": [
+        false
+      ],
+      "document_save_requests": 1,
+      "panel_save_dispatches": 0,
+      "artifact_created": false,
+      "receiver_active_at_end": false,
+      "recorded_receiver_activations": 0,
+      "native_input_commands": {},
+      "desktop_check": {
+        "status": "passed",
+        "reason": "sampled execution coverage within 100 ms; shorter transients remain outside resolution",
+        "max_gap_ms": 34.85012496821582
+      },
+      "panel_state": {
+        "filename": "artifact.txt",
+        "directory_matches_destination": true,
+        "destination_writable": true,
+        "panel_key": false,
+        "document_key": false,
+        "app_key_is_panel": false,
+        "panel_on_active_space": false,
+        "document_edited": false,
+        "first_responder_type": "NSRemoteView",
+        "delegate_type": null
+      },
+      "panel_state_sample_count": 4,
+      "panel_state_consistent": true
+    },
+    {
+      "case": "passive-pair2-visible",
+      "context": "visible",
+      "status": "panel_state_observed",
+      "save_enabled": [
+        true
+      ],
+      "document_save_requests": 1,
+      "panel_save_dispatches": 0,
+      "artifact_created": false,
+      "receiver_active_at_end": false,
+      "recorded_receiver_activations": 0,
+      "native_input_commands": {},
+      "desktop_check": {
+        "status": "passed",
+        "reason": "sampled execution coverage within 100 ms; shorter transients remain outside resolution",
+        "max_gap_ms": 53.14500001259148
+      },
+      "panel_state": {
+        "filename": "artifact.txt",
+        "directory_matches_destination": true,
+        "destination_writable": true,
+        "panel_key": false,
+        "document_key": false,
+        "app_key_is_panel": false,
+        "panel_on_active_space": true,
+        "document_edited": false,
+        "first_responder_type": "NSRemoteView",
+        "delegate_type": null
+      },
+      "panel_state_sample_count": 4,
+      "panel_state_consistent": true
+    }
+  ],
+  "host_sheet_native_input_attempts": [
+    {
+      "case": "native-edit2-inactive",
+      "context": "inactive",
+      "status": "native_filename_edit_not_observed",
+      "save_enabled": [
+        false
+      ],
+      "document_save_requests": 1,
+      "panel_save_dispatches": 0,
+      "artifact_created": false,
+      "receiver_active_at_end": false,
+      "recorded_receiver_activations": 1,
+      "native_input_commands": {
+        "window click": 1,
+        "window key": 1,
+        "window type-text": 1
+      },
+      "desktop_check": {
+        "status": "unverified",
+        "reason": "observation gap exceeds 100 ms",
+        "max_gap_ms": 150.2347500063479
+      },
+      "filename_matches_native_edit": false,
+      "pointer_preparation": "no_safe_point"
+    },
+    {
+      "case": "native-visible3-visible",
+      "context": "visible",
+      "status": "native_filename_edit_not_observed",
+      "save_enabled": [
+        true
+      ],
+      "document_save_requests": 1,
+      "panel_save_dispatches": 0,
+      "artifact_created": false,
+      "receiver_active_at_end": false,
+      "recorded_receiver_activations": 1,
+      "native_input_commands": {
+        "window click": 1,
+        "window key": 1,
+        "window type-text": 1
+      },
+      "desktop_check": {
+        "status": "failed",
+        "reason": "pointer moved without physical input",
+        "max_gap_ms": null
+      },
+      "filename_matches_native_edit": false,
+      "pointer_preparation": "no_safe_point"
+    }
+  ],
+  "pre_fix_native_catalog": {
+    "result": {
+      "case": "catalog-only2-visible",
+      "context": "visible",
+      "status": "native_catalog_observed",
+      "save_enabled": [
+        true
+      ],
+      "document_save_requests": 1,
+      "panel_save_dispatches": 0,
+      "artifact_created": false,
+      "receiver_active_at_end": false,
+      "recorded_receiver_activations": 0,
+      "native_input_commands": {},
+      "desktop_check": {
+        "status": "unverified",
+        "reason": "observation gap exceeds 100 ms",
+        "max_gap_ms": 152.8722916264087
+      }
+    },
+    "sheet_owner_cf_equal": true,
+    "rows": [
+      {
+        "window": "document",
+        "full_matches": 1,
+        "including_matches": 1
+      },
+      {
+        "window": "host_sheet",
+        "full_matches": 1,
+        "including_matches": 1
+      },
+      {
+        "window": "remote_content",
+        "full_matches": 1,
+        "including_matches": 0
+      }
+    ]
+  },
+  "pre_fix_content_membership_attempt": {
+    "case": "native-content1-visible",
+    "context": "visible",
+    "status": "diagnostic_error",
+    "save_enabled": [
+      true
+    ],
+    "document_save_requests": 1,
+    "panel_save_dispatches": 0,
+    "artifact_created": false,
+    "receiver_active_at_end": false,
+    "recorded_receiver_activations": 0,
+    "native_input_commands": {},
+    "desktop_check": {
+      "status": "unverified",
+      "reason": "observation gap exceeds 100 ms",
+      "max_gap_ms": 997.8072500089183
+    }
+  },
+  "preliminary_attempts": [
+    {
+      "case": "native-edit-inactive",
+      "status": "diagnostic_error",
+      "document_save_requests": 1,
+      "panel_save_dispatches": 0,
+      "native_input_commands": {},
+      "desktop_check_status": "passed"
+    },
+    {
+      "case": "native-visible1-visible",
+      "status": "diagnostic_error",
+      "document_save_requests": 0,
+      "panel_save_dispatches": 0,
+      "native_input_commands": {},
+      "desktop_check_status": "passed"
+    },
+    {
+      "case": "native-visible2-visible",
+      "status": "diagnostic_error",
+      "document_save_requests": 1,
+      "panel_save_dispatches": 0,
+      "native_input_commands": {},
+      "desktop_check_status": "passed"
+    },
+    {
+      "case": "catalog-only1-visible",
+      "status": "diagnostic_error",
+      "document_save_requests": 0,
+      "panel_save_dispatches": 0,
+      "native_input_commands": {},
+      "desktop_check_status": "passed"
+    }
+  ],
+  "post_fix": {
+    "case": "postfix-catalog2-visible",
+    "context": "visible",
+    "status": "catalog_lookup_verified",
+    "document_save_requests": 1,
+    "panel_save_dispatches": 0,
+    "artifact_created": false,
+    "receiver_active_at_end": false,
+    "recorded_receiver_activations": 0,
+    "native_input_commands": {},
+    "remote_membership_count": 0,
+    "remote_move_observation_issued": false,
+    "remote_membership_matches_sheet": false,
+    "snapshot_succeeded": true,
+    "snapshot_is_onscreen": false,
+    "input_status": {
+      "input_busy": false,
+      "keyboard": {
+        "dispatch_ready": false,
+        "reason": "target is not the app's verified keyboard window; input was not redirected"
+      },
+      "pointer": {
+        "dispatch_ready": true
+      },
+      "application_acceptance": "unverified"
+    },
+    "catalog_contrast": [
+      {
+        "all_matches": 1,
+        "identity_equal_when_unique": true,
+        "including_available": true,
+        "including_excluding_desktop_available": true,
+        "including_excluding_desktop_matches": 1,
+        "including_matches": 1,
+        "window": "document"
+      },
+      {
+        "all_matches": 1,
+        "identity_equal_when_unique": true,
+        "including_available": true,
+        "including_excluding_desktop_available": true,
+        "including_excluding_desktop_matches": 1,
+        "including_matches": 1,
+        "window": "host_sheet"
+      },
+      {
+        "all_matches": 1,
+        "identity_equal_when_unique": null,
+        "including_available": true,
+        "including_excluding_desktop_available": true,
+        "including_excluding_desktop_matches": 0,
+        "including_matches": 0,
+        "window": "remote_content"
+      }
+    ],
+    "desktop_check": {
+      "status": "passed",
+      "reason": "sampled execution coverage within 100 ms; shorter transients remain outside resolution",
+      "max_gap_ms": 91.23474999796599,
+      "coverage_bound_ms": 100
+    },
+    "scope": "Read-only catalog, Space membership, snapshot and readiness checks after one document Save-panel request. No panel Save or native input; empty content membership is unavailable, not proof of a separate movable Space."
+  },
+  "verification": {
+    "red": {
+      "swift_catalog_test": "failed as intended",
+      "space_catalog_test": "failed as intended"
+    },
+    "green": {
+      "swift_catalog_test": "passed",
+      "space_catalog_test": "passed"
+    },
+    "rust_1_88_0_locked_release_build": "passed",
+    "rust_1_88_0_locked_workspace_tests": {
+      "passed": 963,
+      "failed": 0,
+      "ignored": 38
+    },
+    "rust_1_99_0_initial_suite": "One files-info fixture setup failure; isolated rerun passed. Cause unconfirmed. No unrelated test changed or suppressed.",
+    "changed_rust_format_ci_script": "passed with Rust 1.88.0",
+    "workspace_format_stable": "pre-existing differences outside the changed Rust file; not reformatted",
+    "public_swift_probe": "typecheck passed; invalid ID exited 2; live owned document, sheet and remote-content IDs observed",
+    "post_fix_live": "catalog/membership lookup, snapshot and read-only input-status succeeded; keyboard route remains correctly unavailable; no input acceptance claim"
+  },
+  "cleanup": {
+    "all_owned_receivers_stopped": true,
+    "all_owned_observers_stopped": true,
+    "owned_context_temp_directories_absent": true,
+    "system_panel_services_not_terminated_by_operator": true
+  },
+  "limitations": [
+    "Private fixture public-getter instrumentation, not unchanged-app acceptance.",
+    "Shallow AX traversal remains incomplete. Native input sent to the host sheet did not change the filename in either Space context.",
+    "Trace failures and coverage gaps remain failures or unverified; 100 ms bound unchanged.",
+    "No panel Save, global activation request, Space switch request, uncertain Save replay, existing document overwrite or automatic input retargeting.",
+    "Lookup repair does not resolve disabled inactive-first Save; issues 33 and 36 remain open.",
+    "Host-sheet traces cover the document receiver and desktop scene, not complete remote-service activation states."
+  ],
+  "private_raw_report_sha256": {
+    "native-edit-inactive.json": "d5ceb96c095164c0864865e608c35e76a44ed46d6774c75526bbec311cc34968",
+    "native-visible1-visible.json": "20c072afd8a63c3a889722f01fc533885d12a6103b9c926d3e47da9d09fa4116",
+    "native-visible2-visible.json": "d4ed20f908e5815008c3db37440b2ac349b2a664438f22a9b1b32be44df440cb",
+    "catalog-only1-visible.json": "7ba95f817efc5c576ab8af5cb51807e16797f4fa4a5b9f581b6c465e4c198102",
+    "passive-pair2-inactive.json": "9d1e35b585629c712977b0bad62048d26256e7a29b0aef47843abbe550789273",
+    "passive-pair2-visible.json": "9a2bed6ea0f77f95f5e19ea98d3c032f6ceab0198a634eff94ebf6e5c7946460",
+    "native-edit2-inactive.json": "ef1ef23334cd9f062028b90e87d397d90bd4dc0e36082f5333719013f95f42fe",
+    "native-visible3-visible.json": "6affb265aae18c45875b5f3f0cc0e09756d626c3c58742fd8677ab356afe4191",
+    "native-content1-visible.json": "a613a32ca8831bb73f2f1b6494a76cb0f5f1dcd1b22d55bb008d78cbd6559b8d",
+    "catalog-only2-visible.json": "6a00cffc19de6e25a20aab53287b6898ec6b48c0edc74fa6792fd4f9e4311a1b",
+    "postfix-catalog2-visible.json": "3f860dbce7d6809f45840e68dc79409edebb698348c78ce79f7089a1a7c4c1b5"
+  },
+  "post_fix_locked_preflight": {
+    "status": "blocked_before_receiver_launch",
+    "reason": "macOS session locked",
+    "receiver_started": false,
+    "panel_save_dispatches": 0,
+    "native_input_commands": {},
+    "live_membership_verified": false
+  }
+}

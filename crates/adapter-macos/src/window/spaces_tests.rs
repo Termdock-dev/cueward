@@ -12,6 +12,20 @@ fn space_guards_reject_active_fullscreen_unknown_and_changed_windows() {
 }
 
 #[test]
+fn space_catalog_observes_remote_windows_without_overriding_identity_conflicts() {
+    let source = [
+        include_str!("space_catalog_fixture.m"),
+        include_str!("space_guards.m"),
+        include_str!("spaces.m"),
+        include_str!("space_create.m"),
+        include_str!("space_catalog_tests.m"),
+    ]
+    .join("\n");
+    let output = run_objc(&source, b"").expect("Space catalog fixture");
+    assert_eq!(String::from_utf8_lossy(&output).trim(), "passed");
+}
+
+#[test]
 fn space_commands_reject_missing_identity_before_external_calls() {
     assert!(window_spaces(0).is_err());
     assert!(move_window_to_space("invalid", 0).is_err());

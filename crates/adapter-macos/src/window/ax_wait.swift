@@ -55,10 +55,11 @@ struct WaitScan {
 
 func windowState() -> String? {
     guard CGPreflightScreenCaptureAccess() else { fail("Screen Recording permission is required") }
-    guard let rows = CGWindowListCopyWindowInfo([.optionIncludingWindow, .excludeDesktopElements], windowID) as? [[String: Any]] else {
+    guard let rows = catalogWindowRows() else {
         fail("window catalog is unavailable; absence is unproven")
     }
-    guard let row = rows.first(where: { ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID }) else { return "window_gone" }
+    guard rows.count <= 1 else { fail("window catalog is ambiguous; absence is unproven") }
+    guard let row = rows.first else { return "window_gone" }
     return catalogWindowMatches(row, allowOffscreen: true, exactBounds: true) ? nil : "window_changed"
 }
 
