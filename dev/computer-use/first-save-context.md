@@ -62,3 +62,5 @@ Both Python entry points recover Save beyond 500 nodes in offline native-boundar
 | Cleanup | Receiver and owned observer processes absent; context temporary directory absent |
 
 The marked execution lasted 15.27 seconds; compilation/preparation and cleanup are outside it. Raw targets, paths, process IDs and desktop records remain private. Source hashes in the aggregate identify the diagnostic code used. This confirms useful control discovery without forcing Save, not full panel traversal, a repair of disabled Save, fresh-agent/real-app acceptance or completion of #33. No action was replayed, and #33 remains open.
+
+The [2026-11-13 public-getter and native-window contrasts](remote-window-catalog.md) separate disabled Save from an input route that did not change the filename in either context. They also identify a remote-content catalog lookup defect tracked separately in #104. Repairing that lookup does not establish a repair for inactive-first Save; #33 remains open.

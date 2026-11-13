@@ -46,7 +46,14 @@ func testCatalogBounds() {
         require(catalogWindowMatches(allowOffscreen: true), "AX bounds tolerance changed")
     }
     observe(expectedBounds)
-    let original = observedCatalog[0]
+    testRemoteCatalog(observedCatalog[0])
+    print("passed")
+}
+
+func testRemoteCatalog(_ original: [String: Any]) {
+    func require(_ condition: Bool, _ message: String) {
+        guard condition else { fail(message) }
+    }
     individualCatalog = []
     var bystander = original
     bystander[kCGWindowNumber as String] = NSNumber(value: windowID + 1)
@@ -80,5 +87,4 @@ func testCatalogBounds() {
     require(!catalogWindowMatches(allowOffscreen: true), "full catalog overrode a conflicting individual identity")
     individualCatalog = [original, original]
     require(!catalogWindowMatches(allowOffscreen: true), "ambiguous individual window accepted")
-    print("passed")
 }

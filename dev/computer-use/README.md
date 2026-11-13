@@ -67,6 +67,8 @@ The initial matching wait uncovered unconditional reads of irrelevant AXDescript
 
 See [first-save-context.md](first-save-context.md) for the observer-backed diagnostic and its current-build limitations. [Initialization and native-app contrasts](first-save-initialization.md) distinguish the reproducible disabled panel from an unmodified TextEdit artifact result; neither is a completed #33 acceptance claim.
 
+The [remote-window catalog contrast](remote-window-catalog.md) records public panel-state comparisons and the separate #104 lookup defect. Its read-only probe compares full and single-window observations without printing window titles or contents.
+
 # Background pointer repair
 
 [Input with Stage Manager on](stage-manager.md) records wrong-target clicks on thumbnails and how input behaves when a window changes around a command.
