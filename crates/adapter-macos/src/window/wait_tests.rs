@@ -116,8 +116,7 @@ print("matched")
     }
 }
 
-#[test]
-fn wait_classifies_window_lifecycle_from_consistent_catalog_observations() {
+fn compile_wait_catalog() -> (tempfile::TempDir, std::path::PathBuf) {
     let directory = tempfile::tempdir().expect("wait catalog fixture");
     let path = directory.path().join("wait.swift");
     fs::write(
@@ -145,6 +144,12 @@ fn wait_classifies_window_lifecycle_from_consistent_catalog_observations() {
         "{}",
         String::from_utf8_lossy(&compiled.stderr)
     );
+    (directory, binary)
+}
+
+#[test]
+fn wait_classifies_window_lifecycle_from_consistent_catalog_observations() {
+    let (_fixture, binary) = compile_wait_catalog();
     let request = serde_json::to_vec(&json!({
         "caller_pid": std::process::id(),
         "options": { "condition": "window-gone", "timeout_ms": 200, "interval_ms": 50 }
