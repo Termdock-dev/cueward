@@ -57,6 +57,13 @@ The unreleased repair keeps the normal single-window query. Only when it contain
 
 The deterministic regressions run the actual Swift catalog guard and Objective-C Space helper against OS-boundary replacements. Both fail before the repair with `remote window absent from individual lookup was rejected` and pass afterward. Negative cases retain PID, title, frame, offscreen, missing/unavailable and duplicate-row rejection. This is lookup verification, not remote-input acceptance.
 
-The post-fix owned-receiver check stopped at its locked-session preflight, before launching any receiver or observer. Live remote-content membership and input-status verification remain pending; no post-fix desktop pass is claimed. The original inactive-first disabled Save, third-party new-document creation and cross-app artifact acceptance remain unresolved. #33 and #36 stay open.
+The initial post-fix attempt stopped at locked-session preflight, before launching any receiver or observer. After the operator unlocked, a new owned receiver reproduced the remote-content row in the full catalog and its absence in both single-window query variants. With the repaired CLI:
+
+- `space window` returned the observed content ID without the false identity-change error. Its membership was `[]`, so no move target was issued. This is unavailable independent membership, not proof of a movable content Space or equality with its parent sheet.
+- A fresh remote-content snapshot succeeded. Read-only `input-status` returned pointer dispatch-ready, while keyboard routing remained unavailable because this was not the service's verified keyboard window. No input was redirected or sent, and application acceptance remained unverified.
+- The document received one Save-panel request; panel Save and native input dispatches were both zero. No artifact was created. The receiver ended inactive with zero recorded activations.
+- The sampled document/desktop check passed within its 100 ms bound, with a maximum gap of 91.23 ms. This is not complete service-activation or input-isolation proof. Owned receiver/observer processes and their context directory were absent after cleanup.
+
+This completes the live lookup check for #104, not inactive-first saving. The original disabled Save, third-party new-document creation and cross-app artifact acceptance remain unresolved. #33 and #36 stay open.
 
 The CI-matching Rust 1.88.0 locked release build and full serial workspace suite passed: 963 tests passed and 38 were ignored. The changed-Rust formatting script also passed. An earlier Rust 1.99.0 full run failed once in an unchanged files-info fixture setup; the isolated rerun and the full 1.88.0 run passed. Its cause is unconfirmed, and no unrelated test was changed or suppressed. The whole-workspace stable formatter reports existing differences outside the changed Rust file; this patch does not reformat them.

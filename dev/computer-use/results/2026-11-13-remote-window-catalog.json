@@ -240,12 +240,67 @@
     }
   ],
   "post_fix": {
-    "status": "blocked_before_receiver_launch",
-    "reason": "macOS session locked",
-    "receiver_started": false,
+    "case": "postfix-catalog2-visible",
+    "context": "visible",
+    "status": "catalog_lookup_verified",
+    "document_save_requests": 1,
     "panel_save_dispatches": 0,
+    "artifact_created": false,
+    "receiver_active_at_end": false,
+    "recorded_receiver_activations": 0,
     "native_input_commands": {},
-    "live_membership_verified": false
+    "remote_membership_count": 0,
+    "remote_move_observation_issued": false,
+    "remote_membership_matches_sheet": false,
+    "snapshot_succeeded": true,
+    "snapshot_is_onscreen": false,
+    "input_status": {
+      "input_busy": false,
+      "keyboard": {
+        "dispatch_ready": false,
+        "reason": "target is not the app's verified keyboard window; input was not redirected"
+      },
+      "pointer": {
+        "dispatch_ready": true
+      },
+      "application_acceptance": "unverified"
+    },
+    "catalog_contrast": [
+      {
+        "all_matches": 1,
+        "identity_equal_when_unique": true,
+        "including_available": true,
+        "including_excluding_desktop_available": true,
+        "including_excluding_desktop_matches": 1,
+        "including_matches": 1,
+        "window": "document"
+      },
+      {
+        "all_matches": 1,
+        "identity_equal_when_unique": true,
+        "including_available": true,
+        "including_excluding_desktop_available": true,
+        "including_excluding_desktop_matches": 1,
+        "including_matches": 1,
+        "window": "host_sheet"
+      },
+      {
+        "all_matches": 1,
+        "identity_equal_when_unique": null,
+        "including_available": true,
+        "including_excluding_desktop_available": true,
+        "including_excluding_desktop_matches": 0,
+        "including_matches": 0,
+        "window": "remote_content"
+      }
+    ],
+    "desktop_check": {
+      "status": "passed",
+      "reason": "sampled execution coverage within 100 ms; shorter transients remain outside resolution",
+      "max_gap_ms": 91.23474999796599,
+      "coverage_bound_ms": 100
+    },
+    "scope": "Read-only catalog, Space membership, snapshot and readiness checks after one document Save-panel request. No panel Save or native input; empty content membership is unavailable, not proof of a separate movable Space."
   },
   "verification": {
     "red": {
@@ -265,7 +320,8 @@
     "rust_1_99_0_initial_suite": "One files-info fixture setup failure; isolated rerun passed. Cause unconfirmed. No unrelated test changed or suppressed.",
     "changed_rust_format_ci_script": "passed with Rust 1.88.0",
     "workspace_format_stable": "pre-existing differences outside the changed Rust file; not reformatted",
-    "public_swift_probe": "typecheck passed; invalid ID exited 2; post-fix owned live check blocked before launch"
+    "public_swift_probe": "typecheck passed; invalid ID exited 2; live owned document, sheet and remote-content IDs observed",
+    "post_fix_live": "catalog/membership lookup, snapshot and read-only input-status succeeded; keyboard route remains correctly unavailable; no input acceptance claim"
   },
   "cleanup": {
     "all_owned_receivers_stopped": true,
@@ -291,6 +347,15 @@
     "native-edit2-inactive.json": "ef1ef23334cd9f062028b90e87d397d90bd4dc0e36082f5333719013f95f42fe",
     "native-visible3-visible.json": "6affb265aae18c45875b5f3f0cc0e09756d626c3c58742fd8677ab356afe4191",
     "native-content1-visible.json": "a613a32ca8831bb73f2f1b6494a76cb0f5f1dcd1b22d55bb008d78cbd6559b8d",
-    "catalog-only2-visible.json": "6a00cffc19de6e25a20aab53287b6898ec6b48c0edc74fa6792fd4f9e4311a1b"
+    "catalog-only2-visible.json": "6a00cffc19de6e25a20aab53287b6898ec6b48c0edc74fa6792fd4f9e4311a1b",
+    "postfix-catalog2-visible.json": "3f860dbce7d6809f45840e68dc79409edebb698348c78ce79f7089a1a7c4c1b5"
+  },
+  "post_fix_locked_preflight": {
+    "status": "blocked_before_receiver_launch",
+    "reason": "macOS session locked",
+    "receiver_started": false,
+    "panel_save_dispatches": 0,
+    "native_input_commands": {},
+    "live_membership_verified": false
   }
 }
